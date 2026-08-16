@@ -40,6 +40,10 @@ Encounter wandering warriors, factions, patrols, training groups, wanted fighter
 
 Shift + Right-click a Living World fighter to view their relationships, goal, equipment, techniques and history. Shift + Right-click with a Dragon Mine Z Scouter for additional combat information.
 
+## 📚 In-Game Guide
+
+Press **L** to open the Living World interface and select **Guide** for a player-facing explanation of fighters, relationships, combat and growth, techniques, equipment, goals, factions, history, controls and integrations. You can also open it directly with `/livingworld guide`.
+
 ## Requirements
 
 - Minecraft 1.20.1
