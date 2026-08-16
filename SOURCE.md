@@ -6,7 +6,7 @@ The complete corresponding source for the final public **1.0.0** release is prov
 
 `DragonMineZ-LivingWorld-1.0.0-Final-Source.zip`
 
-This final source archive includes the player Guide GUI and the per-world World Settings/configuration layer, along with the Living World Java source, resources, Gradle project files, GPLv3 license, notices and credits required to build and modify the mod.
+This final source archive corresponds to the tested 1.0.0 release candidate. It includes the player Guide GUI, per-world World Settings/configuration layer, unified Living World GUI styling, final GUI/QC polish and the Living World Java source, resources, Gradle project files, GPLv3 license, notices and credits required to build and modify the mod.
 
 `DragonMineZ-LivingWorld-1.0.0-Source.zip` is retained only as the earlier pre-guide 1.0.0 source snapshot and is superseded by the **Final-Source** archive above.
 
