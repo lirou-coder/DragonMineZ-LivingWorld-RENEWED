@@ -44,6 +44,10 @@ Shift + Right-click a Living World fighter to view their relationships, goal, eq
 
 Press **L** to open the Living World interface and select **Guide** for a player-facing explanation of fighters, relationships, combat and growth, techniques, equipment, goals, factions, history, controls and integrations. You can also open it directly with `/livingworld guide`.
 
+## ⚙️ Per-World Settings
+
+Open **L → Settings** to tune Living World for the current save. World hosts/server operators can change the natural activity preset, nearby fighter and hostile caps, faction encounters, dynamic encounters, returning fighters and automatic power sensing. The defaults preserve the intended Living World experience, and the settings are stored per world in `serverconfig/dmzlivingworld-server.toml`.
+
 ## Requirements
 
 - Minecraft 1.20.1
