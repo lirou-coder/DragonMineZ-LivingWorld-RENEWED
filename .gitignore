@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Local development dependencies
+libs/
+
+# Release output
+RELEASE/
+
+# OS
+.DS_Store
+Thumbs.db
