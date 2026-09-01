@@ -141,6 +141,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     private static final EntityDataAccessor<Boolean> READY =
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> DEAD_SOUL =
+            SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> ALIGNMENT =
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> RANK =
@@ -518,6 +520,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     protected void defineSynchedData() {
         super.defineSynchedData();
         entityData.define(READY, false);
+        entityData.define(DEAD_SOUL, false);
         entityData.define(ALIGNMENT, FighterAlignment.NEUTRAL.id());
         entityData.define(RANK, FighterRank.ROOKIE.id());
         entityData.define(PERSONALITY, FighterPersonality.CALM.id());
@@ -719,6 +722,11 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (!(getTarget() instanceof ServerPlayer player) || isSanctionedMatchParticipant()
                 || getStoryRole() == STORY_ENEMY || WorldMenaceManager.isWorldMenace(this)) return;
         int moral = com.dmzlivingworld.world.PlayerAlignmentBridge.alignment(player);
+        if (getAlignment() == FighterAlignment.GOOD && moral <= 32 && !isDefendingAgainstEvilPlayer(player)) {
+            setTarget(null);
+            setAggressive(false);
+            return;
+        }
         if ((getAlignment() == FighterAlignment.BAD && moral <= 32)
                 || (getAlignment() == FighterAlignment.GOOD && moral >= 33 && moral <= 66)) {
             setTarget(null);
@@ -742,6 +750,14 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 getPersistentData().putLong("LWAlignmentWarningAt", level().getGameTime());
             }
         }
+    }
+
+    private boolean isDefendingAgainstEvilPlayer(ServerPlayer player) {
+        if (getLastHurtByMob() == player) return true;
+        LivingEntity victim = player.getLastHurtMob();
+        if (victim == null || !victim.isAlive() || victim.distanceToSqr(this) > 40.0D * 40.0D) return false;
+        if (victim == this || victim instanceof net.minecraft.world.entity.npc.Villager) return true;
+        return victim instanceof AmbientFighterEntity other && other.getAlignment() != FighterAlignment.BAD;
     }
 
     @Override
@@ -2479,9 +2495,10 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 entityData.set(EYES_TYPE, random.nextInt(2));
                 entityData.set(NOSE_TYPE, random.nextInt(2));
                 entityData.set(MOUTH_TYPE, random.nextInt(2));
-                entityData.set(HAIR_ID, 0);
                 entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains(race.dmzId()) ? random.nextInt(22) : 0);
                 String main = pick(random, MAJIN_COLORS);
+                entityData.set(HAIR_ID, isFemale() ? 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())) : 0);
+                entityData.set(HAIR_COLOR, main);
                 entityData.set(BODY_COLOR, main);
                 entityData.set(BODY_COLOR2, main);
                 entityData.set(BODY_COLOR3, main);
@@ -2553,6 +2570,12 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     }
     public FighterPersonality getPersonality() { return FighterPersonality.byId(entityData.get(PERSONALITY)); }
     public FighterRace getRace() { return FighterRace.byId(entityData.get(RACE)); }
+    public boolean isDeadSoul() { return entityData.get(DEAD_SOUL); }
+    public void setDeadSoul(boolean dead) {
+        entityData.set(DEAD_SOUL, dead);
+        if (dead) getPersistentData().putBoolean("LWDeadSoul", true);
+        else getPersistentData().remove("LWDeadSoul");
+    }
     public FighterArchetype getArchetype() { return FighterArchetype.byId(entityData.get(ARCHETYPE)); }
     public String getFighterName() { return entityData.get(FIGHTER_NAME); }
     @Override
@@ -4511,6 +4534,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         writeDialogueHistory(tag, "LWDialogueHistory");
         tag.putBoolean("LWArsenalInitialized", arsenalInitialized);
         tag.putBoolean("LWReady", entityData.get(READY));
+        tag.putBoolean("LWDeadSoul", isDeadSoul());
         tag.putInt("LWAlignment", getAlignment().id());
         tag.putInt("LWRank", getRank().id());
         tag.putInt("LWPersonality", getPersonality().id());
@@ -4618,6 +4642,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         readDialogueHistory(tag, "LWDialogueHistory");
         arsenalInitialized = tag.contains("LWArsenalInitialized") && tag.getBoolean("LWArsenalInitialized");
         if (tag.contains("LWReady")) entityData.set(READY, tag.getBoolean("LWReady"));
+        setDeadSoul(tag.getBoolean("LWDeadSoul") || getPersistentData().getBoolean("LWDeadSoul"));
         if (tag.contains("LWAlignment")) entityData.set(ALIGNMENT, tag.getInt("LWAlignment"));
         if (tag.contains("LWRank")) entityData.set(RANK, tag.getInt("LWRank"));
         if (tag.contains("LWPersonality")) entityData.set(PERSONALITY, tag.getInt("LWPersonality"));

@@ -738,8 +738,8 @@ public final class FighterMemoryManager {
         list.remove(index);
         root.put(RIVALS_KEY, list);
         saveRoot(player, root);
-        player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                .append(Component.literal(name + " will not return.").withStyle(ChatFormatting.DARK_GRAY)), false);
+        player.displayClientMessage(Component.literal(name + " is dead. It may only come back with a wish...")
+                .withStyle(ChatFormatting.DARK_GRAY), false);
     }
 
     private static boolean isRecordAlreadyLoaded(ServerPlayer player, UUID recordId) {

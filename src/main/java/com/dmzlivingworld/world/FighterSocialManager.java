@@ -38,7 +38,9 @@ public final class FighterSocialManager {
 
         FighterRelationshipManager.Disposition disposition = FighterRelationshipManager.disposition(player, fighter);
         int relationship = fighter.isRememberedFor(player) ? fighter.getMemoryRelationship() : 0;
-        if (fighter.getTarget() == player || disposition == FighterRelationshipManager.Disposition.HOSTILE || relationship <= -35) {
+        boolean trustedDespiteAlignment = fighter.getAlignment() == com.dmzlivingworld.entity.FighterAlignment.GOOD
+                && PlayerAlignmentBridge.alignment(player) <= 32 && relationship >= 45;
+        if (fighter.getTarget() == player || (disposition == FighterRelationshipManager.Disposition.HOSTILE && !trustedDespiteAlignment) || relationship <= -35) {
             fighter.speak(hostileLine(fighter), 66);
             player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
                     .append(Component.literal(fighter.getFighterName() + " isn't willing to talk to you.").withStyle(ChatFormatting.RED)), false);

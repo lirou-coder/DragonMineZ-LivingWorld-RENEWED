@@ -27,10 +27,12 @@ public final class FriendlyFistCompat {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDamage(LivingDamageEvent event) {
-        if (!(event.getEntity() instanceof DBSagasEntity target) || target.level().isClientSide) return;
+        // Living World's bridge owns only Living World fighters. Native DMZ saga entities keep
+        // DMZ's own Friendly Fist handling and can never be altered by this compatibility layer.
+        if (!(event.getEntity() instanceof AmbientFighterEntity target) || target.level().isClientSide) return;
         // HOTFIX6: sanctioned LW spars already have a dedicated non-lethal arbiter. Do not let
         // Friendly Fist become a second finishing-damage authority for the same match.
-        if (target instanceof AmbientFighterEntity fighter && fighter.isSanctionedMatchParticipant()) return;
+        if (target.isSanctionedMatchParticipant()) return;
         if (event.getAmount() <= 0.0F) return;
 
         Player player = resolvePlayer(event.getSource().getEntity(), event.getSource().getDirectEntity());
@@ -40,15 +42,15 @@ public final class FriendlyFistCompat {
         // damage cap below remains the only non-lethal damage authority; this only queues the
         // social/downed transition after the real damage event finishes.
         if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer
-                && target instanceof AmbientFighterEntity fighter) {
+                ) {
             // Once spared, Friendly Fist itself cannot be used to keep beating the peaceful
             // fighter or farm trust. This also covers player-owned Ki projectiles.
-            if (MercyManager.shouldIgnoreFriendlyFistHit(serverPlayer, fighter)) {
+            if (MercyManager.shouldIgnoreFriendlyFistHit(serverPlayer, target)) {
                 event.setAmount(0.0F);
                 return;
             }
-            if (MercyManager.shouldQueueMercyDown(serverPlayer, fighter, event.getAmount())) {
-                MercyManager.queueMercyDown(serverPlayer, fighter);
+            if (MercyManager.shouldQueueMercyDown(serverPlayer, target, event.getAmount())) {
+                MercyManager.queueMercyDown(serverPlayer, target);
             }
         }
 

@@ -85,6 +85,13 @@ public final class WorldMenaceManager {
         return isHerobrine(fighter) || RedRibbonExperimentManager.isExperiment(fighter);
     }
 
+    public static boolean isWorldMenaceProfile(CompoundTag profile) {
+        if (profile == null) return false;
+        return profile.getBoolean(HEROBRINE_TAG)
+                || "Herobrine".equalsIgnoreCase(profile.getString("Name"))
+                || RedRibbonExperimentManager.isExperimentProfile(profile);
+    }
+
     public static void writeProfile(AmbientFighterEntity fighter, CompoundTag profile) {
         if (isHerobrine(fighter)) profile.putBoolean(HEROBRINE_TAG, true);
         RedRibbonExperimentManager.writeProfile(fighter, profile);

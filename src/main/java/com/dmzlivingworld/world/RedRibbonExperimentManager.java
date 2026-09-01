@@ -61,6 +61,13 @@ public final class RedRibbonExperimentManager {
                 || "Red Ribbon Experiment X-7".equals(fighter.getFighterName()));
     }
 
+    public static boolean isExperimentProfile(CompoundTag profile) {
+        if (profile == null) return false;
+        String name = profile.getString("Name");
+        return profile.getBoolean(TAG) || "Red Ribbon Experiment X-7".equalsIgnoreCase(name)
+                || "X-7".equalsIgnoreCase(name) || name.toUpperCase(java.util.Locale.ROOT).endsWith(" X-7");
+    }
+
     public static UUID dossierRecordId() { return DOSSIER_ID; }
     public static boolean hasSpotted(ServerPlayer player) { return player != null && player.getPersistentData().getBoolean(PLAYER_SPOTTED); }
     public static int sightings(ServerPlayer player) { return player == null ? 0 : player.getPersistentData().getInt(PLAYER_SIGHTINGS); }

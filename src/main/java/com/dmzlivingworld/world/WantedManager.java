@@ -114,6 +114,11 @@ public final class WantedManager {
         }
     }
 
+    /** Assimilation without consent has the same social consequence as an unlawful kill. */
+    public static void recordAssimilationCrime(ServerPlayer player, AmbientFighterEntity victim) {
+        if (player != null && victim != null) recordPlayerCrime(player, victim, false);
+    }
+
     private static int severityForPressure(int pressure) {
         return pressure >= 45 ? 5 : pressure >= 30 ? 4 : pressure >= 20 ? 3 : pressure >= 12 ? 2 : pressure >= PLAYER_WANTED_THRESHOLD ? 1 : 0;
     }

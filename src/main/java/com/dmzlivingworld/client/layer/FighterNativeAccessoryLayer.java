@@ -3,6 +3,7 @@ package com.dmzlivingworld.client.layer;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.FighterSpecialItemManager;
+import com.dmzlivingworld.world.FighterAfterlifeManager;
 import com.dragonminez.client.render.util.ModRenderTypes;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -25,6 +26,8 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
     private static final ResourceLocation SCOUTER_MODEL = dmz("geo/entity/scouter.geo.json");
     private static final ResourceLocation WEIGHTS_MODEL = dmz("geo/entity/races/weighted_items.geo.json");
     private static final ResourceLocation WEIGHTS_TEXTURE = dmz("textures/entity/races/weighted_items.png");
+    private static final ResourceLocation RACE_PARTS_MODEL = dmz("geo/entity/raceparts.geo.json");
+    private static final ResourceLocation RACE_PARTS_TEXTURE = dmz("textures/entity/races/raceparts.png");
 
     public FighterNativeAccessoryLayer(GeoRenderer<AmbientFighterEntity> renderer) {
         super(renderer);
@@ -35,6 +38,10 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
                               RenderType renderType, MultiBufferSource buffers, VertexConsumer buffer,
                               float partialTick, int packedLight, int packedOverlay) {
         if (WorldMenaceManager.isHerobrine(fighter)) return;
+        if ("head".equals(playerBone.getName()) && fighter.isDeadSoul()) {
+            renderHalo(poseStack, fighter, buffers, partialTick, packedLight);
+            buffers.getBuffer(renderType);
+        }
         int id = fighter.getCosmeticAccessoryId();
         if (id <= FighterSpecialItemManager.ACCESSORY_NONE) return;
         String anchor = playerBone.getName();
@@ -79,6 +86,21 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
             default -> { }
         }
         buffers.getBuffer(renderType);
+    }
+
+    /** Uses the same raceparts model, halo bone, energy render type, tint and alpha as DMZ players. */
+    private void renderHalo(PoseStack poseStack, AmbientFighterEntity fighter,
+                            MultiBufferSource buffers, float partialTick, int packedLight) {
+        BakedGeoModel parts = getGeoModel().getBakedModel(RACE_PARTS_MODEL);
+        BakedGeoModel body = getGeoModel().getBakedModel(getGeoModel().getModelResource(fighter));
+        if (parts == null || body == null) return;
+        parts.getBone("halo").ifPresent(halo -> {
+            syncTargetBoneAndParents(halo, body);
+            VertexConsumer consumer = buffers.getBuffer(ModRenderTypes.energy(RACE_PARTS_TEXTURE));
+            getRenderer().renderRecursively(poseStack, fighter, halo, ModRenderTypes.energy(RACE_PARTS_TEXTURE),
+                    buffers, consumer, true, partialTick, packedLight, OverlayTexture.NO_OVERLAY,
+                    1.0F, 0.9569F, 0.3804F, 0.75F);
+        });
     }
 
     private void renderScouter(PoseStack poseStack, AmbientFighterEntity fighter,

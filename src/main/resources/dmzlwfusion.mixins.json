@@ -11,6 +11,11 @@
     "KiLaserExplosionMixin",
     "LivingWorldOwnedMonsterPersistenceMixin",
     "LivingWorldOwnedHostilePersistenceMixin"
+    ,"RacialSkillLogicMixin"
+    ,"NamekianRevampRacialSkillMixin"
+    ,"NamekianRevampTargetMixin"
+    ,"MajinRevampFriendlyFistMixin"
+    ,"WishTypeAdapterMixin"
   ],
   "client": [
     "FighterModelAnimationMixin",

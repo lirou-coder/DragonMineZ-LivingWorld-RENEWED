@@ -101,6 +101,14 @@ public final class FighterLegacyWorldData extends SavedData {
         return recordId != null && deadRecordIds.contains(recordId);
     }
 
+    /** Removes the death tombstone/archive when a Dragon Ball wish restores this person. */
+    public void reviveRecord(java.util.UUID recordId) {
+        if (recordId == null) return;
+        boolean changed = deadRecordIds.removeIf(recordId::equals);
+        changed |= fallen.removeIf(record -> record.hasUUID("RecordId") && recordId.equals(record.getUUID("RecordId")));
+        if (changed) setDirty();
+    }
+
     public void archive(AmbientFighterEntity fighter, String killerName, long gameTime) {
         if (fighter == null || WorldMenaceManager.isWorldMenace(fighter) || !FighterLegacyManager.isNotable(fighter)) return;
         CompoundTag record = new CompoundTag();
