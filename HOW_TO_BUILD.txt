@@ -1,0 +1,13 @@
+BUILDING DRAGON MINE Z: LIVING WORLD 2.2.0 FINAL
+=====================================================
+1. Extract this complete OneClick Builder.
+2. Use Java 17.
+3. Remove any standalone DragonMineZ-Meditation / dbzmeditation JAR from the test instance.
+4. Run BUILD_LIVING_WORLD_JAR.bat.
+5. Require BUILD SUCCESSFUL and verifier success.
+6. Finished files:
+   RELEASE\DragonMineZ-LivingWorld-2.2.0.jar
+   RELEASE\DragonMineZ-LivingWorld-2.2.0-Source.zip
+7. Run RELEASE_QA_2.2.0.txt on backup/copy worlds before public upload.
+
+The Windows OneClick build is the authoritative mapped Forge/Dragon Mine Z compile gate.

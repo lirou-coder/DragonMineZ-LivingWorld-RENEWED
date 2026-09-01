@@ -1,0 +1,51 @@
+Dragon Mine Z: Living World — Third-Party Notices
+==================================================
+
+This file records the external projects used to build or run Living World. It is a
+technical distribution notice, not legal advice.
+
+Living World
+- License: GPL-3.0-only.
+- Full text: LICENSE.txt.
+
+Integrated Meditation portions
+- Originated under the MIT License, Copyright (c) 2026 Kunyo.
+- The MIT text and notices are retained in MEDITATION_MIT_LICENSE.txt,
+  MEDITATION_NOTICE.txt and MEDITATION_ASSET_PROVENANCE.txt.
+
+Dragon Mine Z
+- Required runtime/gameplay dependency.
+- Upstream license: GNU GPL version 3 or, at the upstream project's option, later.
+- Not redistributed in this source archive or inside the Living World JAR.
+
+Minecraft Forge
+- Mod loader/build environment.
+- The Forge 1.20.x project is generally licensed under LGPL-2.1, subject to the
+  qualifications in Forge's own LICENSE.txt.
+- Forge/Minecraft classes are not redistributed inside the Living World JAR.
+
+GeckoLib
+- Required animation/rendering dependency.
+- Upstream license: MIT.
+- Not redistributed in this source archive or inside the Living World JAR.
+
+Curios API
+- Part of the Dragon Mine Z dependency stack used by the build/runtime setup.
+- Upstream source is LGPL-3.0-or-later.
+- Not redistributed in this source archive or inside the Living World JAR.
+
+TerraBlender
+- Part of the Dragon Mine Z dependency stack used by the build/runtime setup.
+- Upstream license: LGPL-3.0.
+- Not redistributed in this source archive or inside the Living World JAR.
+
+Gradle Wrapper
+- The source/build archive includes the standard Gradle Wrapper bootstrap files.
+- Gradle is Apache-2.0 licensed. See GRADLE_WRAPPER_LICENSE.txt and
+  GRADLE_WRAPPER_NOTICE.txt.
+
+Minecraft / Dragon Ball
+- Minecraft, Dragon Ball, and related names, characters and trademarks are owned by
+  their respective rightsholders. Living World is an unofficial fan-made addon.
+- The release package does not intentionally include upstream Dragon Mine Z models,
+  textures, sounds or other third-party game assets as Living World-owned assets.

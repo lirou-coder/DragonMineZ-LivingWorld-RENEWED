@@ -1,0 +1,28 @@
+Integrated Meditation — Custom Particle Asset Provenance
+=========================================================
+
+The following original addon particle textures were generated specifically for the
+Meditation project with OpenAI image generation and then manually/post-process edited
+for use as small transparent Minecraft particle sprites:
+
+  src/main/resources/assets/dbzmeditation/textures/particle/anime_ki_mote.png
+  src/main/resources/assets/dbzmeditation/textures/particle/anime_ki_wisp.png
+  src/main/resources/assets/dbzmeditation/textures/particle/anime_ground_flare.png
+  src/main/resources/assets/dbzmeditation/textures/particle/anime_meditation_glyph.png
+
+Design direction
+- Original grayscale anime-style energy shapes.
+- No requested text, logos, real alphabet/kanji, copyrighted character, or copied
+  game/anime emblem.
+- Transparent RGBA output sized for Minecraft particle rendering.
+
+Post-processing
+- Background/chroma remnants were removed.
+- Assets were converted to neutral grayscale while preserving alpha and resized to
+  64x64 RGBA.
+- Transparent corners, non-empty visible bounds, neutral RGB channels and alpha were
+  checked before integration.
+
+These assets are shipped only under the dbzmeditation namespace. The release package
+does not intentionally redistribute Dragon Mine Z textures/models or copied anime/game
+artwork as Meditation assets.

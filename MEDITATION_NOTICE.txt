@@ -1,0 +1,14 @@
+Dragon Mine Z Meditation 4.4.0
+Copyright (c) 2026 Kunyo
+
+This project is an unofficial addon for Dragon Mine Z and Minecraft Forge.
+Dragon Mine Z, Minecraft, Minecraft Forge, Dragon Ball, and all third-party
+names, code, assets and trademarks remain the property of their respective
+owners/rightsholders. This addon is not affiliated with or endorsed by those
+projects/rightsholders.
+
+The public Meditation JAR and source archive do not bundle Dragon Mine Z,
+Minecraft Forge, Living World, or other third-party dependency JARs.
+
+Custom Meditation textures/visual assets shipped under the dbzmeditation
+namespace were created specifically for this project. See ASSET_PROVENANCE.txt.

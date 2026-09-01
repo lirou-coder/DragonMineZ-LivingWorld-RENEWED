@@ -3,17 +3,22 @@
 build/
 out/
 
-# IDE
+# IntelliJ IDEA
 .idea/
 *.iml
+*.ipr
+*.iws
 .vscode/
 
-# Local development dependencies
-libs/
+# Minecraft Forge run directory
+run/
+runs/
 
-# Release output
+# Local development dependencies and release output
+libs/
 RELEASE/
 
-# OS
+# Local/editor and operating-system files
+*.log
 .DS_Store
 Thumbs.db

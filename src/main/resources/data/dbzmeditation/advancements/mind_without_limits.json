@@ -1,0 +1,23 @@
+{
+  "parent": "dbzmeditation:still_as_stone",
+  "display": {
+    "icon": {
+      "item": "minecraft:end_crystal"
+    },
+    "title": {
+      "text": "A Mind Without Limits"
+    },
+    "description": {
+      "text": "Spend one hour meditating in total."
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

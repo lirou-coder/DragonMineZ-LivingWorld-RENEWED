@@ -1,0 +1,35 @@
+UPGRADING PUBLISHED LIVING WORLD SAVES TO 2.2.0
+=================================================
+Supported public upgrade lines
+- Living World 1.0.0 -> 2.2.0
+- Living World 1.9.0 -> 2.2.0
+
+Before first launch
+1. Make a backup/copy of the world.
+2. Remove the old Living World JAR from mods.
+3. Remove any standalone DragonMineZ-Meditation / dbzmeditation JAR.
+4. Install Living World 2.2.0 with the required Dragon Mine Z 2.1.3 stack.
+5. Perform the first update launch on a copy if the world matters to you.
+
+Persistence policy
+- mod ID remains dmzlivingworld.
+- fighter entity remains dmzlivingworld:ambient_fighter.
+- public 1.9.0 SavedData names remain unchanged in 2.2.0.
+- long-lived player roots such as DMZLivingWorldMemory, DMZLivingWorldFactionReputation,
+  DMZLivingWorldFactionRequest and DMZLivingWorldPlayerWorld remain recognized.
+- missing newer fields use defaults; new world systems create their own additive data when absent.
+- public 1.9.0 fighter/memory NBT keys remain readable except fields belonging to features deliberately
+  retired before/finalized during the 2.2 line (for example Mentor/Student and obsolete request families),
+  which are explicitly scrubbed/cleared by migration code rather than causing load failures.
+- pre-1.9 generated wanted-v1 data was intentionally retired by the 1.9 public migration and is not
+  required by current gameplay; current factual wanted data uses wanted_v2.
+
+Upgrade verification
+[ ] World opens without missing-registry/data-fixer errors.
+[ ] Existing Living World fighters retain identity/name/race/appearance.
+[ ] Existing known people remain in L -> People.
+[ ] Relationships/equipment/history survive where present.
+[ ] Factions load without duplicate/reset institutions.
+[ ] Save, quit and relaunch; state still persists.
+[ ] Run one Supply request and one Patrol after upgrade.
+[ ] Open Settings and verify a harmless setting persists after relaunch.

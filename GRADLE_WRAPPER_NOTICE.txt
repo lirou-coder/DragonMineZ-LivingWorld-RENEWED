@@ -1,0 +1,9 @@
+Gradle Wrapper Notice
+=====================
+
+The generated gradlew, gradlew.bat and gradle/wrapper/gradle-wrapper.jar files
+are Gradle Wrapper components and are licensed by the Gradle project under the
+Apache License, Version 2.0. See GRADLE_WRAPPER_LICENSE.txt.
+
+These wrapper files are build tooling only and are not part of the playable mod
+runtime JAR.

@@ -1,0 +1,22 @@
+Dragon Mine Z: Living World 2.2.0 — Source & License
+====================================================
+Primary project license
+- GNU General Public License version 3 only (GPL-3.0-only).
+- Full license text: LICENSE.txt.
+
+Integrated Meditation
+- Portions originating from the former standalone Meditation project retain their MIT notice
+  and custom-asset provenance. See MEDITATION_MIT_LICENSE.txt, MEDITATION_NOTICE.txt and
+  MEDITATION_ASSET_PROVENANCE.txt.
+
+Corresponding source
+- BUILD_LIVING_WORLD_JAR.bat builds the final JAR and matching source archive.
+- Expected outputs:
+    RELEASE/DragonMineZ-LivingWorld-2.2.0.jar
+    RELEASE/DragonMineZ-LivingWorld-2.2.0-Source.zip
+- The source archive contains the source/resources/build scripts and notices used for this release.
+- Downloaded third-party mod dependency JARs and generated build output are excluded.
+
+External dependencies
+- Dragon Mine Z, Forge, GeckoLib, Curios and TerraBlender are obtained separately.
+- See THIRD_PARTY_NOTICES.txt. The Gradle Wrapper retains its separate Apache-2.0 notice.

@@ -1,0 +1,18 @@
+Dragon Mine Z: Living World 2.2.0
+Copyright (C) 2026 Living World contributors
+
+Dragon Mine Z: Living World is distributed under GNU General Public License version 3 only
+(GPL-3.0-only). See LICENSE.txt.
+
+This software is provided without warranty, to the extent permitted by law.
+Living World is an unofficial addon for Dragon Mine Z. It is not affiliated with or endorsed by
+the Dragon Mine Z team, Mojang/Microsoft, or the owners of Dragon Ball. Third-party project names
+and trademarks belong to their respective rightsholders.
+
+No Dragon Mine Z, Forge, GeckoLib, Curios or TerraBlender dependency JAR is bundled in the Living
+World release JAR or corresponding-source archive. The Gradle Wrapper is build tooling and retains
+its separate Apache-2.0 notice.
+
+Integrated Meditation portions retain their MIT notice and asset provenance. See
+MEDITATION_MIT_LICENSE.txt, MEDITATION_NOTICE.txt, MEDITATION_ASSET_PROVENANCE.txt and
+THIRD_PARTY_NOTICES.txt.

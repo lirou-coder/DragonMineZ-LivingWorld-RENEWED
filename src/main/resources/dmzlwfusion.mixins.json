@@ -1,0 +1,22 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.dmzlwfusion.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "FusionModeHandlerMixin",
+    "FusionStatusHandlerMixin",
+    "SagaFusionAnimationMixin",
+    "KiProjectileProtectionMixin",
+    "KiLaserExplosionMixin",
+    "LivingWorldOwnedMonsterPersistenceMixin",
+    "LivingWorldOwnedHostilePersistenceMixin"
+  ],
+  "client": [
+    "FighterModelAnimationMixin",
+    "GeoItemRendererAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

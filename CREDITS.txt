@@ -1,0 +1,23 @@
+Dragon Mine Z: Living World — Credits
+=====================================
+
+DragonMineZ
+  Required gameplay foundation. Living World deliberately reuses Dragon Mine Z's native combat, movement, forms, Ki techniques, items and fighter systems instead of replacing them.
+
+Minecraft Forge
+  Mod loader and development environment.
+
+GeckoLib
+  Fighter model/animation rendering support.
+
+Integrated Meditation
+  The former Dragon Mine Z Meditation 4.4.0 subsystem is now maintained directly inside Living World. It provides depth stages, TP progression, rare breakthroughs, form-mastery practice, shared NPC meditation and original meditation visual assets. Image Training/Image Spar is retired.
+
+Integrated Living World Fusion
+  Player/NPC and NPC/NPC fusion code from the final Living World Fusion Bridge 0.2.4 line is now maintained as part of Living World itself.
+
+All third-party projects, code, assets, names and trademarks remain the property of their respective owners.
+
+
+Living World License
+  GNU General Public License v3.0 only (GPL-3.0-only). See LICENSE.txt.

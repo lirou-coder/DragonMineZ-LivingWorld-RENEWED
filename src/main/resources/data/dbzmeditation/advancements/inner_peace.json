@@ -1,0 +1,23 @@
+{
+  "parent": "dbzmeditation:clear_your_mind",
+  "display": {
+    "icon": {
+      "item": "minecraft:echo_shard"
+    },
+    "title": {
+      "text": "Inner Peace"
+    },
+    "description": {
+      "text": "Enter Deep Meditation."
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

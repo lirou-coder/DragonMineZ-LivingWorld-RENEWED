@@ -1,0 +1,28 @@
+DRAGON MINE Z: LIVING WORLD 2.2.0 — PUBLIC CHANGELOG
+=======================================================
+Added / expanded
+- Persistent fighter daily schedules, activities, life needs and off-screen development.
+- More robust DMZ-native melee/Ki/flight/form/equipment behavior and growth balancing.
+- Supply and Patrol faction requests with persistent faction members, live tracking and travel guidance.
+- Scientist role depth, Scientist-created Saibamen persistence and potency/Power Level information.
+- World Menace and Red Ribbon Experiment content.
+- Expanded People/faction/profile/settings UI and player-friendly activity/status information.
+- Meditation refinements including percentage-based stat breakthroughs.
+
+Fixed / hardened
+- Patrol can recover after combat without stale dead targets freezing mission movement.
+- Patrol leader/protected-person identity no longer silently changes because of loaded-roster order.
+- Patrol flight/water continuity and travel obstacle recovery are more reliable.
+- Weapon Training follows native DMZ weapon profiles and preserves grip/orientation between strikes.
+- Minecraft-mob attack setting is enforced against native/Forge target assignment paths as well as attacks.
+- Scientist Saibaman Ki Sense and profile Battle Power use/synchronize the same DMZ value.
+- Schedule history no longer displays duplicate Eat/Eating or Rest/Resting entries.
+- Request-assigned NPCs cannot be pulled into unrelated social/actions while on duty.
+- Near-dead fighters recover from stale post-combat states; simulated fighters catch up more fairly.
+- Numerous GUI, persistence, compatibility, cleanup and performance safeguards across the development line.
+
+Compatibility
+- Stable mod ID: dmzlivingworld
+- Stable fighter entity ID: dmzlivingworld:ambient_fighter
+- Designed to upgrade worlds from published Living World 1.0.0 and 1.9.0.
+- Minecraft 1.20.1 / Forge 47.4.x / Dragon Mine Z 2.1.3 / GeckoLib 4.8.4.
