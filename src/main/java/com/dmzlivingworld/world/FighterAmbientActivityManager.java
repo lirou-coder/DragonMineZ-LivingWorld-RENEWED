@@ -270,7 +270,7 @@ public final class FighterAmbientActivityManager {
         if (event.phase != TickEvent.Phase.END) return;
         MinecraftServer server = event.getServer();
         long now = server.overworld().getGameTime();
-        tickSessions(server, now);
+        if (!SESSIONS.isEmpty()) tickSessions(server, now);
         if (now % 40L == 0L) tryStartNearby(server, now);
     }
 

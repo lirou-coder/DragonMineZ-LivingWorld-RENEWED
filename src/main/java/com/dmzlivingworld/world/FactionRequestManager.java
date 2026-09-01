@@ -63,9 +63,9 @@ public final class FactionRequestManager {
             simulateRareCaptures(overworld, now, day);
             resolveOldPrisoners(overworld, now);
         }
-        // Navigation is intentionally more responsive than request simulation. The objective snapshot is refreshed
-        // four times per second while the actual quest logic keeps its established once-per-second cadence.
-        if (now % 5L == 0L) {
+        // Active actor navigation remains responsive at twice per second; path navigation itself
+        // continues every game tick after a destination is submitted.
+        if (now % 10L == 0L) {
             for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
                 if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) continue;
                 CompoundTag active = request(player);

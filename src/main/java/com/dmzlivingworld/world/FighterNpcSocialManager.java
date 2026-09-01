@@ -351,7 +351,12 @@ public final class FighterNpcSocialManager {
         MinecraftServer server = event.getServer();
         long now = server.overworld().getGameTime();
         if (now % 5L != 0L) return;
-        for (Conversation c : new HashSet<>(CONVERSATIONS.values())) tickConversation(server, c, now);
+        for (Conversation c : new HashSet<>(CONVERSATIONS.values())) {
+            // Settled dialogue is beat-driven and needs no four-times-per-second pose polling.
+            // Approaching pairs retain the original five-tick steering cadence.
+            if (c.settledAt != 0L && now % 10L != 0L) continue;
+            tickConversation(server, c, now);
+        }
     }
 
     private static void tickConversation(MinecraftServer server, Conversation c, long now) {

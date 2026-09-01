@@ -109,7 +109,9 @@ public final class PhysicalContinuityManager {
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         long now = event.getServer().overworld().getGameTime();
-        if (lastTick == now || now % 5L != 0L) return;
+        // Ten ticks keeps route correction visually responsive while halving the largest
+        // repeated 480-block remembered-fighter query in the mod.
+        if (lastTick == now || now % 10L != 0L) return;
         lastTick = now;
         Set<UUID> processed = new HashSet<>();
 

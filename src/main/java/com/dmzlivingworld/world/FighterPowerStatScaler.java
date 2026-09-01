@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.entity.AmbientFighterEntity;
+import com.dmzlivingworld.config.LivingWorldConfig;
 
 /** Converts the fighter's canonical effective stat budget into its real combat attributes. */
 public final class FighterPowerStatScaler {
@@ -102,14 +103,16 @@ public final class FighterPowerStatScaler {
 
     private static Shares shares(AmbientFighterEntity fighter) {
         return switch (fighter.getArchetype()) {
-            // Every point not assigned to offense/defense/ki becomes vitality. The complete
-            // effective budget is therefore represented by real attributes instead of a BP-only
-            // multiplier that had no corresponding combat value.
-            case BRAWLER -> new Shares(.20D, .10D, .06D, .64D);
-            case MARTIAL_ARTIST -> new Shares(.17D, .14D, .17D, .52D);
-            case SPEEDSTER -> new Shares(.15D, .08D, .15D, .62D);
-            case GUARDIAN -> new Shares(.10D, .20D, .10D, .60D);
-            case KI_SPECIALIST -> new Shares(.06D, .10D, .20D, .64D);
+            case BRAWLER -> new Shares(LivingWorldConfig.BRAWLER_MELEE_SHARE.get(), LivingWorldConfig.BRAWLER_DEFENSE_SHARE.get(),
+                    LivingWorldConfig.BRAWLER_KI_SHARE.get(), LivingWorldConfig.BRAWLER_HEALTH_SHARE.get());
+            case MARTIAL_ARTIST -> new Shares(LivingWorldConfig.MARTIAL_ARTIST_MELEE_SHARE.get(), LivingWorldConfig.MARTIAL_ARTIST_DEFENSE_SHARE.get(),
+                    LivingWorldConfig.MARTIAL_ARTIST_KI_SHARE.get(), LivingWorldConfig.MARTIAL_ARTIST_HEALTH_SHARE.get());
+            case SPEEDSTER -> new Shares(LivingWorldConfig.SPEED_FIGHTER_MELEE_SHARE.get(), LivingWorldConfig.SPEED_FIGHTER_DEFENSE_SHARE.get(),
+                    LivingWorldConfig.SPEED_FIGHTER_KI_SHARE.get(), LivingWorldConfig.SPEED_FIGHTER_HEALTH_SHARE.get());
+            case GUARDIAN -> new Shares(LivingWorldConfig.GUARDIAN_MELEE_SHARE.get(), LivingWorldConfig.GUARDIAN_DEFENSE_SHARE.get(),
+                    LivingWorldConfig.GUARDIAN_KI_SHARE.get(), LivingWorldConfig.GUARDIAN_HEALTH_SHARE.get());
+            case KI_SPECIALIST -> new Shares(LivingWorldConfig.KI_SPECIALIST_MELEE_SHARE.get(), LivingWorldConfig.KI_SPECIALIST_DEFENSE_SHARE.get(),
+                    LivingWorldConfig.KI_SPECIALIST_KI_SHARE.get(), LivingWorldConfig.KI_SPECIALIST_HEALTH_SHARE.get());
         };
     }
 

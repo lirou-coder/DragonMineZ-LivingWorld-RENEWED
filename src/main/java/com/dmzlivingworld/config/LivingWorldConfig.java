@@ -31,6 +31,11 @@ public final class LivingWorldConfig {
     public static final ForgeConfigSpec.IntValue NPC_STRENGTH_PERCENT;
     public static final ForgeConfigSpec.DoubleValue LEVEL_MULTIPLIER_PER_SAGA;
     public static final ForgeConfigSpec.DoubleValue MAX_DEFENSE_MITIGATION;
+    public static final ForgeConfigSpec.DoubleValue BRAWLER_MELEE_SHARE, BRAWLER_DEFENSE_SHARE, BRAWLER_KI_SHARE, BRAWLER_HEALTH_SHARE;
+    public static final ForgeConfigSpec.DoubleValue MARTIAL_ARTIST_MELEE_SHARE, MARTIAL_ARTIST_DEFENSE_SHARE, MARTIAL_ARTIST_KI_SHARE, MARTIAL_ARTIST_HEALTH_SHARE;
+    public static final ForgeConfigSpec.DoubleValue SPEED_FIGHTER_MELEE_SHARE, SPEED_FIGHTER_DEFENSE_SHARE, SPEED_FIGHTER_KI_SHARE, SPEED_FIGHTER_HEALTH_SHARE;
+    public static final ForgeConfigSpec.DoubleValue GUARDIAN_MELEE_SHARE, GUARDIAN_DEFENSE_SHARE, GUARDIAN_KI_SHARE, GUARDIAN_HEALTH_SHARE;
+    public static final ForgeConfigSpec.DoubleValue KI_SPECIALIST_MELEE_SHARE, KI_SPECIALIST_DEFENSE_SHARE, KI_SPECIALIST_KI_SHARE, KI_SPECIALIST_HEALTH_SHARE;
     public static final ForgeConfigSpec.IntValue NPC_GROWTH_PERCENT;
     public static final ForgeConfigSpec.BooleanValue ATTACK_MINECRAFT_MOBS;
     public static final ForgeConfigSpec.BooleanValue COMPANION_SAGA_HELP;
@@ -142,6 +147,32 @@ public final class LivingWorldConfig {
                         "0.7 means Defense can absorb at most 70%, so at least 30% always passes through.",
                         "Adaptive defense is not used by Living World NPCs.")
                 .defineInRange("maxDefenseMitigation", 0.7D, 0.0D, 0.99D);
+        builder.push("archetypeStatDistribution");
+        builder.comment(
+                "Fraction of the effective stat budget assigned to each real combat attribute.",
+                "0.20 means 20%. Values are intentionally not normalized, so their sum may be below or above 1.0.",
+                "Health share is added above the vanilla 20 HP baseline.");
+        BRAWLER_MELEE_SHARE = share(builder, "brawlerMelee", .20D);
+        BRAWLER_DEFENSE_SHARE = share(builder, "brawlerDefense", .10D);
+        BRAWLER_KI_SHARE = share(builder, "brawlerKi", .06D);
+        BRAWLER_HEALTH_SHARE = share(builder, "brawlerHealth", .64D);
+        MARTIAL_ARTIST_MELEE_SHARE = share(builder, "martialArtistMelee", .17D);
+        MARTIAL_ARTIST_DEFENSE_SHARE = share(builder, "martialArtistDefense", .14D);
+        MARTIAL_ARTIST_KI_SHARE = share(builder, "martialArtistKi", .17D);
+        MARTIAL_ARTIST_HEALTH_SHARE = share(builder, "martialArtistHealth", .52D);
+        SPEED_FIGHTER_MELEE_SHARE = share(builder, "speedFighterMelee", .15D);
+        SPEED_FIGHTER_DEFENSE_SHARE = share(builder, "speedFighterDefense", .08D);
+        SPEED_FIGHTER_KI_SHARE = share(builder, "speedFighterKi", .15D);
+        SPEED_FIGHTER_HEALTH_SHARE = share(builder, "speedFighterHealth", .62D);
+        GUARDIAN_MELEE_SHARE = share(builder, "guardianMelee", .10D);
+        GUARDIAN_DEFENSE_SHARE = share(builder, "guardianDefense", .20D);
+        GUARDIAN_KI_SHARE = share(builder, "guardianKi", .10D);
+        GUARDIAN_HEALTH_SHARE = share(builder, "guardianHealth", .60D);
+        KI_SPECIALIST_MELEE_SHARE = share(builder, "kiSpecialistMelee", .06D);
+        KI_SPECIALIST_DEFENSE_SHARE = share(builder, "kiSpecialistDefense", .10D);
+        KI_SPECIALIST_KI_SHARE = share(builder, "kiSpecialistKi", .20D);
+        KI_SPECIALIST_HEALTH_SHARE = share(builder, "kiSpecialistHealth", .64D);
+        builder.pop();
         NPC_GROWTH_PERCENT = builder.comment(
                         "Living World fighter earned growth speed.",
                         "100 = normal progression; 0 freezes earned BP/legacy growth; values above 100 accelerate earned progression.",
@@ -181,6 +212,10 @@ public final class LivingWorldConfig {
     }
 
     private LivingWorldConfig() {}
+
+    private static ForgeConfigSpec.DoubleValue share(ForgeConfigSpec.Builder builder, String name, double defaultValue) {
+        return builder.defineInRange(name, defaultValue, 0.0D, 10.0D);
+    }
 
     private static boolean isNonBlankId(Object value) { return value instanceof String s && !s.isBlank(); }
     public static List<String> npcRaceBlacklist() { return NPC_RACE_BLACKLIST.get().stream().map(String::valueOf).map(s -> s.toLowerCase(java.util.Locale.ROOT)).toList(); }

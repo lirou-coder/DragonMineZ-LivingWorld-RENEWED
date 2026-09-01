@@ -5,6 +5,7 @@ import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterPersonality;
 import com.dragonminez.common.stats.StatsCapability;
 import com.dragonminez.common.stats.StatsData;
+import com.dragonminez.common.events.DMZEvent;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -42,7 +43,9 @@ public final class FighterPowerSpikeReactionManager {
         if (event.phase != TickEvent.Phase.END) return;
         MinecraftServer server = event.getServer();
         long now = server.overworld().getGameTime();
-        if (now % 5L != 0L) return;
+        // DMZ form/stat events cover discrete player spikes. Polling remains at a lower cadence
+        // for charge edges, release (DMZ 2.1.3 exposes no server ReleaseChangeEvent), and NPCs.
+        if (now % 10L != 0L) return;
         Set<UUID> onlinePlayers = new HashSet<>();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             onlinePlayers.add(player.getUUID());
@@ -67,6 +70,37 @@ public final class FighterPowerSpikeReactionManager {
         LAST_NPC_TRANSFORM.keySet().removeIf(id -> staleNpc(id, now));
         LAST_NPC_SEEN.entrySet().removeIf(entry -> now - entry.getValue() > NPC_STALE_TICKS);
         SOURCE_COOLDOWN.keySet().removeIf(id -> !onlinePlayers.contains(id) && staleNpc(id, now));
+    }
+
+    @SubscribeEvent
+    public static void onFormChange(DMZEvent.FormChangeEvent event) {
+        reactToDmzFormEvent(event.getPlayer());
+    }
+
+    @SubscribeEvent
+    public static void onStackFormChange(DMZEvent.StackFormChangeEvent event) {
+        reactToDmzFormEvent(event.getPlayer());
+    }
+
+    @SubscribeEvent
+    public static void onStatChange(DMZEvent.StatChangeEvent event) {
+        if (event.getPlayer() instanceof ServerPlayer player) refreshPlayerPower(player, false);
+    }
+
+    private static void reactToDmzFormEvent(ServerPlayer player) {
+        refreshPlayerPower(player, true);
+    }
+
+    private static void refreshPlayerPower(ServerPlayer player, boolean transformation) {
+        if (player == null || !(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) return;
+        StatsData stats = player.getCapability(StatsCapability.INSTANCE).orElse(null);
+        if (stats == null) return;
+        long now = level.getServer().overworld().getGameTime();
+        double current = Math.max(1.0D, stats.getBattlePowerExact());
+        LAST_PLAYER_BP.put(player.getUUID(), current);
+        LAST_PLAYER_RELEASE.put(player.getUUID(), (double)Math.max(0, stats.getResources().getPowerRelease()));
+        if (transformation && now >= SOURCE_COOLDOWN.getOrDefault(player.getUUID(), 0L))
+            react(level, player, current, false, true, now);
     }
 
     private static void tickPlayer(ServerLevel level, ServerPlayer player, long now) {

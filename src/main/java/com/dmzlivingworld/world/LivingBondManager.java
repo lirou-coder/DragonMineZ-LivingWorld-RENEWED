@@ -77,14 +77,20 @@ public final class LivingBondManager {
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) continue;
             long now = level.getServer().overworld().getGameTime();
-            tickInvite(player, level, now);
             tickCompanion(player, level, now);
-            tickAutomaticMeditation(player, level, now);
             tickMeditationBonds(player, level, now);
+            // Offers and discovery are human-scale decisions; only active companion/meditation
+            // state needs per-tick control.
+            if (now % 20L == Math.floorMod(player.getUUID().hashCode(), 20)) {
+                tickInvite(player, level, now);
+                tickAutomaticMeditation(player, level, now);
+            }
         }
         long now = event.getServer().overworld().getGameTime();
-        INVITES.entrySet().removeIf(e -> e.getValue().expires < now);
-        DEFENSE_THREATS.entrySet().removeIf(e -> e.getValue().expires < now);
+        if (now % 20L == 0L) {
+            INVITES.entrySet().removeIf(e -> e.getValue().expires < now);
+            DEFENSE_THREATS.entrySet().removeIf(e -> e.getValue().expires < now);
+        }
     }
 
     /**
