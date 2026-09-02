@@ -11,7 +11,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 
 /** Tiny S2C channel used only for presentation snapshots. Simulation remains server authoritative. */
 public final class LWNetwork {
-    private static final String PROTOCOL = "38.3";
+    private static final String PROTOCOL = "38.4";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(LivingWorldMod.MOD_ID, "main"),
             () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
@@ -87,6 +87,10 @@ public final class LWNetwork {
                 FighterDispositionSnapshotPacket::encode,
                 FighterDispositionSnapshotPacket::decode,
                 FighterDispositionSnapshotPacket::handle);
+        CHANNEL.registerMessage(nextId++, FighterInteractPacket.class,
+                FighterInteractPacket::encode,
+                FighterInteractPacket::decode,
+                FighterInteractPacket::handle);
     }
 
     public static void sendFactionDossier(ServerPlayer player, FactionDossierPacket packet) {
@@ -119,6 +123,10 @@ public final class LWNetwork {
 
     public static void requestFighterAction(String action, java.util.UUID fighterId) {
         if (fighterId != null) CHANNEL.sendToServer(new FighterActionPacket(action, fighterId));
+    }
+
+    public static void interactWithFighter(int entityId, net.minecraft.world.InteractionHand hand) {
+        CHANNEL.sendToServer(new FighterInteractPacket(entityId, hand));
     }
 
     public static void requestRememberedFighter(java.util.UUID recordId) {

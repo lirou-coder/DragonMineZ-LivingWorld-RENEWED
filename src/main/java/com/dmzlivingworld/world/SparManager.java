@@ -235,11 +235,28 @@ public final class SparManager {
         return sessionForFighter(id) != null || X7_SPARS.values().stream().anyMatch(s -> s.fighterId().equals(id));
     }
 
+    /** Finishes a bout using Forge's final, post-mitigation damage result. */
+    public static void finishFromFinalDamage(ServerPlayer player, AmbientFighterEntity fighter, boolean playerWon) {
+        if (player == null || fighter == null) return;
+        X7SparSession x7 = X7_SPARS.get(player.getUUID());
+        if (x7 != null && x7.fighterId().equals(fighter.getUUID())) {
+            finishX7(player.getServer(), player.getUUID(), playerWon,
+                    playerWon ? "X-7 lowers his guard. \"Enough. You proved the point.\""
+                            : fighter.getFighterName() + " won the spar.", true);
+            return;
+        }
+        Session session = SESSIONS.get(player.getUUID());
+        if (session == null || !session.fighterId.equals(fighter.getUUID())) return;
+        if (playerWon) fighter.concedeSanctionedMatch();
+        end(player.getServer(), session, player, fighter, playerWon, true,
+                (playerWon ? player.getGameProfile().getName() : fighter.getFighterName()) + " won the spar");
+    }
+
     public static void concedePlayer(ServerPlayer player, AmbientFighterEntity fighter) {
         if (player == null) return;
         X7SparSession x7 = X7_SPARS.get(player.getUUID());
         if (x7 != null && (fighter == null || x7.fighterId().equals(fighter.getUUID()))) {
-            finishX7(player.getServer(), player.getUUID(), false, "You concede. X-7 immediately disengages.");
+            finishX7(player.getServer(), player.getUUID(), false, "You concede. X-7 immediately disengages.", true);
             return;
         }
         if (fighter == null) return;
@@ -251,7 +268,7 @@ public final class SparManager {
     public static void concedePlayer(ServerPlayer player) {
         if (player == null) return;
         if (X7_SPARS.containsKey(player.getUUID())) {
-            finishX7(player.getServer(), player.getUUID(), false, "You concede. X-7 immediately disengages.");
+            finishX7(player.getServer(), player.getUUID(), false, "You concede. X-7 immediately disengages.", true);
             return;
         }
         Session session = SESSIONS.get(player.getUUID());
@@ -285,7 +302,7 @@ public final class SparManager {
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (X7_SPARS.containsKey(player.getUUID())) {
-            finishX7(player.getServer(), player.getUUID(), false, null);
+            finishX7(player.getServer(), player.getUUID(), false, null, false);
             return;
         }
         SENZU_WARNED.remove(player.getUUID());
@@ -331,16 +348,16 @@ public final class SparManager {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
             AmbientFighterEntity fighter = find(server, session.fighterId());
             if (player == null || fighter == null || !player.isAlive() || !fighter.isAlive()) {
-                finishX7(server, playerId, false, null);
+                finishX7(server, playerId, false, null, false);
                 continue;
             }
             if (player.level() != fighter.level() || player.distanceToSqr(fighter) > 160.0D * 160.0D
                     || now - session.startedAt() > MAX_X7_SPAR_TICKS) {
-                finishX7(server, playerId, false, "The controlled bout ends as the fighters separate.");
+                finishX7(server, playerId, false, "The controlled bout ends as the fighters separate.", false);
                 continue;
             }
             if (fighter.isDefeated()) {
-                finishX7(server, playerId, true, "X-7 lowers his guard. \"Enough. You proved the point.\"");
+                finishX7(server, playerId, true, "X-7 lowers his guard. \"Enough. You proved the point.\"", true);
                 continue;
             }
             fighter.maintainSanctionedMatch(player);
@@ -348,7 +365,7 @@ public final class SparManager {
         }
     }
 
-    private static void finishX7(MinecraftServer server, UUID playerId, boolean playerWon, String text) {
+    private static void finishX7(MinecraftServer server, UUID playerId, boolean playerWon, String text, boolean decisive) {
         X7SparSession session = X7_SPARS.remove(playerId);
         if (session == null || server == null) return;
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
@@ -362,6 +379,7 @@ public final class SparManager {
         }
         if (player != null && text != null && !text.isBlank())
             player.displayClientMessage(Component.literal("[Living World] " + text), false);
+        if (player != null && decisive) DMZSkillProgressionCompat.onFighterDefeated(player);
     }
 
     private static void end(MinecraftServer server, Session session, ServerPlayer player, AmbientFighterEntity fighter,
@@ -406,6 +424,7 @@ public final class SparManager {
                 fighter.speak(reactionLine, 96);
                 FactionRequestManager.onSparCompleted(player, fighter, decisive);
                 FighterAftermathManager.beginPlayerSpar(fighter, player, playerWon, decisive);
+                if (decisive) DMZSkillProgressionCompat.onFighterDefeated(player);
             }
         }
         if (player != null) {

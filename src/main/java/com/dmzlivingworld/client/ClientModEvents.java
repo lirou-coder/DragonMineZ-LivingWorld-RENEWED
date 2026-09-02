@@ -19,6 +19,9 @@ public final class ClientModEvents {
     public static final KeyMapping TRACK_LAST_WORLD_EVENT = new KeyMapping(
             "key.dmzlivingworld.track_last_event", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K,
             "key.categories.dmzlivingworld");
+    public static final KeyMapping FIGHTER_INTERACT = new KeyMapping(
+            "key.dmzlivingworld.fighter_interact", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_SHIFT,
+            "key.categories.dmzlivingworld");
 
     private ClientModEvents() {}
 
@@ -31,5 +34,6 @@ public final class ClientModEvents {
     public static void registerKeys(RegisterKeyMappingsEvent event) {
         event.register(OPEN_LIVING_WORLD);
         event.register(TRACK_LAST_WORLD_EVENT);
+        event.register(FIGHTER_INTERACT);
     }
 }

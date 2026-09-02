@@ -62,7 +62,12 @@ public final class FriendlyFistCompat {
             return;
         }
         float maximumNonLethalDamage = Math.max(0.0F, target.getHealth() - 1.0F);
-        if (event.getAmount() > maximumNonLethalDamage) event.setAmount(maximumNonLethalDamage);
+        if (event.getAmount() >= maximumNonLethalDamage) {
+            event.setAmount(maximumNonLethalDamage);
+            if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+                DMZSkillProgressionCompat.onFighterDefeated(serverPlayer);
+            }
+        }
     }
 
     private static Player resolvePlayer(Entity causing, Entity direct) {

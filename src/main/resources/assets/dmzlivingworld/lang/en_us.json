@@ -5,5 +5,6 @@
   "message.dmzlwfusion.partner_form": "%s needs to return to base form first.",
   "message.dmzlwfusion.partner_missing": "Your fusion partner slipped out of sync. The fusion ended safely.",
   "message.dmzlwfusion.dimension_end": "The fusion destabilized during dimensional travel and ended safely.",
-  "key.dmzlivingworld.track_last_event": "Track Latest Living World Event"
+  "key.dmzlivingworld.track_last_event": "Track Latest Living World Event",
+  "key.dmzlivingworld.fighter_interact": "Fighter Interact"
 }

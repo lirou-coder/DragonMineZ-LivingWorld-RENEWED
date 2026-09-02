@@ -157,7 +157,6 @@ public final class MercyManager {
         ReactiveWorldManager.rememberEvent(fighter, "SHOWN_MERCY", player.getGameProfile().getName(),
                 "was spared with Friendly Fist after yielding");
         FactionRequestManager.onMercyDowned(player, fighter);
-
         player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
                 .append(Component.literal("You spare " + fighter.getFighterName()
                         + ". Their trust toward you improves slightly.").withStyle(ChatFormatting.GREEN)), false);

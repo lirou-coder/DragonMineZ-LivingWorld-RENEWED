@@ -39,6 +39,12 @@ public record FighterActionPacket(String action, UUID fighterId) {
                 if (msg.fighterId == null) return;
                 var entity = sender.serverLevel().getEntity(msg.fighterId);
                 if (!(entity instanceof AmbientFighterEntity fighter) || sender.distanceToSqr(fighter) > 12.0D * 12.0D) return;
+                if (fighter.isSanctionedMatchParticipant() || fighter.getTarget() != null) {
+                    sender.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                            "The NPC is fighting! You can't interact right now!")
+                            .withStyle(net.minecraft.ChatFormatting.RED), false);
+                    return;
+                }
                 if ("deliver".equals(msg.action)) {
                     if (!FactionRequestManager.deliverToReceiver(sender, fighter)) {
                         sender.displayClientMessage(net.minecraft.network.chat.Component.literal(

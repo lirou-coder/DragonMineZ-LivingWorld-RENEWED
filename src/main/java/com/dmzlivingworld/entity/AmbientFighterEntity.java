@@ -1931,6 +1931,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         Entity attackerEntity = source.getEntity();
+        if (!level().isClientSide && SanctionedMatchGuard.isPostSparInvulnerable(this)) return false;
         if (!level().isClientSide && attackerEntity instanceof ServerPlayer player
                 && PlayerCreationSafety.isCreating(player)) return false;
         if (!level().isClientSide && !source.is(DamageTypeTags.BYPASSES_ARMOR)) {
@@ -1953,7 +1954,6 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (!level().isClientSide && sanctionedMatchParticipant) {
             if (!isSanctionedOpponent(attackerEntity)) return false;
             if (isDefeated() || recoveryGraceTicks > 0) return false;
-            if (SanctionedMatchGuard.interceptNpcHurt(this, source, amount)) return true;
             // Legitimate non-finishing spar damage uses DMZ's real damage path, but bypasses
             // crime/faction-war logic and ordinary NPC concession/death handling below.
             return super.hurt(source, amount);
@@ -2356,11 +2356,30 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             return InteractionResult.sidedSuccess(level().isClientSide);
         }
 
+        // Shift remains the default modifier and therefore also supports vanilla's normal entity
+        // interaction packet. Other configured modifiers arrive through FighterInteractPacket.
+        if (!player.isShiftKeyDown()) return super.mobInteract(player, hand);
+        return performFighterInteraction(player, hand);
+    }
+
+    public InteractionResult performFighterInteraction(Player player, InteractionHand hand) {
+        if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
+        if (com.dmzlwfusion.NpcFusionManager.isHiddenFusionPartner(this)) {
+            return InteractionResult.sidedSuccess(level().isClientSide);
+        }
         ItemStack held = player.getItemInHand(hand);
+
+        if (isSanctionedMatchParticipant() || getTarget() != null) {
+            if (!level().isClientSide && player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.displayClientMessage(Component.literal(
+                        "The NPC is fighting! You can't interact right now!").withStyle(ChatFormatting.RED), false);
+            }
+            return InteractionResult.sidedSuccess(level().isClientSide);
+        }
 
         // World Menace inspection is deliberately forgiving: sneak + right-click opens the
         // dossier even with a held item. Menaces never fall through to ordinary bonds/gifts/social actions.
-        if (WorldMenaceManager.isWorldMenace(this) && player.isShiftKeyDown()) {
+        if (WorldMenaceManager.isWorldMenace(this)) {
             if (!level().isClientSide && player instanceof ServerPlayer serverPlayer) {
                 if (WorldMenaceManager.isHerobrine(this)) WorldMenaceManager.markSpotted(serverPlayer, this);
                 else if (RedRibbonExperimentManager.isExperiment(this)) RedRibbonExperimentManager.markSpotted(serverPlayer, this);
@@ -2368,10 +2387,6 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             }
             return InteractionResult.sidedSuccess(level().isClientSide);
         }
-
-        // Living World only takes over deliberate sneak interactions. Normal right-click
-        // is left to Minecraft/DMZ so inspecting a fighter does not interfere with ordinary use.
-        if (!player.isShiftKeyDown()) return super.mobInteract(player, hand);
 
         // A request participant stays inspectable, but the request owns every unrelated sneak action.
         // This must precede gifts/Senzu/bond handling so an assigned receiver cannot accidentally turn
@@ -2444,7 +2459,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             return InteractionResult.CONSUME;
         }
 
-        return super.mobInteract(player, hand);
+        return InteractionResult.PASS;
     }
 
     private void randomizeNativeAppearance(RandomSource random) {

@@ -18,6 +18,8 @@ import com.dmzlivingworld.client.screen.FactionRequestTrackerOverlay;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderHandEvent;
+import net.minecraftforge.client.event.InputEvent;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -37,6 +39,19 @@ public final class ClientForgeEvents {
         if (Minecraft.getInstance().screen instanceof LivingWorldScreenMarker) {
             event.setCanceled(true);
         }
+    }
+
+    @SubscribeEvent
+    public static void onInteractionKey(InputEvent.InteractionKeyMappingTriggered event) {
+        if (!event.isUseItem()) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!(minecraft.hitResult instanceof EntityHitResult hit)
+                || !(hit.getEntity() instanceof AmbientFighterEntity fighter)) return;
+        // An unbound modifier intentionally means that ordinary right-click is sufficient.
+        if (!ClientModEvents.FIGHTER_INTERACT.isUnbound() && !ClientModEvents.FIGHTER_INTERACT.isDown()) return;
+        LWNetwork.interactWithFighter(fighter.getId(), event.getHand());
+        event.setSwingHand(false);
+        event.setCanceled(true);
     }
 
     @SubscribeEvent

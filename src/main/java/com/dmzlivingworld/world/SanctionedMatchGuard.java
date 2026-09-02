@@ -4,6 +4,7 @@ import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dragonminez.common.stats.StatsCapability;
 import com.dragonminez.common.stats.StatsProvider;
+import com.dragonminez.common.init.entities.ki.AbstractKiProjectile;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.damagesource.DamageSource;
@@ -12,6 +13,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -34,11 +36,12 @@ import java.util.UUID;
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class SanctionedMatchGuard {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final int POST_SPAR_PEACE_TICKS = 600;
-    // Diagnostic only. Protection still ends at 30s; HOTFIX6 watches the same pair afterward
+    private static final int POST_SPAR_PEACE_TICKS = 200;
+    // Diagnostic only. Protection ends at 10s; the watch keeps observing the same pair afterward
     // so an intermittent late re-aggro is visible instead of disappearing when PEACE_END logs.
     private static final int POST_PEACE_WATCH_TICKS = 600;
     private static final Map<UUID, PeaceSession> PEACE = new HashMap<>();
+    private static final Map<UUID, Long> POST_SPAR_INVULNERABLE = new HashMap<>();
     private static final Map<UUID, WatchSession> WATCH = new HashMap<>();
     private static final Set<UUID> TRACE_PLAYERS = new HashSet<>();
     private record PeaceSession(UUID playerId, long startedAt, long expiresAt) {}
@@ -50,6 +53,8 @@ public final class SanctionedMatchGuard {
         if (fighter == null || player == null || fighter.level().isClientSide) return;
         long now = player.getServer().overworld().getGameTime();
         fighter.beginPostSparPeace(player, POST_SPAR_PEACE_TICKS);
+        POST_SPAR_INVULNERABLE.put(fighter.getUUID(), now + POST_SPAR_PEACE_TICKS);
+        POST_SPAR_INVULNERABLE.put(player.getUUID(), now + POST_SPAR_PEACE_TICKS);
         WATCH.remove(fighter.getUUID());
         PEACE.put(fighter.getUUID(), new PeaceSession(player.getUUID(), now, now + POST_SPAR_PEACE_TICKS));
         trace(player, fighter, "PEACE_START", now);
@@ -105,6 +110,15 @@ public final class SanctionedMatchGuard {
         }
     }
 
+    public static boolean isPostSparInvulnerable(LivingEntity entity) {
+        if (entity == null || entity.level().isClientSide || !entity.isAlive()) return false;
+        Long until = POST_SPAR_INVULNERABLE.get(entity.getUUID());
+        if (until == null) return false;
+        if (until > entity.level().getGameTime()) return true;
+        POST_SPAR_INVULNERABLE.remove(entity.getUUID());
+        return false;
+    }
+
     public static void clearRuntime(UUID playerId) {
         if (playerId == null) return;
         TRACE_PLAYERS.remove(playerId);
@@ -112,7 +126,7 @@ public final class SanctionedMatchGuard {
         WATCH.entrySet().removeIf(e -> e.getValue().playerId().equals(playerId));
     }
 
-    public static void clearRuntime() { PEACE.clear(); WATCH.clear(); TRACE_PLAYERS.clear(); }
+    public static void clearRuntime() { PEACE.clear(); WATCH.clear(); TRACE_PLAYERS.clear(); POST_SPAR_INVULNERABLE.clear(); }
 
     public static String state(ServerPlayer player) {
         if (player == null) return "no player";
@@ -178,22 +192,10 @@ public final class SanctionedMatchGuard {
         if (causing instanceof LivingEntity living) return living;
         if (causing instanceof Projectile projectile && projectile.getOwner() instanceof LivingEntity owner) return owner;
         Entity direct = source.getDirectEntity();
+        if (direct instanceof AbstractKiProjectile ki && ki.getOwner() instanceof LivingEntity owner) return owner;
         if (direct instanceof LivingEntity living) return living;
         if (direct instanceof Projectile projectile && projectile.getOwner() instanceof LivingEntity owner) return owner;
         return null;
-    }
-
-    /** Called from AmbientFighterEntity.hurt before super.hurt(). */
-    public static boolean interceptNpcHurt(AmbientFighterEntity fighter, DamageSource source, float amount) {
-        if (fighter == null || fighter.level().isClientSide || !fighter.isSanctionedMatchParticipant()) return false;
-        Entity attacker = source == null ? null : source.getEntity();
-        if (!fighter.isSanctionedOpponent(attacker)) return false;
-        float floor = Math.max(1.0F, fighter.getMaxHealth() * 0.30F);
-        if (fighter.getHealth() - Math.max(0.0F, amount) > floor) return false;
-        fighter.setHealth(Math.max(floor, fighter.getHealth()));
-        fighter.restoreSanctionedLivingState(false);
-        fighter.concedeSanctionedMatch();
-        return true;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -201,6 +203,16 @@ public final class SanctionedMatchGuard {
         if (event.getAmount() <= 0.0F) return;
         Entity attacker = event.getSource().getEntity();
         LivingEntity responsible = responsibleAttacker(event.getSource());
+
+        Long protectedUntil = POST_SPAR_INVULNERABLE.get(event.getEntity().getUUID());
+        if (protectedUntil != null) {
+            long now = event.getEntity().level().getGameTime();
+            if (event.getEntity().isAlive() && protectedUntil > now) {
+                event.setCanceled(true);
+                return;
+            }
+            POST_SPAR_INVULNERABLE.remove(event.getEntity().getUUID());
+        }
 
         if (event.getEntity() instanceof AmbientFighterEntity peaceFighter && peaceFighter.isPostSparIncomingGrace(responsible)) {
             event.setCanceled(true);
@@ -215,16 +227,6 @@ public final class SanctionedMatchGuard {
         }
 
         if (event.getEntity() instanceof AmbientFighterEntity fighter && fighter.isSanctionedMatchParticipant()) {
-            float floor = Math.max(1.0F, fighter.getMaxHealth() * 0.30F);
-            if (fighter.getHealth() - event.getAmount() <= floor) {
-                // Finishing damage is arbitration-owned even if a DMZ damage source does not
-                // expose the expected attacker entity. This prevents one-shot death bypasses.
-                event.setCanceled(true);
-                fighter.setHealth(floor);
-                fighter.restoreSanctionedLivingState(false);
-                fighter.concedeSanctionedMatch();
-                return;
-            }
             // Non-finishing third-party/stray damage is never allowed into a deliberate spar.
             if (!fighter.isSanctionedOpponent(attacker)) event.setCanceled(true);
             return;
@@ -233,20 +235,43 @@ public final class SanctionedMatchGuard {
         if (event.getEntity() instanceof ServerPlayer player) {
             boolean spar = SparManager.isPlayerInSpar(player);
             if (!spar) return;
+            if (!SparManager.isSanctionedPlayerOpponent(player, responsible)) event.setCanceled(true);
+        }
+    }
+
+    /** The 30% decision uses the final damage after DMZ defense and every other modifier. */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDamage(LivingDamageEvent event) {
+        if (event.getAmount() <= 0.0F) return;
+        LivingEntity responsible = responsibleAttacker(event.getSource());
+        if (event.getEntity() instanceof AmbientFighterEntity fighter && fighter.isSanctionedMatchParticipant()) {
+            if (!(responsible instanceof ServerPlayer player) || !fighter.isSanctionedOpponent(player)) return;
+            float floor = Math.max(1.0F, fighter.getMaxHealth() * 0.30F);
+            if (fighter.getHealth() - event.getAmount() <= floor) {
+                event.setAmount(Math.max(0.0F, fighter.getHealth() - floor));
+                SparManager.finishFromFinalDamage(player, fighter, true);
+            }
+            return;
+        }
+        if (event.getEntity() instanceof ServerPlayer player && SparManager.isPlayerInSpar(player)
+                && responsible instanceof AmbientFighterEntity fighter
+                && SparManager.isSanctionedPlayerOpponent(player, fighter)) {
             float floor = Math.max(1.0F, player.getMaxHealth() * 0.30F);
-            if (player.getHealth() - event.getAmount() > floor) return;
-            event.setCanceled(true);
-            player.setHealth(floor);
-            player.setPose(Pose.STANDING);
-            SparManager.concedePlayer(player);
+            if (player.getHealth() - event.getAmount() <= floor) {
+                event.setAmount(Math.max(0.0F, player.getHealth() - floor));
+                player.setPose(Pose.STANDING);
+                SparManager.finishFromFinalDamage(player, fighter, false);
+            }
         }
     }
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || (PEACE.isEmpty() && WATCH.isEmpty())) return;
+        if (event.phase != TickEvent.Phase.END
+                || (PEACE.isEmpty() && WATCH.isEmpty() && POST_SPAR_INVULNERABLE.isEmpty())) return;
         MinecraftServer server = event.getServer();
         long now = server.overworld().getGameTime();
+        POST_SPAR_INVULNERABLE.entrySet().removeIf(entry -> entry.getValue() < now);
 
         for (var entry : java.util.List.copyOf(PEACE.entrySet())) {
             PeaceSession session = entry.getValue();
@@ -297,6 +322,9 @@ public final class SanctionedMatchGuard {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDeath(LivingDeathEvent event) {
+        if (event.getEntity() instanceof ServerPlayer) {
+            POST_SPAR_INVULNERABLE.remove(event.getEntity().getUUID());
+        }
         Entity attacker = event.getSource().getEntity();
         if (event.getEntity() instanceof AmbientFighterEntity fighter && fighter.isSanctionedMatchParticipant()) {
             event.setCanceled(true);
