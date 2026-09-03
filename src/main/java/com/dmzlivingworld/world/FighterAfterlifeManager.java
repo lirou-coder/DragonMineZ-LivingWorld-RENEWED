@@ -4,6 +4,7 @@ import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
 import com.dmzlivingworld.entity.LWEntities;
+import com.dmzlivingworld.config.LivingWorldConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -35,6 +36,8 @@ public final class FighterAfterlifeManager {
     private static final ResourceKey<Level> OTHERWORLD = ResourceKey.create(Registries.DIMENSION,
             ResourceLocation.fromNamespaceAndPath("dragonminez", "otherworld"));
     private static final ResourceKey<Level> NETHER = Level.NETHER;
+    private static volatile Method dmzPlusHellMethod;
+    private static volatile boolean dmzPlusHellLookupComplete;
 
     private FighterAfterlifeManager() {}
 
@@ -61,6 +64,7 @@ public final class FighterAfterlifeManager {
         entry.putInt("Alignment", fighter.getAlignment().id());
         entry.put("Profile", fighter.writeMemoryProfile());
         data.dead.put(id, entry);
+        data.trimDead();
         data.setDirty();
         FighterWishIntegration.refresh(level.getServer());
     }
@@ -71,32 +75,33 @@ public final class FighterAfterlifeManager {
         MinecraftServer server = event.getServer();
         if (server.getTickCount() % 200 != 0) return;
         Data data = Data.get(server.overworld());
-        discardInvalidMenaceSouls(server);
-        ServerLevel otherworld = server.getLevel(OTHERWORLD);
-        int visibleGoodSouls = otherworld == null ? 0 : countSouls(otherworld);
+        SoulSnapshot souls = scanSouls(server);
+        boolean hellEnabled = dmzPlusHellEnabled();
         for (CompoundTag entry : List.copyOf(data.dead.values())) {
             FighterAlignment alignment = FighterAlignment.byId(entry.getInt("Alignment"));
-            if (alignment != FighterAlignment.BAD && visibleGoodSouls >= 5) continue;
-            if (ensureSoul(server, entry) && alignment != FighterAlignment.BAD) visibleGoodSouls++;
+            if (alignment != FighterAlignment.BAD && souls.visibleGood >= 5) continue;
+            if (ensureSoul(server, entry, souls, hellEnabled) && alignment != FighterAlignment.BAD) souls.visibleGood++;
         }
     }
 
-    private static boolean ensureSoul(MinecraftServer server, CompoundTag entry) {
+    private static boolean ensureSoul(MinecraftServer server, CompoundTag entry, SoulSnapshot souls,
+                                      boolean hellEnabled) {
         if (isWorldMenaceRecord(entry)) return false;
         FighterAlignment alignment = FighterAlignment.byId(entry.getInt("Alignment"));
         ServerLevel destination;
         BlockPos center;
         if (alignment == FighterAlignment.BAD) {
-            if (!dmzPlusHellEnabled()) return false;
+            if (!hellEnabled) return false;
             destination = server.getLevel(NETHER);
             center = destination == null ? BlockPos.ZERO : destination.getSharedSpawnPos();
         } else {
             destination = server.getLevel(OTHERWORLD);
             if (destination == null) return false;
-            center = kaiosamaPosition(destination);
+            center = souls.kaiosama;
             if (center == null) return false; // Never violate the requested 20-block Kaiosama boundary.
         }
-        if (destination == null || soulExists(destination, entry.getUUID("Id"))) return false;
+        UUID id = entry.getUUID("Id");
+        if (destination == null || souls.ids(destination).contains(id)) return false;
         AmbientFighterEntity soul = LWEntities.AMBIENT_FIGHTER.get().create(destination);
         if (soul == null) return false;
         soul.initializeFromMemory(entry.getCompound("Profile"));
@@ -109,38 +114,57 @@ public final class FighterAfterlifeManager {
                 center.offset(dx, 0, dz));
         soul.moveTo(at.getX() + 0.5D, at.getY(), at.getZ() + 0.5D, soul.getRandom().nextFloat() * 360F, 0F);
         destination.addFreshEntity(soul);
+        souls.ids(destination).add(id);
         return true;
     }
 
-    private static int countSouls(ServerLevel level) {
-        int count = 0;
-        for (Entity entity : level.getAllEntities())
-            if (entity instanceof AmbientFighterEntity fighter && fighter.isDeadSoul()) count++;
-        return count;
-    }
-
-    private static boolean soulExists(ServerLevel level, UUID id) {
-        for (Entity entity : level.getAllEntities())
-            if (entity instanceof AmbientFighterEntity fighter && fighter.getPersistentData().hasUUID("LWAfterlifeRecord")
-                    && id.equals(fighter.getPersistentData().getUUID("LWAfterlifeRecord"))) return true;
-        return false;
-    }
-
-    private static BlockPos kaiosamaPosition(ServerLevel level) {
-        for (Entity entity : level.getAllEntities()) {
-            ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
-            if (key != null && (key.getPath().contains("kaiosama") || key.getPath().contains("king_kai"))) return entity.blockPosition();
+    private static SoulSnapshot scanSouls(MinecraftServer server) {
+        SoulSnapshot snapshot = new SoulSnapshot();
+        for (ServerLevel level : server.getAllLevels()) {
+            Set<UUID> ids = snapshot.ids(level);
+            for (Entity entity : level.getAllEntities()) {
+                if (entity instanceof AmbientFighterEntity fighter && fighter.isDeadSoul()) {
+                    if (WorldMenaceManager.isWorldMenace(fighter)) {
+                        fighter.discard();
+                        continue;
+                    }
+                    if (level.dimension().equals(OTHERWORLD)) snapshot.visibleGood++;
+                    if (fighter.getPersistentData().hasUUID("LWAfterlifeRecord"))
+                        ids.add(fighter.getPersistentData().getUUID("LWAfterlifeRecord"));
+                }
+                if (snapshot.kaiosama == null && level.dimension().equals(OTHERWORLD)) {
+                    ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
+                    if (key != null && (key.getPath().contains("kaiosama") || key.getPath().contains("king_kai")))
+                        snapshot.kaiosama = entity.blockPosition();
+                }
+            }
         }
-        return null;
+        return snapshot;
     }
 
     private static boolean dmzPlusHellEnabled() {
         if (!ModList.get().isLoaded("dmzplus")) return false;
         try {
-            Class<?> config = Class.forName("com.kiziro.dmzplus.config.DMZPlusConfig");
-            Method method = config.getMethod("hellEnabled");
-            return Boolean.TRUE.equals(method.invoke(null));
+            Method method = dmzPlusHellMethod();
+            return method != null && Boolean.TRUE.equals(method.invoke(null));
         } catch (ReflectiveOperationException ignored) { return false; }
+    }
+
+    private static Method dmzPlusHellMethod() {
+        if (!dmzPlusHellLookupComplete) {
+            synchronized (FighterAfterlifeManager.class) {
+                if (!dmzPlusHellLookupComplete) {
+                    try {
+                        dmzPlusHellMethod = Class.forName("com.kiziro.dmzplus.config.DMZPlusConfig")
+                                .getMethod("hellEnabled");
+                    } catch (ReflectiveOperationException ignored) {
+                        dmzPlusHellMethod = null;
+                    }
+                    dmzPlusHellLookupComplete = true;
+                }
+            }
+        }
+        return dmzPlusHellMethod;
     }
 
     private static UUID recordId(AmbientFighterEntity fighter) {
@@ -220,18 +244,19 @@ public final class FighterAfterlifeManager {
         return entry != null && WorldMenaceManager.isWorldMenaceProfile(entry.getCompound("Profile"));
     }
 
-    private static void discardInvalidMenaceSouls(MinecraftServer server) {
-        for (ServerLevel level : server.getAllLevels()) {
-            for (Entity entity : level.getAllEntities()) {
-                if (entity instanceof AmbientFighterEntity fighter && fighter.isDeadSoul()
-                        && WorldMenaceManager.isWorldMenace(fighter)) fighter.discard();
-            }
+    private static final class SoulSnapshot {
+        private final Map<ResourceKey<Level>, Set<UUID>> idsByDimension = new HashMap<>();
+        private int visibleGood;
+        private BlockPos kaiosama;
+
+        private Set<UUID> ids(ServerLevel level) {
+            return idsByDimension.computeIfAbsent(level.dimension(), ignored -> new HashSet<>());
         }
     }
 
     public record DeadFighter(UUID id, String name, FighterAlignment alignment) {}
 
-    public static final class Data extends SavedData {
+        public static final class Data extends SavedData {
         private static final String NAME = "dmzlivingworld_afterlife_v1";
         private final Map<UUID, CompoundTag> dead = new LinkedHashMap<>();
         private final Set<UUID> assimilated = new HashSet<>();
@@ -251,7 +276,17 @@ public final class FighterAfterlifeManager {
                 CompoundTag entry = (CompoundTag)raw;
                 if (entry.hasUUID("Id")) data.assimilated.add(entry.getUUID("Id"));
             }
+            data.trimDead();
             return data;
+        }
+        private void trimDead() {
+            int cap = LivingWorldConfig.maxRememberedDeadFighters();
+            while (dead.size() > cap) {
+                Iterator<UUID> iterator = dead.keySet().iterator();
+                if (!iterator.hasNext()) break;
+                iterator.next();
+                iterator.remove();
+            }
         }
         @Override public CompoundTag save(CompoundTag root) {
             ListTag deadList = new ListTag(); this.dead.values().forEach(e -> deadList.add(e.copy())); root.put("Dead", deadList);

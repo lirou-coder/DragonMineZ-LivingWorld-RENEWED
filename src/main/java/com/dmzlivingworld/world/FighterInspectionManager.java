@@ -219,7 +219,7 @@ public final class FighterInspectionManager {
                 relationshipKnown, relationship, relationshipStage, nextStage, nextThreshold,
                 relationshipKnown ? Math.max(1, fighter.getMemoryEncounters()) : 0,
                 factionRep, factionRepLabel, goal, goalProgress, fightingStyle, techniques,
-                activeForm, fighter.getBattlePower(), scouter || menace, rememberedSnapshot, false,
+                activeForm, FighterVisualPower.of(fighter), scouter || menace, rememberedSnapshot, false,
                 requestLocked, supplyReceiver, supplyRequestLine, profileSnapshotForPanel(fighter, rememberedSnapshot, rememberedRecord),
                 equipment, overview, story, combat, science, messages));
     }
@@ -379,8 +379,8 @@ public final class FighterInspectionManager {
         List<String> lines = new ArrayList<>();
         boolean menace = WorldMenaceManager.isWorldMenace(fighter);
         lines.add("## Combat");
-        int currentPower = Math.max(1, fighter.getBattlePower());
-        int permanentPower = Math.max(1, fighter.getPermanentBattlePower());
+        int currentPower = FighterVisualPower.of(fighter);
+        int permanentPower = FighterVisualPower.scale(fighter.getPermanentBattlePower());
         lines.add("* Current Power Level: " + currentPower);
         if (currentPower != permanentPower)
             lines.add("* Base permanent Power Level: " + permanentPower + " • temporary form/power state is included above");

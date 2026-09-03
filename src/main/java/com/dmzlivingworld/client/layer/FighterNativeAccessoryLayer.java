@@ -42,6 +42,16 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
             renderHalo(poseStack, fighter, buffers, partialTick, packedLight);
             buffers.getBuffer(renderType);
         }
+        if ("head".equals(playerBone.getName())
+                && fighter.getRace() == com.dmzlivingworld.entity.FighterRace.NAMEKIAN) {
+            renderNamekianHeadParts(poseStack, fighter, buffers, partialTick, packedLight);
+            buffers.getBuffer(renderType);
+        }
+        if ("head".equals(playerBone.getName())
+                && fighter.getRace() == com.dmzlivingworld.entity.FighterRace.MAJIN) {
+            renderMajinHeadParts(poseStack, fighter, buffers, partialTick, packedLight);
+            buffers.getBuffer(renderType);
+        }
         int id = fighter.getCosmeticAccessoryId();
         if (id <= FighterSpecialItemManager.ACCESSORY_NONE) return;
         String anchor = playerBone.getName();
@@ -100,6 +110,47 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
             getRenderer().renderRecursively(poseStack, fighter, halo, ModRenderTypes.energy(RACE_PARTS_TEXTURE),
                     buffers, consumer, true, partialTick, packedLight, OverlayTexture.NO_OVERLAY,
                     1.0F, 0.9569F, 0.3804F, 0.75F);
+        });
+    }
+
+    private void renderNamekianHeadParts(PoseStack poseStack, AmbientFighterEntity fighter,
+                                         MultiBufferSource buffers, float partialTick, int packedLight) {
+        BakedGeoModel parts = getGeoModel().getBakedModel(RACE_PARTS_MODEL);
+        BakedGeoModel body = getGeoModel().getBakedModel(getGeoModel().getModelResource(fighter));
+        if (parts == null || body == null) return;
+        float[] color = com.dragonminez.client.util.ColorUtils.hexToRgb(fighter.getBodyColor());
+        renderNamekianPart(parts, body, "ears" + (Math.floorMod(fighter.getHeadBone(), 3) + 1),
+                poseStack, fighter, buffers, partialTick, packedLight, color);
+        renderNamekianPart(parts, body, "antennas" + (Math.floorMod(fighter.getHeadBone(), 2) + 1),
+                poseStack, fighter, buffers, partialTick, packedLight, color);
+    }
+
+    private void renderMajinHeadParts(PoseStack poseStack, AmbientFighterEntity fighter,
+                                      MultiBufferSource buffers, float partialTick, int packedLight) {
+        BakedGeoModel parts = getGeoModel().getBakedModel(RACE_PARTS_MODEL);
+        BakedGeoModel body = getGeoModel().getBakedModel(getGeoModel().getModelResource(fighter));
+        if (parts == null || body == null) return;
+        float[] color = com.dragonminez.client.util.ColorUtils.hexToRgb(fighter.getBodyColor());
+        // DMZPlayer's race-parts layer always adds ears3 to Majins. Male Majins
+        // additionally use the selected majin1/majin2/majin3 cranial head bone.
+        renderNamekianPart(parts, body, "ears3", poseStack, fighter, buffers, partialTick, packedLight, color);
+        if (!fighter.isFemale()) {
+            renderNamekianPart(parts, body, "majin" + (Math.floorMod(fighter.getHeadBone(), 3) + 1),
+                    poseStack, fighter, buffers, partialTick, packedLight, color);
+        }
+    }
+
+    private void renderNamekianPart(BakedGeoModel parts, BakedGeoModel body, String boneName,
+                                    PoseStack poseStack, AmbientFighterEntity fighter,
+                                    MultiBufferSource buffers, float partialTick, int packedLight,
+                                    float[] color) {
+        parts.getBone(boneName).ifPresent(part -> {
+            syncTargetBoneAndParents(part, body);
+            RenderType type = RenderType.entityCutoutNoCull(RACE_PARTS_TEXTURE);
+            VertexConsumer consumer = buffers.getBuffer(type);
+            getRenderer().renderRecursively(poseStack, fighter, part, type, buffers, consumer, true,
+                    partialTick, packedLight, OverlayTexture.NO_OVERLAY,
+                    color[0], color[1], color[2], 1.0F);
         });
     }
 

@@ -463,6 +463,7 @@ public final class NpcFusionManager {
             mob.setPersistenceRequired();
         }
         fused.setHealth(fused.getMaxHealth());
+        DmzRevampFusionCompat.applyNpcMetamoruClothes(fused);
 
         CompoundTag root = new CompoundTag();
         root.putBoolean("Active", true);
@@ -541,7 +542,8 @@ public final class NpcFusionManager {
         }
         String race1 = LivingWorldCompat.raceId(first);
         String race2 = LivingWorldCompat.raceId(second);
-        if (race1.isBlank() || !race1.equalsIgnoreCase(race2)) {
+        if (race1.isBlank() || (!race1.equalsIgnoreCase(race2)
+                && !DmzRevampFusionCompat.allowsDifferentRaceMetamoru())) {
             fail(initiator, "Metamoran fusion requires the same race. Got " + race1 + " + " + race2 + ".");
             return false;
         }
@@ -573,7 +575,8 @@ public final class NpcFusionManager {
         if (first == null || second == null || first == second) return false;
         if (LivingWorldCompat.unavailableForFusion(first) || LivingWorldCompat.unavailableForFusion(second)) return false;
         if (LivingWorldCompat.hasActiveForm(first) || LivingWorldCompat.hasActiveForm(second)) return false;
-        if (!LivingWorldCompat.raceId(first).equalsIgnoreCase(LivingWorldCompat.raceId(second))) return false;
+        if (!LivingWorldCompat.raceId(first).equalsIgnoreCase(LivingWorldCompat.raceId(second))
+                && !DmzRevampFusionCompat.allowsDifferentRaceMetamoru()) return false;
         LWFusionProfile one = LWFusionProfile.from(first);
         LWFusionProfile two = LWFusionProfile.from(second);
         double threshold = ConfigManager.getServerConfig().getGameplay().getMetamoruFusionThreshold();
@@ -646,6 +649,7 @@ public final class NpcFusionManager {
     }
 
     private static void hideOriginalOnFusion(LivingEntity original, LivingEntity fused) {
+        LivingWorldCompat.suppressAura(original);
         original.stopRiding();
         original.setInvisible(true);
         if (LivingWorldCompat.isLivingWorldFighter(original)) LivingWorldCompat.setFighterName(original, "");
@@ -730,7 +734,7 @@ public final class NpcFusionManager {
     public static boolean isHiddenFusionPartner(net.minecraft.world.entity.Entity entity) {
         if (entity == null || !entity.getPersistentData().contains(PARTNER_ROOT)) return false;
         CompoundTag root = entity.getPersistentData().getCompound(PARTNER_ROOT);
-        return root.getBoolean("Active") && root.getBoolean("NpcFusion");
+        return root.getBoolean("Active") && (root.getBoolean("NpcFusion") || root.hasUUID("Host"));
     }
 
     private static boolean hasNpcBackup(LivingEntity fighter) {

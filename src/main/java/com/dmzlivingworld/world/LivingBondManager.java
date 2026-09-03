@@ -17,6 +17,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.HitResult;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
@@ -27,6 +29,8 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +51,7 @@ public final class LivingBondManager {
     private static final Map<UUID, Map<UUID, MeditationBondSession>> MEDITATION_BONDS = new HashMap<>();
     private static final Map<UUID, AutoMeditationState> AUTO_MEDITATION = new HashMap<>();
     private static final Map<UUID, DefenseThreat> DEFENSE_THREATS = new HashMap<>();
+    private static final Map<UUID, Deque<Vec3>> TRAVEL_TRAILS = new HashMap<>();
     private static final int MAX_MEDITATION_PARTNERS = 4;
     private static final long FRIENDLY_FIRE_RESET_TICKS = 2400L;
     private enum InviteType { TRAVEL }
@@ -454,9 +459,11 @@ public final class LivingBondManager {
         }
 
         double companionDistance = player.distanceToSqr(companion);
+        recordTravelTrail(player);
         // Navigation cannot bridge unloaded chunks reliably. A companion who falls far enough
         // behind gets a clean catch-up instead of becoming a stale "travelling with you" flag.
-        if (companionDistance > 192.0D * 192.0D) {
+        double regroupDistance = companion.hasLineOfSight(player) ? 192.0D : 40.0D;
+        if (companionDistance > regroupDistance * regroupDistance) {
             recoverCompanion(player, false);
             return;
         }
@@ -521,7 +528,8 @@ public final class LivingBondManager {
             companion.setFlyingFast(distanceSq > 18.0D * 18.0D);
             companion.setSprinting(false);
             Vec3 look = player.getLookAngle();
-            Vec3 target = player.position().add(-look.x * 2.8D, playerAirborne ? 0.55D : 1.8D, -look.z * 2.8D);
+            Vec3 directTarget = player.position().add(-look.x * 2.8D, playerAirborne ? 0.55D : 1.8D, -look.z * 2.8D);
+            Vec3 target = flightTrailTarget(level, companion, player, directTarget);
             // R22: companion flight used to continuously cross the follow point, reverse, cross it
             // again and converge in smaller arcs. Give the follow point an arrival dead-zone plus
             // hysteresis: once settled, the companion only resumes steering after the player has
@@ -580,8 +588,13 @@ public final class LivingBondManager {
         companion.setSprinting(far);
         CompoundTag data = companion.getPersistentData();
         long now = level.getGameTime();
-        BlockPos dryDestination = AmbientFighterSpawner.findSafeGroundAround(
-                level, player.blockPosition(), companion.getRandom(), 0, 5, 24);
+        // Heightmaps describe the open-air surface, not the cave floor. Below Y=0 they made a
+        // companion abandon its owner and route straight upward. The player's current feet are a
+        // valid local navigation goal underground; surface-safe sampling remains useful above it.
+        BlockPos dryDestination = player.getY() <= 0.0D
+                ? player.blockPosition()
+                : AmbientFighterSpawner.findSafeGroundAround(
+                        level, player.blockPosition(), companion.getRandom(), 0, 5, 24);
         if (dryDestination == null) {
             // There is no legitimate ground route target right now. Holding is preferable to
             // repeatedly stepping into adjacent water and being pushed back out by WaterSafety.
@@ -632,6 +645,36 @@ public final class LivingBondManager {
 
     private static boolean travelBlocked(ServerLevel level, BlockPos pos) {
         return level != null && pos != null && !level.getBlockState(pos).getCollisionShape(level, pos).isEmpty();
+    }
+
+    private static void recordTravelTrail(ServerPlayer player) {
+        Deque<Vec3> trail = TRAVEL_TRAILS.computeIfAbsent(player.getUUID(), ignored -> new ArrayDeque<>());
+        Vec3 point = player.position().add(0.0D, 0.8D, 0.0D);
+        Vec3 last = trail.peekLast();
+        if (last == null || last.distanceToSqr(point) >= 2.25D) trail.addLast(point);
+        while (trail.size() > 36) trail.removeFirst();
+    }
+
+    /**
+     * Follow the player's recent route through doors, cave bends and gaps. The companion skips
+     * breadcrumbs only while the farther point is directly visible, so open terrain remains fast
+     * without restoring the old wall-cutting behaviour.
+     */
+    private static Vec3 flightTrailTarget(ServerLevel level, AmbientFighterEntity companion,
+                                          ServerPlayer player, Vec3 directTarget) {
+        Deque<Vec3> trail = TRAVEL_TRAILS.get(player.getUUID());
+        if (trail == null || trail.isEmpty()) return directTarget;
+        while (trail.size() > 1 && companion.position().distanceToSqr(trail.peekFirst()) < 3.0D * 3.0D) trail.removeFirst();
+        Vec3 selected = trail.peekFirst();
+        Vec3 eye = companion.position().add(0.0D, companion.getBbHeight() * 0.55D, 0.0D);
+        for (Vec3 candidate : trail) {
+            HitResult hit = level.clip(new ClipContext(eye, candidate, ClipContext.Block.COLLIDER,
+                    ClipContext.Fluid.NONE, companion));
+            if (hit.getType() != HitResult.Type.MISS) break;
+            selected = candidate;
+        }
+        if (selected == null || selected.distanceToSqr(directTarget) < 4.0D) return directTarget;
+        return selected;
     }
 
     /** Measures real progress toward the player's destination; oscillating on one block increases stall. */
@@ -738,7 +781,9 @@ public final class LivingBondManager {
             }
         }
 
-        BlockPos regroup = AmbientFighterSpawner.findSafeGroundAround(targetLevel, player.blockPosition(), player.getRandom(), 5, 10, 48);
+        BlockPos regroup = player.getY() <= 0.0D
+                ? findUndergroundRegroup(targetLevel, player.blockPosition())
+                : AmbientFighterSpawner.findSafeGroundAround(targetLevel, player.blockPosition(), player.getRandom(), 5, 10, 48);
 
         if (companion != null && companion.level().dimension().equals(targetLevel.dimension())) {
             if (regroup == null) {
@@ -800,6 +845,26 @@ public final class LivingBondManager {
         for (ServerLevel candidate : player.getServer().getAllLevels()) {
             AmbientFighterEntity found = entity(candidate, id);
             if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static BlockPos findUndergroundRegroup(ServerLevel level, BlockPos center) {
+        if (level == null || center == null) return null;
+        for (int radius = 1; radius <= 4; radius++) {
+            for (int dy = -1; dy <= 2; dy++) {
+                for (int dx = -radius; dx <= radius; dx++) {
+                    for (int dz = -radius; dz <= radius; dz++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
+                        BlockPos feet = center.offset(dx, dy, dz);
+                        if (level.getBlockState(feet).getCollisionShape(level, feet).isEmpty()
+                                && level.getBlockState(feet.above()).getCollisionShape(level, feet.above()).isEmpty()
+                                && !level.getBlockState(feet.below()).getCollisionShape(level, feet.below()).isEmpty()) {
+                            return feet;
+                        }
+                    }
+                }
+            }
         }
         return null;
     }
@@ -979,6 +1044,9 @@ public final class LivingBondManager {
         root.remove("CompanionFriendlyFireBrokenUntil");
         root.putLong("NextCompanionChatter", player.serverLevel().getServer().overworld().getGameTime() + 1200L + player.getRandom().nextInt(1801));
         npc.getPersistentData().putUUID("LWCompanionOwner", player.getUUID());
+        Deque<Vec3> trail = new ArrayDeque<>();
+        trail.add(player.position().add(0.0D, 0.8D, 0.0D));
+        TRAVEL_TRAILS.put(player.getUUID(), trail);
         rememberCompanionState(player, root, npc);
         npc.setPersistenceRequired();
     }
@@ -997,6 +1065,13 @@ public final class LivingBondManager {
             if (current != null && current.equals(fighter.getUUID())) return true;
         }
         return false;
+    }
+
+    /** True only while this player's current travelling companion has an active combat target. */
+    public static boolean isCombatProtectedCompanion(ServerPlayer player, AmbientFighterEntity npc) {
+        if (player == null || npc == null || npc.getTarget() == null) return false;
+        UUID current = companionId(player);
+        return current != null && current.equals(npc.getUUID());
     }
 
     /**
@@ -1104,6 +1179,7 @@ public final class LivingBondManager {
     }
 
     public static void clearCompanion(ServerPlayer player) {
+        TRAVEL_TRAILS.remove(player.getUUID());
         CompoundTag root = root(player);
         UUID currentId = root.hasUUID("Companion") ? root.getUUID("Companion") : null;
         AmbientFighterEntity current = findLoadedCompanion(player, currentId);

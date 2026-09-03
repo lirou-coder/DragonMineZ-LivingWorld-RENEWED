@@ -6,9 +6,13 @@ import com.dragonminez.common.config.ConfigManager;
 import net.minecraftforge.fml.ModList;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 /** DMZ-style flat and adaptive defense with Living World's global mitigation ceiling. */
 public final class NpcDefenseCalculator {
+    private static volatile AdaptiveAccess revampAdaptive;
+    private static volatile boolean adaptiveLookupComplete;
+
     private NpcDefenseCalculator() {}
 
     public static float mitigate(float incoming, double defense, double defensePenetration) {
@@ -32,11 +36,13 @@ public final class NpcDefenseCalculator {
     private static Adaptive adaptive(CombatConfig dmz) {
         if (ModList.get().isLoaded("dmzrevamp")) {
             try {
-                Object c = Class.forName("com.dmzrevamp.config.AdaptiveDefenseMoreConfigured")
-                        .getMethod("get").invoke(null);
-                return new Adaptive(bool(c, "enable"), number(c, "adaptativeMitigationParityRatio"),
-                        number(c, "adaptativeMitigationParityValue"), number(c, "adaptativeMitigationZeroRatio"),
-                        number(c, "adaptativeDefenseMitigationCap"), number(c, "adaptiveDefenseCapRatio"));
+                AdaptiveAccess access = adaptiveAccess();
+                if (access != null) {
+                    Object c = access.getter.invoke(null);
+                    return new Adaptive(access.enabled.getBoolean(c), number(c, access.parityRatio),
+                            number(c, access.parityValue), number(c, access.zeroRatio),
+                            number(c, access.cap), number(c, access.capRatio));
+                }
             } catch (ReflectiveOperationException ignored) {}
         }
         return new Adaptive(dmz.getEnableAdaptativeDefenseMitigation(), dmz.getAdaptativeMitigationParityRatio(),
@@ -44,13 +50,30 @@ public final class NpcDefenseCalculator {
                 dmz.getAdaptativeDefenseMitigationCap(), 0.0D);
     }
 
-    private static boolean bool(Object owner, String name) throws ReflectiveOperationException {
-        return owner.getClass().getField(name).getBoolean(owner);
+    private static double number(Object owner, Field field) throws ReflectiveOperationException {
+        return ((Number)field.get(owner)).doubleValue();
     }
 
-    private static double number(Object owner, String name) throws ReflectiveOperationException {
-        Field field = owner.getClass().getField(name);
-        return ((Number)field.get(owner)).doubleValue();
+    private static AdaptiveAccess adaptiveAccess() {
+        if (!adaptiveLookupComplete) {
+            synchronized (NpcDefenseCalculator.class) {
+                if (!adaptiveLookupComplete) {
+                    try {
+                        Class<?> type = Class.forName("com.dmzrevamp.config.AdaptiveDefenseMoreConfigured");
+                        revampAdaptive = new AdaptiveAccess(type.getMethod("get"), type.getField("enable"),
+                                type.getField("adaptativeMitigationParityRatio"),
+                                type.getField("adaptativeMitigationParityValue"),
+                                type.getField("adaptativeMitigationZeroRatio"),
+                                type.getField("adaptativeDefenseMitigationCap"),
+                                type.getField("adaptiveDefenseCapRatio"));
+                    } catch (ReflectiveOperationException ignored) {
+                        revampAdaptive = null;
+                    }
+                    adaptiveLookupComplete = true;
+                }
+            }
+        }
+        return revampAdaptive;
     }
 
     private static double clamp01(double value) { return Math.max(0.0D, Math.min(1.0D, value)); }
@@ -74,4 +97,7 @@ public final class NpcDefenseCalculator {
             return 0.0D;
         }
     }
+
+    private record AdaptiveAccess(Method getter, Field enabled, Field parityRatio, Field parityValue,
+                                  Field zeroRatio, Field cap, Field capRatio) {}
 }

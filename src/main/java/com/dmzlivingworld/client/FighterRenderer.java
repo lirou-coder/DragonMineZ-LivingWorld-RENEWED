@@ -215,7 +215,10 @@ public final class FighterRenderer extends GeoEntityRenderer<AmbientFighterEntit
     private void renderNativeSagaEffects(AmbientFighterEntity entity, PoseStack poseStack, float partialTick) {
         if (nativeEffectsUnavailable || nativeSagaEffects == null || drawEffectsInline == null) return;
 
-        boolean aura = entity.isTransforming() || entity.isCharge() || entity.isAuraFlared() || entity.isKaiokenAuraPulse();
+        // A fusion partner is retained as an invisible passenger. Never render a detached
+        // DMZ aura for an invisible fighter while the server-side aura state synchronizes.
+        boolean aura = !entity.isInvisible()
+                && (entity.isTransforming() || entity.isCharge() || entity.isAuraFlared() || entity.isKaiokenAuraPulse());
         boolean lightning = entity.isLightning();
         if (!aura && !lightning) return;
 

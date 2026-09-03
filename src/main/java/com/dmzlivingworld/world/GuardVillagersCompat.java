@@ -8,6 +8,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.npc.Villager;
@@ -30,6 +31,9 @@ public final class GuardVillagersCompat {
     private static final String AGGRESSION_Z = "LWGuardVillagerAggressionZ";
     private static final long AGGRESSION_MEMORY_TICKS = 1_200L;
     private static final double DEFENSE_RADIUS_SQR = 64.0D * 64.0D;
+    private static volatile Boolean guardVillagersLoaded;
+    private static volatile EntityType<?> guardType;
+    private static volatile boolean guardTypeResolved;
 
     private GuardVillagersCompat() {}
 
@@ -86,11 +90,31 @@ public final class GuardVillagersCompat {
     }
 
     private static boolean isGuard(LivingEntity entity) {
-        ResourceLocation id = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
-        return id != null && "guardvillagers".equals(id.getNamespace()) && "guard".equals(id.getPath());
+        EntityType<?> expected = guardType();
+        return expected != null && entity.getType() == expected;
     }
 
-    private static boolean loaded() { return ModList.get().isLoaded("guardvillagers"); }
+    private static boolean loaded() {
+        Boolean cached = guardVillagersLoaded;
+        if (cached == null) {
+            cached = ModList.get().isLoaded("guardvillagers");
+            guardVillagersLoaded = cached;
+        }
+        return cached;
+    }
+
+    private static EntityType<?> guardType() {
+        if (!guardTypeResolved) {
+            synchronized (GuardVillagersCompat.class) {
+                if (!guardTypeResolved) {
+                    guardType = ForgeRegistries.ENTITY_TYPES.getValue(
+                            ResourceLocation.fromNamespaceAndPath("guardvillagers", "guard"));
+                    guardTypeResolved = true;
+                }
+            }
+        }
+        return guardType;
+    }
 
     private static void clearExpired(CompoundTag data) {
         data.remove(AGGRESSION_UNTIL); data.remove(AGGRESSION_DIMENSION);

@@ -3,6 +3,8 @@ package com.dmzlivingworld.world;
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
+import com.dragonminez.common.stats.StatsCapability;
+import com.dragonminez.common.stats.StatsProvider;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -57,6 +59,7 @@ public final class PowerSensingManager {
     private static void sense(ServerPlayer player, boolean forced) {
         Sensed sensed = findBest(player);
         if (sensed == null) return;
+        if (!WorldMenaceManager.isHerobrine(sensed.fighter) && !hasKiSense(player)) return;
         UUID previous = LAST_SIGNAL.get(player.getUUID());
         if (!forced && previous != null && previous.equals(sensed.fighter.getUUID()) && player.tickCount % 360 != 0) return;
         LAST_SIGNAL.put(player.getUUID(), sensed.fighter.getUUID());
@@ -64,13 +67,22 @@ public final class PowerSensingManager {
                 .append(Component.literal(describe(player, sensed)).withStyle(ChatFormatting.WHITE)), true);
     }
 
+    private static boolean hasKiSense(ServerPlayer player) {
+        return StatsProvider.get(StatsCapability.INSTANCE, player).resolve()
+                .map(data -> data.getSkills().getSkillLevel("ki_sense") >= 1
+                        || data.getSkills().getSkillLevel("kisense") >= 1)
+                .orElse(false);
+    }
+
     private static Sensed findBest(ServerPlayer player) {
         if (!(player.level() instanceof ServerLevel level)) return null;
+        boolean canSensePower = hasKiSense(player);
         double anchor = WorldPowerScaler.resolveWorldAnchor(level, player.blockPosition());
         List<AmbientFighterEntity> fighters = level.getEntitiesOfClass(
                 AmbientFighterEntity.class,
                 player.getBoundingBox().inflate(RANGE, 256.0D, RANGE),
-                f -> f.isAlive() && !f.isDefeated() && f.distanceToSqr(player) > 48.0D * 48.0D);
+                f -> f.isAlive() && !f.isDefeated() && f.distanceToSqr(player) > 48.0D * 48.0D
+                        && (canSensePower || WorldMenaceManager.isHerobrine(f)));
 
         return fighters.stream()
                 .map(f -> {

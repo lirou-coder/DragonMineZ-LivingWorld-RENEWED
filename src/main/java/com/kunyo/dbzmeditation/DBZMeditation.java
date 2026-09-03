@@ -601,6 +601,10 @@ public final class DBZMeditation {
 
         int multiplier = getMultiplier(ticks);
 
+        if (ticks % 200 == 0) {
+            com.dmzlivingworld.world.DMZSkillProgressionCompat.onMeditationPulse(player, multiplier);
+        }
+
         // Native DMZ recovery and form-control training are intentionally
         // processed once per second. They augment DMZ's own systems rather
         // than replacing them, and never touch health.

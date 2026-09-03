@@ -10,6 +10,10 @@ public final class BattlePowerFormula {
     private static final double DMZ_REFERENCE = 1200.0D;
     private static final double DMZ_DIVISOR = 100.0D;
     private static final double DMZ_EXPONENT = 1.2D;
+    private static volatile Method revampCalculator;
+    private static volatile boolean calculatorLookupComplete;
+    private static volatile ConfigAccess revampConfig;
+    private static volatile boolean configLookupComplete;
 
     private BattlePowerFormula() {}
 
@@ -17,9 +21,8 @@ public final class BattlePowerFormula {
         double safe = Math.max(1.0D, effective);
         if (ModList.get().isLoaded("dmzrevamp")) {
             try {
-                Class<?> calculator = Class.forName("com.dmzrevamp.revamp.battlepower.CustomBattlePowerCalculator");
-                Method method = calculator.getMethod("calculateMobBattlePower", double.class);
-                return ((Number)method.invoke(null, safe)).doubleValue();
+                Method method = calculatorMethod();
+                if (method != null) return ((Number)method.invoke(null, safe)).doubleValue();
             } catch (ReflectiveOperationException ignored) {
                 // A different Overhaul build may not expose the bridge; use its public config below.
             }
@@ -41,20 +44,57 @@ public final class BattlePowerFormula {
     private static Parameters parameters() {
         if (ModList.get().isLoaded("dmzrevamp")) {
             try {
-                Object config = Class.forName("com.dmzrevamp.config.CustomBattlePowerConfig")
-                        .getMethod("get").invoke(null);
-                return new Parameters(read(config, "referenceMultiplier", DMZ_REFERENCE),
-                        read(config, "totalStatsDivisor", DMZ_DIVISOR), read(config, "exponent", DMZ_EXPONENT));
+                ConfigAccess access = configAccess();
+                if (access != null) {
+                    Object config = access.getter.invoke(null);
+                    return new Parameters(read(config, access.reference, DMZ_REFERENCE),
+                            read(config, access.divisor, DMZ_DIVISOR), read(config, access.exponent, DMZ_EXPONENT));
+                }
             } catch (ReflectiveOperationException ignored) {}
         }
         return new Parameters(DMZ_REFERENCE, DMZ_DIVISOR, DMZ_EXPONENT);
     }
 
-    private static double read(Object owner, String name, double fallback) throws ReflectiveOperationException {
-        Field field = owner.getClass().getField(name);
+    private static double read(Object owner, Field field, double fallback) throws ReflectiveOperationException {
         double value = ((Number)field.get(owner)).doubleValue();
         return Double.isFinite(value) && value > 0.0D ? value : fallback;
     }
 
+    private static Method calculatorMethod() {
+        if (!calculatorLookupComplete) {
+            synchronized (BattlePowerFormula.class) {
+                if (!calculatorLookupComplete) {
+                    try {
+                        revampCalculator = Class.forName("com.dmzrevamp.revamp.battlepower.CustomBattlePowerCalculator")
+                                .getMethod("calculateMobBattlePower", double.class);
+                    } catch (ReflectiveOperationException ignored) {
+                        revampCalculator = null;
+                    }
+                    calculatorLookupComplete = true;
+                }
+            }
+        }
+        return revampCalculator;
+    }
+
+    private static ConfigAccess configAccess() {
+        if (!configLookupComplete) {
+            synchronized (BattlePowerFormula.class) {
+                if (!configLookupComplete) {
+                    try {
+                        Class<?> type = Class.forName("com.dmzrevamp.config.CustomBattlePowerConfig");
+                        revampConfig = new ConfigAccess(type.getMethod("get"), type.getField("referenceMultiplier"),
+                                type.getField("totalStatsDivisor"), type.getField("exponent"));
+                    } catch (ReflectiveOperationException ignored) {
+                        revampConfig = null;
+                    }
+                    configLookupComplete = true;
+                }
+            }
+        }
+        return revampConfig;
+    }
+
     private record Parameters(double reference, double divisor, double exponent) {}
+    private record ConfigAccess(Method getter, Field reference, Field divisor, Field exponent) {}
 }

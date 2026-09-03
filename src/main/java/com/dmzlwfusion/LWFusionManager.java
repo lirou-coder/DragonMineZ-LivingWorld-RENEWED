@@ -146,7 +146,8 @@ public final class LWFusionManager {
 
         String playerRace = safe(stats.getCharacter().getRace()).toLowerCase(Locale.ROOT);
         String npcRace = safe(LivingWorldCompat.raceId(partner)).toLowerCase(Locale.ROOT);
-        if (playerRace.isBlank() || npcRace.isBlank() || !playerRace.equals(npcRace)) {
+        if (playerRace.isBlank() || npcRace.isBlank()
+                || (!playerRace.equals(npcRace) && !DmzRevampFusionCompat.allowsDifferentRaceMetamoru())) {
             player.displayClientMessage(Component.translatable("message.dragonminez.fusion.different_race"), true);
             debug(player, "Rejected: race mismatch player=" + playerRace + ", npc=" + npcRace + ".");
             return false;
@@ -519,6 +520,7 @@ public final class LWFusionManager {
 
     private static void hidePartner(ServerPlayer player, LivingEntity partner) {
         storePartnerBackup(player, partner);
+        LivingWorldCompat.suppressAura(partner);
         partner.stopRiding();
         partner.setInvisible(true);
         // LW 0.6.x renders its custom identity label independently of vanilla
@@ -541,6 +543,7 @@ public final class LWFusionManager {
     }
 
     private static void keepPartnerAttached(ServerPlayer player, LivingEntity partner) {
+        LivingWorldCompat.suppressAura(partner);
         partner.setInvisible(true);
         if (LivingWorldCompat.isLivingWorldFighter(partner)) LivingWorldCompat.setFighterName(partner, "");
         partner.setInvulnerable(true);

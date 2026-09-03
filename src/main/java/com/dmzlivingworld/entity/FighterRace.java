@@ -30,7 +30,7 @@ public enum FighterRace {
     public String displayName() { return displayName; }
     public String dmzId() { return dmzId; }
     public boolean gendered() { return gendered; }
-    public boolean usesHair() { return this == HUMAN || this == SAIYAN; }
+    public boolean usesHair() { return this == HUMAN || this == SAIYAN || this == MAJIN; }
 
     public static FighterRace byId(int id) {
         for (FighterRace race : values()) if (race.id == id) return race;

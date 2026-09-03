@@ -21,6 +21,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 /** Makes Living World Namekians first-class targets of both assimilation implementations. */
 public final class NamekAssimilationCompat {
@@ -153,6 +154,9 @@ public final class NamekAssimilationCompat {
         }
         target.getPersistentData().putBoolean(ASSIMILATED, true);
         FighterAfterlifeManager.markAssimilated(target);
+        UUID identity = target.getMemoryRecordId() == null ? target.getUUID() : target.getMemoryRecordId();
+        FighterLegacyWorldData.get(player.serverLevel()).markDeadRecord(identity);
+        if (!identity.equals(target.getUUID())) FighterLegacyWorldData.get(player.serverLevel()).markDeadRecord(target.getUUID());
         target.discard();
         data.getResources().addRacialSkillCount(1);
         NetworkHandler.sendToTrackingEntityAndSelf(new StatsSyncS2C(player), player);

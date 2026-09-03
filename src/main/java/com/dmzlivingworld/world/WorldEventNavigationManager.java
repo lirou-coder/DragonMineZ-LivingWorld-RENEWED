@@ -36,6 +36,10 @@ public final class WorldEventNavigationManager {
                 }))))
                 .then(net.minecraft.commands.Commands.literal("last").executes(ctx -> {
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
+                    if (TARGETS.remove(player.getUUID()) != null) {
+                        player.displayClientMessage(Component.literal("[Living World] Event tracking stopped.").withStyle(ChatFormatting.GRAY), false);
+                        return 1;
+                    }
                     Target latest = LATEST.get(player.getUUID());
                     if (latest == null) {
                         player.displayClientMessage(Component.literal("[Living World] No recent announced event to track.").withStyle(ChatFormatting.GRAY), false);
@@ -60,6 +64,12 @@ public final class WorldEventNavigationManager {
 
     public static void track(ServerPlayer player, BlockPos pos, String label) {
         if (player == null || pos == null) return;
+        Target active = TARGETS.get(player.getUUID());
+        if (active != null) {
+            TARGETS.remove(player.getUUID());
+            player.displayClientMessage(Component.literal("[Living World] Event tracking stopped.").withStyle(ChatFormatting.GRAY), false);
+            return;
+        }
         TARGETS.put(player.getUUID(), new Target(player.level().dimension(), pos.immutable(), label == null || label.isBlank() ? "World event" : label));
         player.displayClientMessage(Component.literal("[Living World] Tracking " + (label == null ? "world event" : label) + ".").withStyle(ChatFormatting.GOLD), false);
     }

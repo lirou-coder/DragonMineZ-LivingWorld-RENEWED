@@ -42,13 +42,32 @@ public record WorldSettingsPacket(LivingWorldConfig.Snapshot world,
         b.writeVarInt(v.worldEventAlertRadius()); b.writeBoolean(v.socialTalk()); b.writeVarInt(v.talkBaseGain());
         b.writeVarInt(v.talkRelationshipCap()); b.writeVarInt(v.talkCooldownMinSeconds()); b.writeVarInt(v.talkCooldownMaxSeconds());
         b.writeBoolean(v.npcSocializing()); b.writeVarInt(v.npcChaosPercent()); b.writeBoolean(v.companionSagaHelp()); b.writeVarInt(v.npcKiMode()); b.writeVarInt(v.npcStrengthPercent()); b.writeVarInt(v.npcGrowthPercent()); b.writeBoolean(v.attackMinecraftMobs()); b.writeVarInt(v.npcChatFrequencyPercent()); b.writeVarInt(v.earthGuardianResponsePercent());
+        b.writeVarInt(v.maxRememberedDeadFighters()); b.writeVarInt(v.npcDespawnProtectionRadius());
+        b.writeDouble(v.levelMultiplierPerSaga()); b.writeDouble(v.maxDefenseMitigation()); b.writeDouble(v.bpVisualMultiplier());
+        b.writeBoolean(v.canMeditationProcSkillProgression()); writeStrings(b, v.npcRaceBlacklist());
+        b.writeBoolean(v.treatRaceBlacklistAsWhitelist()); writeStrings(b, v.canUseClothes()); writeStrings(b, v.dimensionWhitelist());
+        b.writeBoolean(v.treatDimensionWhitelistAsBlacklist()); b.writeVarInt(v.archetypeShares().size());
+        for (double share : v.archetypeShares()) b.writeDouble(share);
     }
 
     static LivingWorldConfig.Snapshot readWorld(FriendlyByteBuf b) {
         return new LivingWorldConfig.Snapshot(b.readVarInt(), b.readVarInt(), b.readVarInt(),
                 b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readVarInt(),
                 b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readVarInt(), b.readBoolean(), b.readVarInt(),
-                b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readVarInt());
+                b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readVarInt(),
+                b.readVarInt(), b.readVarInt(), b.readDouble(), b.readDouble(), b.readDouble(), b.readBoolean(), readStrings(b), b.readBoolean(), readStrings(b), readStrings(b), b.readBoolean(), readDoubles(b));
+    }
+
+    private static void writeStrings(FriendlyByteBuf b, java.util.List<String> values) {
+        b.writeVarInt(values.size()); for (String value : values) b.writeUtf(value, 256);
+    }
+    private static java.util.List<String> readStrings(FriendlyByteBuf b) {
+        int size = Math.min(256, b.readVarInt()); java.util.List<String> result = new java.util.ArrayList<>(size);
+        for (int i=0;i<size;i++) result.add(b.readUtf(256)); return result;
+    }
+    private static java.util.List<Double> readDoubles(FriendlyByteBuf b) {
+        int size = Math.min(64, b.readVarInt()); java.util.List<Double> result = new java.util.ArrayList<>(size);
+        for (int i=0;i<size;i++) result.add(b.readDouble()); return result;
     }
 
     static void writeMeditation(FriendlyByteBuf b, MeditationConfig.ServerSnapshot v) {

@@ -22,9 +22,9 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     private static final int[] PRESENCE_RADII = {96, 128, 160, 192, 256, 320, 384, 512, 768, 1024, 1536, 2048, 3072, 4096, 6144, 8192};
     private static final int[] ALERT_RADII = {256, 512, 800, 1000, 1400, 1800, 2400, 3200, 4096, 6144, 8192, 12288, 16384, 24576, 32768};
     private static final int[] KI_MODE_ORDER = {0, 3, 1, 2};
-    private static final String[] TAB_NAMES = {"World", "NPC Behaviour", "Relationships", "Display", "Meditation", "Meditation Visuals"};
+    private static final String[] TAB_NAMES = {"World", "NPC Behaviour", "Advanced NPC", "Relationships", "Display", "Meditation", "Meditation Visuals"};
     // Visual order is independent of the established logical tab IDs, preserving save/default/update logic.
-    private static final int[] TAB_ORDER = {0, 5, 1, 2, 3, 4};
+    private static final int[] TAB_ORDER = {0, 5, 6, 1, 2, 3, 4};
 
     private int tab;
     private int scroll;
@@ -36,6 +36,11 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             talkRelationshipCap, talkCooldownMinSeconds, talkCooldownMaxSeconds, npcChaosPercent, npcKiMode, npcStrengthPercent, npcGrowthPercent, npcChatFrequencyPercent, earthGuardianResponsePercent;
     private boolean factionEncounters, dynamicEncounters, recurringFighters, automaticPowerSensing,
             worldIncidents, worldEventAlerts, socialTalk, npcSocializing, companionSagaHelp, attackMinecraftMobs;
+    private int maxRememberedDeadFighters, npcDespawnProtectionRadius;
+    private double levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier;
+    private boolean canMeditationProcSkillProgression, treatRaceBlacklistAsWhitelist, treatDimensionWhitelistAsBlacklist;
+    private String npcRaceBlacklist, canUseClothes, dimensionWhitelist;
+    private double[] archetypeShares = new double[20];
 
     // Living World client values
     private double nameScale, dialogueScale, verticalOffset;
@@ -108,6 +113,13 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         npcChaosPercent=v.npcChaosPercent(); companionSagaHelp=v.companionSagaHelp(); npcKiMode=v.npcKiMode(); npcStrengthPercent=v.npcStrengthPercent();
         npcGrowthPercent=v.npcGrowthPercent(); attackMinecraftMobs=v.attackMinecraftMobs();
         npcChatFrequencyPercent=v.npcChatFrequencyPercent(); earthGuardianResponsePercent=v.earthGuardianResponsePercent();
+        maxRememberedDeadFighters=v.maxRememberedDeadFighters(); npcDespawnProtectionRadius=v.npcDespawnProtectionRadius();
+        levelMultiplierPerSaga=v.levelMultiplierPerSaga(); maxDefenseMitigation=v.maxDefenseMitigation(); bpVisualMultiplier=v.bpVisualMultiplier();
+        canMeditationProcSkillProgression=v.canMeditationProcSkillProgression();
+        npcRaceBlacklist=String.join(",",v.npcRaceBlacklist()); treatRaceBlacklistAsWhitelist=v.treatRaceBlacklistAsWhitelist();
+        canUseClothes=String.join(",",v.canUseClothes()); dimensionWhitelist=String.join(",",v.dimensionWhitelist());
+        treatDimensionWhitelistAsBlacklist=v.treatDimensionWhitelistAsBlacklist();
+        for(int i=0;i<Math.min(20,v.archetypeShares().size());i++) archetypeShares[i]=v.archetypeShares().get(i);
     }
 
     private void loadClient(LivingWorldClientConfig.Snapshot v) {
@@ -145,7 +157,10 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 factionResidentCap, automaticPowerSensing, worldIncidents, worldEventAlerts, worldEventAlertRadius,
                 socialTalk, talkBaseGain, talkRelationshipCap, talkCooldownMinSeconds, talkCooldownMaxSeconds,
                 npcSocializing, npcChaosPercent, companionSagaHelp, npcKiMode, npcStrengthPercent, npcGrowthPercent, attackMinecraftMobs,
-                npcChatFrequencyPercent, earthGuardianResponsePercent);
+                npcChatFrequencyPercent, earthGuardianResponsePercent, maxRememberedDeadFighters, npcDespawnProtectionRadius,
+                levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier, canMeditationProcSkillProgression,
+                csv(npcRaceBlacklist), treatRaceBlacklistAsWhitelist, csv(canUseClothes), csv(dimensionWhitelist),
+                treatDimensionWhitelistAsBlacklist, java.util.Arrays.stream(archetypeShares).boxed().toList());
     }
 
     private LivingWorldClientConfig.Snapshot clientSnapshot() {
@@ -168,10 +183,10 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     }
 
     private int rowCount() {
-        return switch (tab) { case 0 -> 12; case 1 -> 6; case 2 -> 11; case 3 -> 15; case 4 -> 10; default -> 8; };
+        return switch (tab) { case 0 -> 12; case 1 -> 6; case 2 -> 11; case 3 -> 15; case 4 -> 10; case 6 -> 31; default -> 8; };
     }
 
-    private boolean serverTab() { return tab == 0 || tab == 1 || tab == 3 || tab == 5; }
+    private boolean serverTab() { return tab == 0 || tab == 1 || tab == 3 || tab == 5 || tab == 6; }
     private boolean rowEditable() { return !serverTab() || canEdit; }
 
     @Override
@@ -277,7 +292,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             String value = rowValue(row);
             String fitted = LivingWorldGuiStyle.fitText(font, value, Math.max(10, valueW - 6));
             g.drawString(font, fitted, valueX + Math.max(2,(valueW-font.width(fitted))/2), y + Math.max(1, (h - font.lineHeight) / 2), valueColor(row), false);
-            if (isTypeableRow(row)) {
+            if (isTypeableRow(row) && !isTextRow(tab, row)) {
                 // Every numeric option uses the same hybrid control: arrows for small steps,
                 // click the value to type exactly, or drag the thin track for quick adjustment.
                 int trackLeft = valueX + 5;
@@ -322,6 +337,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 2 -> "DMZ meditation animation"; case 3 -> "HUD top offset"; case 4 -> "Effect intensity";
                 case 5 -> "Focus Seal"; case 6 -> "Seal intensity"; case 7 -> "Seal size";
                 case 8 -> "NPC meditation FX"; default -> "Stage transition FX"; };
+            case 6 -> advancedName(r);
             default -> switch (r) { case 0 -> "World activity"; case 1 -> "Power sensing"; case 2 -> "Companion saga help";
                 case 3 -> "NPC Ki block damage"; case 4 -> "NPC strength"; case 5 -> "NPC growth speed";
                 case 6 -> "NPC chat frequency"; default -> "Attack Minecraft mobs"; };
@@ -350,6 +366,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 4 -> "Overall meditation effect strength"; case 5 -> "Seal beneath the character";
                 case 6 -> "Seal brightness"; case 7 -> "Seal radius"; case 8 -> "NPC and shared-meditation effects";
                 default -> "Small effect when meditation deepens"; };
+            case 6 -> r >= 11 ? "Effective budget share for this archetype attribute" : "Advanced Living World server option";
             default -> npcBehaviorRowHelp(r);
         };
     }
@@ -419,6 +436,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 2 -> onOff(medNativeAnimation); case 3 -> medHudOffset+" px"; case 4 -> medAuraIntensity+"%";
                 case 5 -> onOff(medFocusSeal); case 6 -> medSealIntensity+"%"; case 7 -> medSealSize+"%";
                 case 8 -> onOff(medNpcFx); default -> onOff(medStageFx); };
+            case 6 -> advancedValue(r);
             default -> switch (r) { case 0 -> npcChaosPercent+"%"; case 1 -> onOff(automaticPowerSensing);
                 case 2 -> onOff(companionSagaHelp); case 3 -> kiModeLabel(); case 4 -> npcStrengthPercent+"%";
                 case 5 -> npcGrowthPercent+"%"; case 6 -> npcChatFrequencyPercent+"%"; default -> onOff(attackMinecraftMobs); };
@@ -498,6 +516,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 7 -> attackMinecraftMobs=stepSign>0;
                 default -> {}
             } }
+            case 6 -> changeAdvanced(r, stepSign);
         }
         if (!before.equals(rowValue(r))) markDirty();
     }
@@ -520,7 +539,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             if (y<contentTop || y+rowHeight-3>settingsBodyBottom()) continue;
             int h=rowHeight-3, cy=panelWidth<430?y+h-21:y+Math.max(2,(h-20)/2), ch=panelWidth<430?18:20;
             if (inside(mouseX,mouseY,valueX,cy,valueW,ch) && isTypeableRow(r) && rowEditable()) {
-                if (mouseY >= cy + ch - 7) {
+                if (!isTextRow(tab, r) && mouseY >= cy + ch - 7) {
                     draggingSliderTab = tab;
                     draggingSliderRow = r;
                     setNumericFromSlider(r, mouseX, valueX, valueW);
@@ -582,6 +601,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 5 -> medFocusedMultiplier; case 6 -> medCenteredMultiplier; case 7 -> medDeepMultiplier; case 8 -> medTranscendentMultiplier;
                 case 12 -> medBreakthroughChance; default -> medBreakthroughPoints; };
             case 4 -> switch (row) { case 3 -> medHudOffset; case 4 -> medAuraIntensity; case 6 -> medSealIntensity; default -> medSealSize; };
+            case 6 -> advancedNumericValue(row);
             default -> switch (row) { case 0 -> npcChaosPercent; case 4 -> npcStrengthPercent; case 5 -> npcGrowthPercent; default -> npcChatFrequencyPercent; };
         };
     }
@@ -593,6 +613,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 2 -> switch (row) { case 0,1 -> 65.0D; case 2 -> -0.25D; case 6,8,10 -> 8.0D; case 7 -> 6.0D; default -> 0.0D; };
             case 3 -> switch (row) { case 2 -> 0.0D; case 3,4,5,6,7,8,13 -> 1.0D; case 12 -> 0.0D; default -> 0.0D; };
             case 4 -> switch (row) { case 3,4 -> 0.0D; case 6 -> 25.0D; case 7 -> 60.0D; default -> 0.0D; };
+            case 6 -> row == 1 ? 96D : row == 2 ? .1D : 0D;
             default -> switch (row) { case 0,5 -> 0.0D; case 4 -> 25.0D; default -> 0.0D; };
         };
     }
@@ -606,6 +627,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 3 -> switch (row) { case 2 -> 5000.0D; case 3 -> 120.0D; case 4,5,6,7,8 -> 100.0D;
                 case 12 -> 100.0D; default -> 100.0D; };
             case 4 -> switch (row) { case 3 -> 240.0D; case 4 -> 250.0D; case 6 -> 200.0D; default -> 160.0D; };
+            case 6 -> row == 0 || row == 1 ? 4096D : row == 2 ? 1000D : row == 3 ? .99D : row == 4 ? 1_000_000D : 10D;
             default -> switch (row) { case 0,4,5 -> 1000.0D; case 6 -> 500.0D; default -> 1000.0D; };
         };
     }
@@ -670,6 +692,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 6 -> npcChatFrequencyPercent=clamp((int)Math.round(raw/5.0D)*5,0,500);
                 default -> {}
             } }
+            case 6 -> setAdvancedNumeric(row, raw);
         }
         markDirty();
     }
@@ -731,6 +754,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 3 -> resetMeditationTabDefaults();
             case 4 -> resetMeditationVisualTabDefaults();
             case 5 -> resetNpcBehaviorTabDefaults();
+            case 6 -> resetAdvancedDefaults();
             default -> { return; }
         }
         dirty = true;
@@ -773,6 +797,16 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         npcGrowthPercent = d.npcGrowthPercent();
         npcChatFrequencyPercent = d.npcChatFrequencyPercent();
         attackMinecraftMobs = d.attackMinecraftMobs();
+    }
+
+    private void resetAdvancedDefaults() {
+        LivingWorldConfig.Snapshot d=LivingWorldConfig.defaults();
+        maxRememberedDeadFighters=d.maxRememberedDeadFighters(); npcDespawnProtectionRadius=d.npcDespawnProtectionRadius();
+        levelMultiplierPerSaga=d.levelMultiplierPerSaga(); maxDefenseMitigation=d.maxDefenseMitigation(); bpVisualMultiplier=d.bpVisualMultiplier();
+        canMeditationProcSkillProgression=d.canMeditationProcSkillProgression(); npcRaceBlacklist=String.join(",",d.npcRaceBlacklist());
+        treatRaceBlacklistAsWhitelist=d.treatRaceBlacklistAsWhitelist(); canUseClothes=String.join(",",d.canUseClothes());
+        dimensionWhitelist=String.join(",",d.dimensionWhitelist()); treatDimensionWhitelistAsBlacklist=d.treatDimensionWhitelistAsBlacklist();
+        for(int i=0;i<20;i++) archetypeShares[i]=d.archetypeShares().get(i);
     }
 
     private void resetMeditationTabDefaults() {
@@ -830,6 +864,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 3 -> row == 2 || row == 3 || (row >= 4 && row <= 8) || row == 12 || row == 13;
             case 4 -> row == 3 || row == 4 || row == 6 || row == 7;
             case 5 -> row == 0 || row == 4 || row == 5 || row == 6;
+            case 6 -> row != 5 && row != 7 && row != 10;
             default -> false;
         };
     }
@@ -889,6 +924,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 6 -> Integer.toString(npcChatFrequencyPercent);
                 default -> "";
             };
+            case 6 -> advancedRawValue(row);
             default -> "";
         };
     }
@@ -904,7 +940,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     }
 
     private static boolean isDecimalNumericRow(int tab, int row) {
-        return (tab == 2 && (row == 0 || row == 1 || row == 2)) || (tab == 3 && row == 12);
+        return (tab == 2 && (row == 0 || row == 1 || row == 2)) || (tab == 3 && row == 12) || (tab == 6 && row >= 2);
     }
 
     private void beginNumericEditor(int row, int x, int y, int w, int h) {
@@ -913,10 +949,11 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         editingRow = row;
         editingTab = tab;
         numericEditor = new EditBox(font, x + 1, y + 1, Math.max(24, w - 2), Math.max(16, h - 2), Component.literal(rowName(row)));
-        numericEditor.setMaxLength(14);
+        numericEditor.setMaxLength(isTextRow(tab, row) ? 512 : 14);
         final boolean decimal = isDecimalNumericRow(tab, row);
         final boolean negative = tab == 2 && row == 2;
         numericEditor.setFilter(value -> {
+            if (isTextRow(tab, row)) return true;
             if (value.isEmpty()) return true;
             if (negative) return value.matches("-?[0-9]*\\.?[0-9]*");
             if (decimal) return value.matches("[0-9]*\\.?[0-9]*");
@@ -946,6 +983,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 3 -> commitMeditationNumber(row, raw);
                 case 4 -> commitMeditationVisualNumber(row, raw);
                 case 5 -> commitNpcBehaviorNumber(row, raw);
+                case 6 -> commitAdvanced(row, raw);
                 default -> { return; }
             }
             markDirty();
@@ -1033,6 +1071,39 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         }
     }
 
+    private static boolean isTextRow(int selectedTab,int row){return selectedTab==6&&(row==6||row==8||row==9);}
+    private static java.util.List<String> csv(String text){
+        if(text==null||text.isBlank())return java.util.List.of();
+        return java.util.Arrays.stream(text.split(",")).map(String::trim).filter(s->!s.isBlank()).toList();
+    }
+    private String advancedName(int r){
+        if(r<11)return switch(r){case 0->"Remembered dead fighters";case 1->"NPC despawn protection";case 2->"Saga level multiplier";
+            case 3->"Maximum defense mitigation";case 4->"Visual BP multiplier";case 5->"Meditation skill discovery";
+            case 6->"NPC race blacklist";case 7->"Race list is whitelist";case 8->"Races that use clothes";
+            case 9->"Spawn dimensions";default->"Dimension list is blacklist";};
+        String[] archetypes={"Brawler","Martial Artist","Speed Fighter","Guardian","Ki Specialist"};
+        String[] stats={"Melee","Defense","Ki","Health"}; int i=r-11; return archetypes[i/4]+" "+stats[i%4]+" share";
+    }
+    private String advancedValue(int r){
+        if(r>=11)return pct(archetypeShares[r-11]);
+        return switch(r){case 0->Integer.toString(maxRememberedDeadFighters);case 1->npcDespawnProtectionRadius+" blocks";
+            case 2->"x"+formatNumber(levelMultiplierPerSaga,2);case 3->pct(maxDefenseMitigation);case 4->"x"+formatNumber(bpVisualMultiplier,2);
+            case 5->onOff(canMeditationProcSkillProgression);case 6->npcRaceBlacklist.isBlank()?"(empty)":npcRaceBlacklist;
+            case 7->onOff(treatRaceBlacklistAsWhitelist);case 8->canUseClothes;case 9->dimensionWhitelist;
+            default->onOff(treatDimensionWhitelistAsBlacklist);};
+    }
+    private String advancedRawValue(int r){if(isTextRow(6,r))return r==6?npcRaceBlacklist:r==8?canUseClothes:dimensionWhitelist;
+        return formatNumber(advancedNumericValue(r),4);}
+    private double advancedNumericValue(int r){if(r>=11)return archetypeShares[r-11];return switch(r){case 0->maxRememberedDeadFighters;
+        case 1->npcDespawnProtectionRadius;case 2->levelMultiplierPerSaga;case 3->maxDefenseMitigation;case 4->bpVisualMultiplier;default->0D;};}
+    private void changeAdvanced(int r,int d){if(r==5)canMeditationProcSkillProgression=d>0;else if(r==7)treatRaceBlacklistAsWhitelist=d>0;
+        else if(r==10)treatDimensionWhitelistAsBlacklist=d>0;else if(!isTextRow(6,r))setAdvancedNumeric(r,advancedNumericValue(r)+d*(r>=11?.01D:r==3?.01D:r==2?.1D:1D));}
+    private void setAdvancedNumeric(int r,double v){if(r>=11)archetypeShares[r-11]=clamp(v,0D,10D);else switch(r){case 0->maxRememberedDeadFighters=clamp((int)Math.round(v),0,4096);
+        case 1->npcDespawnProtectionRadius=clamp((int)Math.round(v),96,4096);case 2->levelMultiplierPerSaga=clamp(v,.1D,1000D);
+        case 3->maxDefenseMitigation=clamp(v,0D,.99D);case 4->bpVisualMultiplier=clamp(v,0D,1_000_000D);default->{}}}
+    private void commitAdvanced(int r,String raw){if(r==6)npcRaceBlacklist=raw;else if(r==8)canUseClothes=raw;else if(r==9)dimensionWhitelist=raw;
+        else setAdvancedNumeric(r,Double.parseDouble(raw));}
+
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (numericEditor != null) {
@@ -1052,6 +1123,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         case 2 -> "Display • local readability • sliders also support exact typing";
         case 3 -> "Meditation • progression • sliders also support exact typing";
         case 4 -> "Meditation visuals • local effects • sliders also support exact typing";
+        case 6 -> "Advanced NPC • data limits, scaling, race lists and archetype shares";
         default -> "NPC Behaviour • activity, sensing and combat policy • sliders also support exact typing";
     };}
     private String activityLabel(){return switch(activityPreset){case 0->"Off";case 1->"Low";case 3->"High";default->"Normal";};}

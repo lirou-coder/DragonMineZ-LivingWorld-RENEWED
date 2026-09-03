@@ -356,6 +356,38 @@ public final class LivingWorldCommands {
         event.getDispatcher().register(
                 Commands.literal("livingworld")
                         .executes(ctx -> openWorldOverview(ctx.getSource().getPlayerOrException()))
+                        .then(Commands.literal("summon")
+                                .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(), null, null, null, null))
+                                .then(Commands.argument("race", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> {
+                                            for (String value : new String[]{"human", "saiyan", "namekian", "frostdemon", "bioandroid", "majin"}) builder.suggest(value);
+                                            return builder.buildFuture();
+                                        })
+                                        .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
+                                                StringArgumentType.getString(ctx, "race"), null, null, null))
+                                        .then(Commands.argument("rank", StringArgumentType.word())
+                                                .suggests((ctx, builder) -> {
+                                                    for (String value : new String[]{"rokie", "rookie", "trained", "veteran"}) builder.suggest(value);
+                                                    return builder.buildFuture();
+                                                })
+                                                .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
+                                                        StringArgumentType.getString(ctx, "race"),
+                                                        StringArgumentType.getString(ctx, "rank"), null, null))
+                                                .then(Commands.argument("archetype", StringArgumentType.word())
+                                                        .suggests((ctx, builder) -> {
+                                                            for (String value : new String[]{"brawler", "martial_artist", "speed_fighter", "guardian", "ki_specialist"}) builder.suggest(value);
+                                                            return builder.buildFuture();
+                                                        })
+                                                        .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
+                                                                StringArgumentType.getString(ctx, "race"),
+                                                                StringArgumentType.getString(ctx, "rank"),
+                                                                StringArgumentType.getString(ctx, "archetype"), null))
+                                                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                                                .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
+                                                                        StringArgumentType.getString(ctx, "race"),
+                                                                        StringArgumentType.getString(ctx, "rank"),
+                                                                        StringArgumentType.getString(ctx, "archetype"),
+                                                                        StringArgumentType.getString(ctx, "name"))))))))
                         .then(Commands.literal("factions")
                                 .executes(ctx -> openPlayerFactionList(ctx.getSource().getPlayerOrException())))
                         .then(Commands.literal("faction")
@@ -1471,6 +1503,51 @@ public final class LivingWorldCommands {
         return Command.SINGLE_SUCCESS;
     }
 
+    private static int summonFighter(ServerPlayer player, String raceName, String rankName,
+                                     String archetypeName, String customName) {
+        if (!(player.level() instanceof ServerLevel level)) return 0;
+
+        FighterRace race = raceName == null ? AmbientFighterSpawner.rollRaceForLevel(level, player.getRandom()) : parseRace(raceName);
+        FighterRank rank = rankName == null ? FighterRank.roll(player.getRandom()) : parseRank(rankName);
+        FighterArchetype archetype = archetypeName == null ? null : parseStyle(archetypeName);
+        if (race == null) {
+            player.displayClientMessage(Component.literal("[Living World] Races: human, saiyan, namekian, frostdemon, bioandroid, majin")
+                    .withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
+        if (rank == null) {
+            player.displayClientMessage(Component.literal("[Living World] Training levels: rokie, trained, veteran")
+                    .withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
+        if (archetypeName != null && archetype == null) {
+            player.displayClientMessage(Component.literal("[Living World] Archetypes: brawler, martial_artist, speed_fighter, guardian, ki_specialist")
+                    .withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
+        if (archetype == null) archetype = FighterArchetype.roll(player.getRandom(), rank);
+
+        BlockPos pos = AmbientFighterSpawner.findSafeGroundAround(level, player.blockPosition(), player.getRandom(), 7, 13, 18);
+        if (pos == null) {
+            player.displayClientMessage(Component.literal("[Living World] Could not find safe ground nearby.")
+                    .withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
+
+        FighterAlignment alignment = FighterAlignment.roll(player.getRandom());
+        FighterPersonality personality = FighterPersonality.roll(player.getRandom(), alignment);
+        AmbientFighterEntity fighter = AmbientFighterSpawner.spawnAt(level, pos, alignment, rank,
+                personality, race, archetype, player.getRandom());
+        if (fighter == null) return 0;
+        if (customName != null && !customName.isBlank()) fighter.setFighterName(customName.trim());
+
+        player.displayClientMessage(Component.literal("[Living World] Summoned ").withStyle(ChatFormatting.GOLD)
+                .append(Component.literal(fighter.getFighterName()).withStyle(ChatFormatting.WHITE))
+                .append(Component.literal(" • " + race.displayName() + " • " + rank.displayName()
+                        + " • " + archetype.displayName()).withStyle(ChatFormatting.GRAY)), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
     private static int memoryStatus(ServerPlayer player) {
         player.displayClientMessage(Component.literal("[Living World] " + FighterMemoryManager.status(player))
                 .withStyle(ChatFormatting.GRAY), false);
@@ -2161,10 +2238,31 @@ public final class LivingWorldCommands {
     private static FighterArchetype parseStyle(String value) {
         return switch (value.toLowerCase(java.util.Locale.ROOT)) {
             case "brawler" -> FighterArchetype.BRAWLER;
-            case "martial", "martial_artist" -> FighterArchetype.MARTIAL_ARTIST;
-            case "ki", "ki_specialist" -> FighterArchetype.KI_SPECIALIST;
-            case "speed", "speedster" -> FighterArchetype.SPEEDSTER;
+            case "martial", "martial_artist", "martialartist" -> FighterArchetype.MARTIAL_ARTIST;
+            case "ki", "ki_specialist", "kispecialist" -> FighterArchetype.KI_SPECIALIST;
+            case "speed", "speedster", "speed_fighter", "speedfighter" -> FighterArchetype.SPEEDSTER;
             case "guardian" -> FighterArchetype.GUARDIAN;
+            default -> null;
+        };
+    }
+
+    private static FighterRace parseRace(String value) {
+        return switch (value.toLowerCase(java.util.Locale.ROOT)) {
+            case "human" -> FighterRace.HUMAN;
+            case "saiyan" -> FighterRace.SAIYAN;
+            case "namekian" -> FighterRace.NAMEKIAN;
+            case "frostdemon", "frost_demon" -> FighterRace.FROST_DEMON;
+            case "bioandroid", "bio_android" -> FighterRace.BIO_ANDROID;
+            case "majin" -> FighterRace.MAJIN;
+            default -> null;
+        };
+    }
+
+    private static FighterRank parseRank(String value) {
+        return switch (value.toLowerCase(java.util.Locale.ROOT)) {
+            case "rokie", "rookie" -> FighterRank.ROOKIE;
+            case "trained" -> FighterRank.TRAINED;
+            case "veteran" -> FighterRank.VETERAN;
             default -> null;
         };
     }

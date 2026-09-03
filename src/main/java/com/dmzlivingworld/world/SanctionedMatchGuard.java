@@ -198,6 +198,20 @@ public final class SanctionedMatchGuard {
         return null;
     }
 
+    /** Called only after AmbientFighterEntity has applied its real DMZ melee and Defense mitigation. */
+    public static boolean interceptFinalNpcSparDamage(AmbientFighterEntity fighter, DamageSource source, float finalDamage) {
+        if (fighter == null || fighter.level().isClientSide || !fighter.isSanctionedMatchParticipant()) return false;
+        LivingEntity attacker = responsibleAttacker(source);
+        if (!(attacker instanceof ServerPlayer player) || !fighter.isSanctionedOpponent(player)) return false;
+        float floor = Math.max(1.0F, fighter.getMaxHealth() * 0.30F);
+        if (fighter.getHealth() - Math.max(0.0F, finalDamage) > floor) return false;
+        fighter.setHealth(floor);
+        fighter.restoreSanctionedLivingState(false);
+        fighter.concedeSanctionedMatch();
+        SparManager.finishFromFinalDamage(player, fighter, true);
+        return true;
+    }
+
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingHurt(LivingHurtEvent event) {
         if (event.getAmount() <= 0.0F) return;
@@ -239,6 +253,10 @@ public final class SanctionedMatchGuard {
         }
     }
 
+    /**
+     * Preventive player-side floor. LOWEST is intentional: DMZ and compatibility handlers have
+     * already converted the original hit into the mitigated amount by this point.
+     */
     /** The 30% decision uses the final damage after DMZ defense and every other modifier. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDamage(LivingDamageEvent event) {

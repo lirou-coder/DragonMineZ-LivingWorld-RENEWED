@@ -15,7 +15,7 @@ import software.bernie.geckolib.renderer.GeoRenderer;
 import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
 import software.bernie.geckolib.util.RenderUtils;
 
-/** Delegates Human/Saiyan hair geometry entirely to DragonMineZ's HairRenderer. */
+/** Delegates humanoid hair geometry entirely to DragonMineZ's HairRenderer. */
 public final class FighterHairLayer extends GeoRenderLayer<AmbientFighterEntity> {
     public FighterHairLayer(GeoRenderer<AmbientFighterEntity> renderer) {
         super(renderer);
@@ -26,7 +26,8 @@ public final class FighterHairLayer extends GeoRenderLayer<AmbientFighterEntity>
                               RenderType renderType, MultiBufferSource bufferSource,
                               VertexConsumer buffer, float partialTick, int packedLight, int packedOverlay) {
         if (WorldMenaceManager.isHerobrine(entity)) return;
-        if (!"head".equals(bone.getName()) || !entity.getRace().usesHair()) return;
+        if (!"head".equals(bone.getName()) || !entity.getRace().usesHair()
+                || (entity.getRace() == com.dmzlivingworld.entity.FighterRace.MAJIN && !entity.isFemale())) return;
 
         Character character = entity.getDMZCharacter();
         String hairType = entity.getActiveRacialForm() == null ? "base" : entity.getActiveRacialForm().hairType();

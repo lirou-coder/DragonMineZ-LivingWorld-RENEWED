@@ -3,6 +3,12 @@ package com.dmzlwfusion;
 import com.dragonminez.common.stats.StatsData;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraftforge.fml.ModList;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -16,6 +22,33 @@ final class DmzRevampFusionCompat {
     private static final String SCALE_TAG = "DmzRevampFusionScale";
 
     private DmzRevampFusionCompat() {}
+
+    static boolean allowsDifferentRaceMetamoru() {
+        if (!ModList.get().isLoaded("dmzrevamp")) return false;
+        try {
+            Class<?> config = Class.forName("com.dmzrevamp.config.FusionsRevampedConfig");
+            return Boolean.TRUE.equals(config.getMethod("canUseDifferentRaceMetamoru").invoke(null));
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return false;
+        }
+    }
+
+    /** The revamp cosmetic rows are player-only; use its exact Metamoru armor on a fused NPC. */
+    static void applyNpcMetamoruClothes(LivingEntity fused) {
+        if (fused == null || !ModList.get().isLoaded("dmzrevamp")) return;
+        try {
+            Class<?> config = Class.forName("com.dmzrevamp.config.FusionsRevampedConfig");
+            if (!Boolean.TRUE.equals(config.getMethod("isRevampedEnabled").invoke(null))) return;
+            fused.setItemSlot(EquipmentSlot.FEET, item("gogeta_armor_boots"));
+            fused.setItemSlot(EquipmentSlot.LEGS, item("gogeta_armor_leggings"));
+            fused.setItemSlot(EquipmentSlot.CHEST, item("gogeta_armor_chestplate"));
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+    }
+
+    private static ItemStack item(String path) {
+        Item item = ForgeRegistries.ITEMS.getValue(ResourceLocation.fromNamespaceAndPath("dragonminez", path));
+        return item == null ? ItemStack.EMPTY : new ItemStack(item);
+    }
 
     static boolean applyIfEnabled(StatsData player, LWFusionProfile npc, int playerTotal) {
         if (!ModList.get().isLoaded("dmzrevamp") || player == null || npc == null) return false;

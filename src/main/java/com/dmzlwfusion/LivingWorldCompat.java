@@ -74,6 +74,10 @@ public final class LivingWorldCompat {
     }
 
     public static int battlePower(LivingEntity fighter) {
+        // Fusion deliberately sees Living World's configured visual power. All non-fusion LW
+        // systems continue reading their authoritative getBattlePower()/permanent BP directly.
+        Object visual = invoke(fighter, "getVisualBattlePower");
+        if (visual instanceof Number number) return Math.max(1, number.intValue());
         Object value = invoke(fighter, "getBattlePower");
         if (value instanceof Number number) return Math.max(1, number.intValue());
         return 1;
@@ -123,6 +127,13 @@ public final class LivingWorldCompat {
 
     public static boolean setAuraColor(LivingEntity fighter, int rgb) {
         return invokeVoid(fighter, "setAuraColor", new Class<?>[]{int.class}, rgb & 0xFFFFFF);
+    }
+
+    /** Stops DMZ charge and Living World's transient aura before a fusion partner is hidden. */
+    public static void suppressAura(LivingEntity fighter) {
+        if (fighter == null) return;
+        invokeVoid(fighter, "suppressActivityAura", new Class<?>[0]);
+        invokeVoid(fighter, "setKiCharge", new Class<?>[]{boolean.class}, false);
     }
 
     public static boolean unavailableForFusion(LivingEntity fighter) {

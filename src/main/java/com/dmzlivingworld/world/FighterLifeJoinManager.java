@@ -4,6 +4,7 @@ import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
 import com.dmzlivingworld.entity.FighterRank;
+import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -57,7 +58,7 @@ public final class FighterLifeJoinManager {
 
     public static boolean request(ServerPlayer player, AmbientFighterEntity fighter) {
         if (player == null || fighter == null || !fighter.isAlive()) return false;
-        if (SESSIONS.containsKey(player.getUUID()) || fighter.isSocialLifeActivity()) {
+        if (activeSession(player) != null) {
             message(player, "You're already accompanying someone.", ChatFormatting.GRAY);
             return false;
         }
@@ -75,13 +76,37 @@ public final class FighterLifeJoinManager {
         Entity target = player.serverLevel().getEntity(opportunity.targetId());
         if (target == null || !target.isAlive()) return false;
         fighter.setSocialLifeActivity(true);
-        fighter.getNavigation().moveTo(target, 1.08D);
-        fighter.speak(opening(fighter, opportunity, target), 100);
+        moveTowardOpportunity(fighter, target, true);
+        fighter.speak(opening(fighter, player, opportunity, target), 120);
         SESSIONS.put(player.getUUID(), new Session(player.getUUID(), fighter.getUUID(), target.getUUID(),
                 opportunity.kind(), player.serverLevel().getGameTime()));
         message(player, fighter.getFighterName() + " agreed to go with you. " + opportunity.label(), ChatFormatting.GREEN);
         message(player, "Stay close until the situation is finished.", ChatFormatting.GRAY);
         return true;
+    }
+
+    /**
+     * Static runtime state can outlive a world transition inside the same client/server process.
+     * Only a session whose player and fighter are still physically participating may block a new
+     * Go Along request; every orphaned/expired entry is released silently here.
+     */
+    private static Session activeSession(ServerPlayer player) {
+        Session session = SESSIONS.get(player.getUUID());
+        if (session == null) return null;
+        AmbientFighterEntity oldFighter = findFighter(player.getServer(), session.fighterId);
+        long now = player.getServer().overworld().getGameTime();
+        boolean valid = oldFighter != null && oldFighter.isAlive()
+                && oldFighter.level() == player.level()
+                && player.distanceToSqr(oldFighter) <= 32.0D * 32.0D
+                && now - session.started <= MAX_TICKS;
+        if (valid) return session;
+        SESSIONS.remove(player.getUUID());
+        releaseQuietTarget(session, oldFighter);
+        if (oldFighter != null) {
+            oldFighter.setSocialLifeActivity(false);
+            if (oldFighter.getTarget() == null) oldFighter.getNavigation().stop();
+        }
+        return null;
     }
 
     public static String activeLabel(AmbientFighterEntity fighter) {
@@ -118,7 +143,6 @@ public final class FighterLifeJoinManager {
         if (event.phase != TickEvent.Phase.END) return;
         MinecraftServer server = event.getServer();
         long now = server.overworld().getGameTime();
-        if (now % 10L != 0L) return;
         for (Session session : List.copyOf(SESSIONS.values())) tick(server, session, now);
     }
 
@@ -161,7 +185,7 @@ public final class FighterLifeJoinManager {
             fighter.getLookControl().setLookAt(target, 30.0F, 30.0F);
             double arrive = session.kind == Kind.EQUIPMENT ? 3.0D : 5.0D;
             if (fighter.distanceToSqr(target) > arrive * arrive) {
-                if (fighter.getNavigation().isDone() || now % 30L == 0L) fighter.getNavigation().moveTo(target, 1.08D);
+                moveTowardOpportunity(fighter, target, fighter.getNavigation().isDone() || now % 20L == 0L);
                 return;
             }
             if (player.distanceToSqr(fighter) > 9.0D * 9.0D) return;
@@ -307,8 +331,8 @@ public final class FighterLifeJoinManager {
         Entity target = level.getEntity(opportunity.targetId());
         if (target == null || !target.isAlive()) return 0;
         fighter.setSocialLifeActivity(true);
-        fighter.getNavigation().moveTo(target, 1.08D);
-        fighter.speak(opening(fighter, opportunity, target), 100);
+        moveTowardOpportunity(fighter, target, true);
+        fighter.speak(opening(fighter, player, opportunity, target), 120);
         SESSIONS.put(player.getUUID(), new Session(player.getUUID(), fighter.getUUID(), target.getUUID(),
                 opportunity.kind(), level.getServer().overworld().getGameTime()));
         message(player, "Go Along test started: " + opportunity.label(), ChatFormatting.AQUA);
@@ -339,14 +363,56 @@ public final class FighterLifeJoinManager {
         return null;
     }
 
-    private static String opening(AmbientFighterEntity fighter, Opportunity opportunity, Entity target) {
-        return switch (opportunity.kind()) {
+    private static String opening(AmbientFighterEntity fighter, ServerPlayer player, Opportunity opportunity, Entity target) {
+        String objective = switch (opportunity.kind()) {
             case RIVAL -> "I found " + ((AmbientFighterEntity) target).getFighterName() + ". I'm settling this now.";
             case EQUIPMENT -> "There's something nearby I can actually use. I'm going for it.";
             case THREAT -> "There's trouble nearby. I'm not ignoring it.";
             case FRIEND -> "I haven't checked in with " + ((AmbientFighterEntity) target).getFighterName() + " in a while. Come on.";
             case FACTION -> "I'm checking in with " + ((AmbientFighterEntity) target).getFighterName() + " before I move on. Come if you want.";
         };
+        int relationship = fighter.isRememberedFor(player) ? fighter.getMemoryRelationship() : 0;
+        String address = relationship >= 35 ? "I trust you, so come with me. "
+                : relationship >= 15 ? "You can come if you keep up. " : "Stay out of my way. ";
+        String mood = switch (ReactiveWorldManager.mood(fighter)) {
+            case UPBEAT -> "This should be a good change of pace. ";
+            case IRRITATED -> "I don't want to waste time. ";
+            case SOMBER -> "I need to do this, even if I'm not feeling talkative. ";
+            case WARY -> "Keep your eyes open. ";
+            case WEARY -> "I'm tired, but this still needs doing. ";
+            case FOCUSED -> "I've made up my mind. ";
+            case CONTENT -> "Now is as good a time as any. ";
+        };
+        String personality = switch (fighter.getPersonality()) {
+            case HEROIC -> "Let's handle it properly. ";
+            case CALM -> "No need to rush blindly. ";
+            case CAUTIOUS -> "We'll take the safe route. ";
+            case PROUD -> "Don't slow me down. ";
+            case AGGRESSIVE -> "If it turns into a fight, even better. ";
+        };
+        return address + mood + personality + objective;
+    }
+
+    private static void moveTowardOpportunity(AmbientFighterEntity fighter, Entity target, boolean refreshGroundPath) {
+        if (fighter == null || target == null) return;
+        boolean targetFlying = target instanceof DBSagasEntity sagaTarget && sagaTarget.isFlying();
+        if (targetFlying && fighter.hasFlightUnlocked() && !fighter.isNonCombatant()) {
+            fighter.getNavigation().stop();
+            fighter.setFlying(true);
+            fighter.setNoGravity(true);
+            double distanceSq = fighter.distanceToSqr(target);
+            fighter.setFlyingFast(distanceSq > 16.0D * 16.0D);
+            fighter.steerAmbientFlightToward(target.position().add(0.0D, target.getBbHeight() * 0.55D, 0.0D),
+                    distanceSq > 16.0D * 16.0D ? 0.58D : 0.42D);
+            fighter.getLookControl().setLookAt(target, 35.0F, 30.0F);
+            return;
+        }
+        if (fighter.isFlying() || fighter.isNoGravity()) {
+            fighter.setFlying(false);
+            fighter.setFlyingFast(false);
+            fighter.setNoGravity(false);
+        }
+        if (refreshGroundPath) fighter.getNavigation().moveTo(target, 1.08D);
     }
 
     private static String nothingToDo(AmbientFighterEntity fighter) {

@@ -19,7 +19,9 @@
   ],
   "client": [
     "FighterModelAnimationMixin",
-    "GeoItemRendererAccessor"
+    "GeoItemRendererAccessor",
+    "KiSenseVisualBattlePowerMixin",
+    "ScouterVisualBattlePowerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

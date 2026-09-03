@@ -236,6 +236,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> MOUTH_TYPE =
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> HEAD_BONE =
+            SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> HAIR_ID =
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> OUTFIT =
@@ -267,9 +269,10 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             "#2B211B", "#503522", "#6B4A2B", "#3E5F43", "#355C7D", "#566B85", "#6B456E"
     };
     private static final String[] NAMEK_GREEN = {"#1FAA24", "#2FB43A", "#168B24", "#49C451"};
+    private static final String[] NAMEK_LIGHT_GREEN = {"#8FEA72", "#A6F28A", "#72D968", "#B5F39A"};
     private static final String[] NAMEK_ACCENT = {"#BB2024", "#D13835", "#8F1A25", "#D85B42"};
     private static final String[] NAMEK_PINK = {"#FF86A6", "#EA6F96", "#FF9DB7"};
-    private static final String[] MAJIN_COLORS = {"#FFA4FF", "#F18BEA", "#D979DF", "#FFB2D8"};
+    private static final String[] MAJIN_EYE_RED = {"#D71920", "#FF3038", "#A80F18", "#E84B50"};
     private static final String[] FROST_MAIN = {"#FFFFFF", "#E9EEFF", "#ECE4F5", "#DDEEFF"};
     private static final String[] FROST_SECOND = {"#E8A2FF", "#B99CFF", "#88C8FF", "#F0B0E6"};
     private static final String[] FROST_ACCENT = {"#FF39A9", "#7E59FF", "#44BCEB", "#D92774"};
@@ -567,6 +570,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         entityData.define(EYES_TYPE, 0);
         entityData.define(NOSE_TYPE, 0);
         entityData.define(MOUTH_TYPE, 0);
+        entityData.define(HEAD_BONE, 0);
         entityData.define(HAIR_ID, 1);
         entityData.define(OUTFIT, 0);
         entityData.define(BODY_COLOR, "#E9B18D");
@@ -1507,6 +1511,11 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         return Math.max(1, stored > 0 ? stored : getBattlePower());
     }
 
+    /** Presentation/fusion reading; never use this for Living World progression or stat scaling. */
+    public int getVisualBattlePower() {
+        return com.dmzlivingworld.world.FighterVisualPower.of(this);
+    }
+
     /**
      * A permanent adjustment made by setup/faction/debug systems. It does not qualify as
      * personal progression for faction re-anchoring, but it always updates the canonical base.
@@ -1954,6 +1963,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (!level().isClientSide && sanctionedMatchParticipant) {
             if (!isSanctionedOpponent(attackerEntity)) return false;
             if (isDefeated() || recoveryGraceTicks > 0) return false;
+            if (SanctionedMatchGuard.interceptFinalNpcSparDamage(this, source, amount)) return true;
             // Legitimate non-finishing spar damage uses DMZ's real damage path, but bypasses
             // crime/faction-war logic and ordinary NPC concession/death handling below.
             return super.hurt(source, amount);
@@ -1963,6 +1973,12 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         // repeated trust/reputation gains. Friendly Fist off still restores ordinary lethal rules.
         if (!level().isClientSide && attackerEntity instanceof ServerPlayer player
                 && MercyManager.shouldIgnoreFriendlyFistHit(player, this)) {
+            return false;
+        }
+
+        // Combat swings aimed through a travelling companion must never count as betrayal.
+        if (!level().isClientSide && attackerEntity instanceof ServerPlayer player
+                && LivingBondManager.isCombatProtectedCompanion(player, this)) {
             return false;
         }
 
@@ -2370,7 +2386,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         ItemStack held = player.getItemInHand(hand);
 
         if (isSanctionedMatchParticipant() || getTarget() != null) {
-            if (!level().isClientSide && player instanceof ServerPlayer serverPlayer) {
+            if (getTarget() != player && !level().isClientSide && player instanceof ServerPlayer serverPlayer) {
                 serverPlayer.displayClientMessage(Component.literal(
                         "The NPC is fighting! You can't interact right now!").withStyle(ChatFormatting.RED), false);
             }
@@ -2495,28 +2511,42 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 entityData.set(BODY_COLOR3, skin);
             }
             case NAMEKIAN -> {
-                entityData.set(BODY_TYPE, random.nextInt(4)); // selects native warrior/trader variant
+                int bodyType = random.nextInt(3);
+                entityData.set(BODY_TYPE, bodyType);
                 entityData.set(EYES_TYPE, random.nextInt(5));
                 entityData.set(NOSE_TYPE, random.nextInt(2));
                 entityData.set(MOUTH_TYPE, random.nextInt(2));
+                entityData.set(HEAD_BONE, random.nextFloat() < 0.50F ? 0 : 1 + random.nextInt(2));
                 entityData.set(HAIR_ID, 0);
-                entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains(race.dmzId()) ? random.nextInt(22) : 0);
-                entityData.set(BODY_COLOR, pick(random, NAMEK_GREEN));
-                entityData.set(BODY_COLOR2, pick(random, NAMEK_ACCENT));
-                entityData.set(BODY_COLOR3, pick(random, NAMEK_PINK));
+                entityData.set(HAIR_COLOR, pick(random, NAMEK_LIGHT_GREEN));
+                entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains(race.dmzId()) ? random.nextInt(44) : 0);
+                String green = pick(random, NAMEK_GREEN), red = pick(random, NAMEK_ACCENT), pink = pick(random, NAMEK_PINK);
+                entityData.set(BODY_COLOR, green);
+                entityData.set(BODY_COLOR2, red);
+                entityData.set(BODY_COLOR3, pink);
             }
             case MAJIN -> {
                 entityData.set(BODY_TYPE, random.nextInt(3));
-                entityData.set(EYES_TYPE, random.nextInt(2));
+                entityData.set(EYES_TYPE, random.nextInt(3));
                 entityData.set(NOSE_TYPE, random.nextInt(2));
                 entityData.set(MOUTH_TYPE, random.nextInt(2));
+                entityData.set(HEAD_BONE, isFemale() ? 0 : random.nextInt(3));
                 entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains(race.dmzId()) ? random.nextInt(22) : 0);
-                String main = pick(random, MAJIN_COLORS);
+                int majinColorRoll = random.nextInt(100);
+                boolean pinkVariant = majinColorRoll < 70;
+                String main = pinkVariant ? colorVariant(random, 0xFFA4FF, 30)
+                        : majinColorRoll < 90 ? colorVariant(random, 0x9CFF9C, 38)
+                        : randomColor(random);
+                String secondary = pinkVariant ? main
+                        : shadeColor(main, random.nextBoolean() ? 0.72D : 1.28D);
                 entityData.set(HAIR_ID, isFemale() ? 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())) : 0);
                 entityData.set(HAIR_COLOR, main);
                 entityData.set(BODY_COLOR, main);
-                entityData.set(BODY_COLOR2, main);
+                entityData.set(BODY_COLOR2, secondary);
                 entityData.set(BODY_COLOR3, main);
+                String redEye = pick(random, MAJIN_EYE_RED);
+                entityData.set(EYE1_COLOR, redEye);
+                entityData.set(EYE2_COLOR, redEye);
             }
             case FROST_DEMON -> {
                 entityData.set(BODY_TYPE, random.nextInt(3));
@@ -2567,6 +2597,43 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     private static String pick(RandomSource random, String[] values) {
         return values[random.nextInt(values.length)];
+    }
+
+    private static String randomColor(RandomSource random) {
+        return String.format(java.util.Locale.ROOT, "#%02X%02X%02X",
+                random.nextInt(256), random.nextInt(256), random.nextInt(256));
+    }
+
+    private static String colorVariant(RandomSource random, int rgb, int variation) {
+        int red = Math.max(0, Math.min(255, ((rgb >> 16) & 255) + random.nextInt(variation * 2 + 1) - variation));
+        int green = Math.max(0, Math.min(255, ((rgb >> 8) & 255) + random.nextInt(variation * 2 + 1) - variation));
+        int blue = Math.max(0, Math.min(255, (rgb & 255) + random.nextInt(variation * 2 + 1) - variation));
+        return String.format(java.util.Locale.ROOT, "#%02X%02X%02X", red, green, blue);
+    }
+
+    /** Range produced by colorVariant(random, 0xFFA4FF, 30), including channel clamping. */
+    private static boolean isMajinPinkVariant(String color) {
+        try {
+            String value = color != null && color.startsWith("#") ? color.substring(1) : color;
+            int rgb = Integer.parseInt(value, 16);
+            int red = (rgb >> 16) & 255, green = (rgb >> 8) & 255, blue = rgb & 255;
+            return red >= 225 && green >= 134 && green <= 194 && blue >= 225;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private static String shadeColor(String color, double factor) {
+        try {
+            String value = color != null && color.startsWith("#") ? color.substring(1) : color;
+            int rgb = Integer.parseInt(value, 16);
+            int red = Math.max(0, Math.min(255, (int)Math.round(((rgb >> 16) & 255) * factor)));
+            int green = Math.max(0, Math.min(255, (int)Math.round(((rgb >> 8) & 255) * factor)));
+            int blue = Math.max(0, Math.min(255, (int)Math.round((rgb & 255) * factor)));
+            return String.format(java.util.Locale.ROOT, "#%02X%02X%02X", red, green, blue);
+        } catch (RuntimeException ignored) {
+            return color;
+        }
     }
 
     public FighterAlignment getAlignment() { return FighterAlignment.byId(entityData.get(ALIGNMENT)); }
@@ -2778,6 +2845,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     public int getNoseType() { return entityData.get(NOSE_TYPE); }
     public int getMouthType() { return entityData.get(MOUTH_TYPE); }
     public int getHairId() { return entityData.get(HAIR_ID); }
+    public int getHeadBone() { return Math.floorMod(entityData.get(HEAD_BONE), 3); }
     public int getOutfit() { return entityData.get(OUTFIT); }
     /** Persistent Living World cosmetic evolution; bounded to native DMZ preset hairs. */
     public void setHairIdForLivingWorld(int hairId) {
@@ -4416,7 +4484,10 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         speechTicks = Math.max(20, ticks);
         rememberDialogue(clean);
         if (level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-            Component chat = Component.literal("<" + getFighterName() + ">: " + clean);
+            ChatFormatting nameColor = WorldMenaceManager.isHerobrine(this)
+                    ? ChatFormatting.RED : ChatFormatting.AQUA;
+            Component chat = Component.literal(getFighterName()).withStyle(nameColor)
+                    .append(Component.literal(": " + clean).withStyle(ChatFormatting.WHITE));
             for (ServerPlayer player : serverLevel.getEntitiesOfClass(ServerPlayer.class, getBoundingBox().inflate(15.0D),
                     p -> !p.isSpectator() && p.distanceToSqr(this) <= 225.0D)) {
                 player.sendSystemMessage(chat);
@@ -4640,6 +4711,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         tag.putInt("LWEyesType", getEyesType());
         tag.putInt("LWNoseType", getNoseType());
         tag.putInt("LWMouthType", getMouthType());
+        tag.putInt("LWHeadBone", getHeadBone());
         tag.putInt("LWHairId", getHairId());
         tag.putInt("LWOutfit", getOutfit());
         tag.putString("LWBodyColor", getBodyColor());
@@ -4806,6 +4878,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (tag.contains("LWEyesType")) entityData.set(EYES_TYPE, tag.getInt("LWEyesType"));
         if (tag.contains("LWNoseType")) entityData.set(NOSE_TYPE, tag.getInt("LWNoseType"));
         if (tag.contains("LWMouthType")) entityData.set(MOUTH_TYPE, tag.getInt("LWMouthType"));
+        if (tag.contains("LWHeadBone")) entityData.set(HEAD_BONE, tag.getInt("LWHeadBone"));
+        else if (getRace() == FighterRace.NAMEKIAN)
+            entityData.set(HEAD_BONE, Math.floorMod(getUUID().hashCode(), 2) == 0 ? 0 : 1 + Math.floorMod(getUUID().hashCode() / 2, 2));
         if (tag.contains("LWHairId")) entityData.set(HAIR_ID, tag.getInt("LWHairId"));
         if (tag.contains("LWOutfit")) entityData.set(OUTFIT, tag.getInt("LWOutfit"));
         if (tag.contains("LWBodyColor")) entityData.set(BODY_COLOR, tag.getString("LWBodyColor"));
@@ -4813,7 +4888,42 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         else entityData.set(BODY_COLOR2, getBodyColor());
         if (tag.contains("LWBodyColor3")) entityData.set(BODY_COLOR3, tag.getString("LWBodyColor3"));
         else entityData.set(BODY_COLOR3, getBodyColor());
+        if (getRace() == FighterRace.NAMEKIAN) {
+            int migratedBodyType = Math.floorMod(getBodyType(), 3);
+            entityData.set(BODY_TYPE, migratedBodyType);
+            // Older renewed builds incorrectly selected the primary colour from the body type.
+            // Rebuild all three independent Namekian layer palettes deterministically so already
+            // existing fighters are migrated as well as newly generated ones.
+            int appearanceSeed = getUUID().hashCode();
+            entityData.set(BODY_COLOR, NAMEK_GREEN[Math.floorMod(appearanceSeed, NAMEK_GREEN.length)]);
+            entityData.set(BODY_COLOR2, NAMEK_ACCENT[Math.floorMod(appearanceSeed / 7, NAMEK_ACCENT.length)]);
+            entityData.set(BODY_COLOR3, NAMEK_PINK[Math.floorMod(appearanceSeed / 17, NAMEK_PINK.length)]);
+            entityData.set(HAIR_COLOR, NAMEK_LIGHT_GREEN[Math.floorMod(appearanceSeed / 29, NAMEK_LIGHT_GREEN.length)]);
+        }
         if (tag.contains("LWHairColor")) entityData.set(HAIR_COLOR, tag.getString("LWHairColor"));
+        // Migrate female Majins created by older builds, where the race-level hair gate
+        // forced an otherwise valid generated HairId to remain invisible (or zero).
+        if (getRace() == FighterRace.MAJIN && isFemale()) {
+            int presets = Math.max(1, HairManager.getPresetCount());
+            if (getHairId() <= 0) entityData.set(HAIR_ID, 1 + Math.floorMod(getUUID().hashCode(), presets));
+            entityData.set(HAIR_COLOR, getBodyColor());
+        }
+        if (getRace() == FighterRace.MAJIN) {
+            int appearanceSeed = getUUID().hashCode();
+            entityData.set(BODY_TYPE, Math.floorMod(getBodyType(), 3));
+            entityData.set(EYES_TYPE, Math.floorMod(getEyesType(), 3));
+            entityData.set(NOSE_TYPE, Math.floorMod(getNoseType(), 2));
+            entityData.set(MOUTH_TYPE, Math.floorMod(getMouthType(), 2));
+            if (!isFemale()) entityData.set(HEAD_BONE, Math.floorMod(appearanceSeed, 3));
+            if (isMajinPinkVariant(getBodyColor()))
+                entityData.set(BODY_COLOR2, getBodyColor());
+            else if (getBodyColor2().equalsIgnoreCase(getBodyColor()))
+                entityData.set(BODY_COLOR2, shadeColor(getBodyColor(), (appearanceSeed & 1) == 0 ? 0.72D : 1.28D));
+            String redEye = MAJIN_EYE_RED[Math.floorMod(appearanceSeed / 11, MAJIN_EYE_RED.length)];
+            entityData.set(EYE1_COLOR, redEye);
+            entityData.set(EYE2_COLOR, redEye);
+            if (isFemale()) entityData.set(HAIR_COLOR, getBodyColor());
+        }
         if (tag.contains("LWEye1Color")) entityData.set(EYE1_COLOR, tag.getString("LWEye1Color"));
         if (tag.contains("LWEye2Color")) entityData.set(EYE2_COLOR, tag.getString("LWEye2Color"));
         // The generic appearance NBT above contains the *currently rendered* form hair/eyes.
@@ -4823,6 +4933,13 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             if (!racialBaseHairColor.isBlank()) entityData.set(HAIR_COLOR, racialBaseHairColor);
             if (!racialBaseEye1Color.isBlank()) entityData.set(EYE1_COLOR, racialBaseEye1Color);
             if (!racialBaseEye2Color.isBlank()) entityData.set(EYE2_COLOR, racialBaseEye2Color);
+        }
+        // Appearance NBT from older builds may contain the former body-coloured Majin eyes.
+        // Normalize the base eye colour after every generic/form restoration has completed.
+        if (getRace() == FighterRace.MAJIN) {
+            String redEye = MAJIN_EYE_RED[Math.floorMod(getUUID().hashCode() / 11, MAJIN_EYE_RED.length)];
+            entityData.set(EYE1_COLOR, redEye);
+            entityData.set(EYE2_COLOR, redEye);
         }
         entityData.set(SPEECH, "");
         speechTicks = 0;

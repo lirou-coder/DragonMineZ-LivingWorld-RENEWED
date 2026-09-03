@@ -52,7 +52,6 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
     // "boobas" chest bone. human_slim.geo.json is only a slim-arm model and does
     // not contain the female chest geometry, which made LW women read as slim men.
     private static final ResourceLocation HUMAN_FEMALE = dmz("geo/entity/races/hbuffed_fem.geo.json");
-    private static final ResourceLocation NAMEKIAN = dmz("geo/entity/enemies/namekian.geo.json");
     private static final ResourceLocation FROST = dmz("geo/entity/races/frostdemon.geo.json");
     private static final ResourceLocation MAJIN = dmz("geo/entity/races/majin.geo.json");
     private static final ResourceLocation MAJIN_SLIM = dmz("geo/entity/races/majin_slim.geo.json");
@@ -104,7 +103,7 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
         }
         return switch (entity.getRace()) {
             case HUMAN, SAIYAN -> entity.isFemale() ? HUMAN_FEMALE : HUMAN;
-            case NAMEKIAN -> NAMEKIAN;
+            case NAMEKIAN -> HUMAN;
             case MAJIN -> entity.isFemale() ? MAJIN_SLIM : MAJIN;
             case FROST_DEMON -> FROST;
             case BIO_ANDROID -> BIO;

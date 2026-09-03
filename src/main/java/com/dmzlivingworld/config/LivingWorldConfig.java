@@ -9,6 +9,7 @@ public final class LivingWorldConfig {
 
     public static final ForgeConfigSpec.IntValue NEARBY_FIGHTER_CAP;
     public static final ForgeConfigSpec.IntValue NEARBY_HOSTILE_CAP;
+    public static final ForgeConfigSpec.IntValue MAX_REMEMBERED_DEAD_FIGHTERS;
     public static final ForgeConfigSpec.BooleanValue FACTION_ENCOUNTERS;
     public static final ForgeConfigSpec.BooleanValue DYNAMIC_ENCOUNTERS;
     public static final ForgeConfigSpec.BooleanValue RECURRING_FIGHTERS;
@@ -31,6 +32,8 @@ public final class LivingWorldConfig {
     public static final ForgeConfigSpec.IntValue NPC_STRENGTH_PERCENT;
     public static final ForgeConfigSpec.DoubleValue LEVEL_MULTIPLIER_PER_SAGA;
     public static final ForgeConfigSpec.DoubleValue MAX_DEFENSE_MITIGATION;
+    public static final ForgeConfigSpec.DoubleValue BP_VISUAL_MULTIPLIER;
+    public static final ForgeConfigSpec.BooleanValue CAN_MEDITATION_PROC_SKILL_PROGRESSION;
     public static final ForgeConfigSpec.DoubleValue BRAWLER_MELEE_SHARE, BRAWLER_DEFENSE_SHARE, BRAWLER_KI_SHARE, BRAWLER_HEALTH_SHARE;
     public static final ForgeConfigSpec.DoubleValue MARTIAL_ARTIST_MELEE_SHARE, MARTIAL_ARTIST_DEFENSE_SHARE, MARTIAL_ARTIST_KI_SHARE, MARTIAL_ARTIST_HEALTH_SHARE;
     public static final ForgeConfigSpec.DoubleValue SPEED_FIGHTER_MELEE_SHARE, SPEED_FIGHTER_DEFENSE_SHARE, SPEED_FIGHTER_KI_SHARE, SPEED_FIGHTER_HEALTH_SHARE;
@@ -71,6 +74,10 @@ public final class LivingWorldConfig {
                 .defineInRange("nearbyFighterCap", 20, 0, 4096);
         NEARBY_HOSTILE_CAP = builder.comment("Maximum naturally generated hostile Living World fighters near each player.")
                 .defineInRange("nearbyHostileCap", 6, 0, 4096);
+        MAX_REMEMBERED_DEAD_FIGHTERS = builder.comment(
+                        "Maximum number of dead fighter profiles retained for afterlife spawning and Dragon Ball wishes.",
+                        "When the limit is exceeded, the oldest retained death is forgotten first.")
+                .defineInRange("maxRememberedDeadFighters", 20, 0, 4096);
         FACTION_RESIDENT_CAP = builder.comment("Maximum physical resident cell size that one faction territory can request. Still bounded by the local fighter cap.")
                 .defineInRange("factionResidentCap", 15, 4, 512);
         builder.pop();
@@ -147,6 +154,15 @@ public final class LivingWorldConfig {
                         "0.7 means Defense can absorb at most 70%, so at least 30% always passes through.",
                         "Adaptive defense is not used by Living World NPCs.")
                 .defineInRange("maxDefenseMitigation", 0.7D, 0.0D, 0.99D);
+        BP_VISUAL_MULTIPLIER = builder.comment(
+                        "Visual-only multiplier for Living World NPC Battle Power readings.",
+                        "Affects scouters, Ki Sense, the fighter interaction menu and BP comparisons used by fusion.",
+                        "Does not affect stats, effective/reference budgets, AI, training or real NPC BP.")
+                .defineInRange("BpVisualMultiplier", 1.0D, 0.0D, 1_000_000.0D);
+        CAN_MEDITATION_PROC_SKILL_PROGRESSION = builder.comment(
+                        "Allow Living World's integrated player meditation to trigger DMZ Skill Progression's mob-defeat skill roll every 10 seconds.",
+                        "Each meditation stage uses its configured TP multiplier as the number of reward-roll opportunities.")
+                .define("canMeditationProcSkillProgression", true);
         builder.push("archetypeStatDistribution");
         builder.comment(
                 "Fraction of the effective stat budget assigned to each real combat attribute.",
@@ -275,6 +291,9 @@ public final class LivingWorldConfig {
     public static int npcStrengthPercent() { return NPC_STRENGTH_PERCENT.get(); }
     public static double levelMultiplierPerSaga() { return LEVEL_MULTIPLIER_PER_SAGA.get(); }
     public static double maxDefenseMitigation() { return MAX_DEFENSE_MITIGATION.get(); }
+    public static double bpVisualMultiplier() { return BP_VISUAL_MULTIPLIER.get(); }
+    public static int maxRememberedDeadFighters() { return MAX_REMEMBERED_DEAD_FIGHTERS.get(); }
+    public static boolean canMeditationProcSkillProgression() { return CAN_MEDITATION_PROC_SKILL_PROGRESSION.get(); }
     public static double npcStrengthScale() { return npcStrengthPercent() / 100.0D; }
     public static int npcGrowthPercent() { return NPC_GROWTH_PERCENT.get(); }
     public static double npcGrowthScale() { return npcGrowthPercent() / 100.0D; }
@@ -332,7 +351,10 @@ public final class LivingWorldConfig {
                 automaticPowerSensing(), worldIncidents(), worldEventAlerts(), worldEventAlertRadius(),
                 socialTalk(), talkBaseGain(), talkRelationshipCap(), talkCooldownMinSeconds(), talkCooldownMaxSeconds(),
                 npcSocializing(), npcChaosPercent(), companionSagaHelp(), npcKiMode(), npcStrengthPercent(), npcGrowthPercent(), attackMinecraftMobs(),
-                npcChatFrequencyPercent(), earthGuardianResponsePercent());
+                npcChatFrequencyPercent(), earthGuardianResponsePercent(), maxRememberedDeadFighters(), npcDespawnProtectionRadius(),
+                levelMultiplierPerSaga(), maxDefenseMitigation(), bpVisualMultiplier(), canMeditationProcSkillProgression(),
+                npcRaceBlacklist(), treatRaceBlacklistAsWhitelist(), canUseClothes(), dimensionWhitelist(), treatDimensionWhitelistAsBlacklist(),
+                archetypeShares());
     }
 
     public static void apply(Snapshot value) {
@@ -365,6 +387,18 @@ public final class LivingWorldConfig {
         COMPANION_SAGA_HELP.set(value.companionSagaHelp());
         EARTH_GUARDIAN_RESPONSE_PERCENT.set(clamp(value.earthGuardianResponsePercent(), 0, 500));
         NPC_KI_MODE.set(clamp(value.npcKiMode(), 0, 3));
+        MAX_REMEMBERED_DEAD_FIGHTERS.set(clamp(value.maxRememberedDeadFighters(), 0, 4096));
+        NPC_DESPAWN_PROTECTION_RADIUS.set(clamp(value.npcDespawnProtectionRadius(), 96, 4096));
+        LEVEL_MULTIPLIER_PER_SAGA.set(clamp(value.levelMultiplierPerSaga(), .1D, 1000D));
+        MAX_DEFENSE_MITIGATION.set(clamp(value.maxDefenseMitigation(), 0D, .99D));
+        BP_VISUAL_MULTIPLIER.set(clamp(value.bpVisualMultiplier(), 0D, 1_000_000D));
+        CAN_MEDITATION_PROC_SKILL_PROGRESSION.set(value.canMeditationProcSkillProgression());
+        NPC_RACE_BLACKLIST.set(List.copyOf(value.npcRaceBlacklist()));
+        TREAT_RACE_BLACKLIST_AS_WHITELIST.set(value.treatRaceBlacklistAsWhitelist());
+        CAN_USE_CLOTHES.set(List.copyOf(value.canUseClothes()));
+        DIMENSION_WHITELIST.set(List.copyOf(value.dimensionWhitelist()));
+        TREAT_DIMENSION_WHITELIST_AS_BLACKLIST.set(value.treatDimensionWhitelistAsBlacklist());
+        applyArchetypeShares(value.archetypeShares());
         // ConfigValue#set updates the loaded Forge config in memory; explicitly save the
         // shared SERVER config after a GUI edit so world settings survive a restart.
         NEARBY_FIGHTER_CAP.save();
@@ -372,10 +406,32 @@ public final class LivingWorldConfig {
 
     public static Snapshot defaults() {
         return new Snapshot(2, 20, 6, true, true, true, 2, 256, 15,
-                true, true, true, 1400, true, 2, 20, 120, 240, true, 100, true, 1, 100, 100, true, 100, 100);
+                true, true, true, 1400, true, 2, 20, 120, 240, true, 100, true, 1, 100, 100, true, 100, 100,
+                20, 288, 5D, .7D, 1D, true, List.of(), false,
+                List.of("human", "saiyan", "namekian", "majin"), List.of("minecraft:overworld", "dragonminez:namek"), false,
+                List.of(.20,.10,.06,.64, .17,.14,.17,.52, .15,.08,.15,.62, .10,.20,.10,.60, .06,.10,.20,.64));
+    }
+
+    private static List<Double> archetypeShares() {
+        return List.of(BRAWLER_MELEE_SHARE.get(), BRAWLER_DEFENSE_SHARE.get(), BRAWLER_KI_SHARE.get(), BRAWLER_HEALTH_SHARE.get(),
+                MARTIAL_ARTIST_MELEE_SHARE.get(), MARTIAL_ARTIST_DEFENSE_SHARE.get(), MARTIAL_ARTIST_KI_SHARE.get(), MARTIAL_ARTIST_HEALTH_SHARE.get(),
+                SPEED_FIGHTER_MELEE_SHARE.get(), SPEED_FIGHTER_DEFENSE_SHARE.get(), SPEED_FIGHTER_KI_SHARE.get(), SPEED_FIGHTER_HEALTH_SHARE.get(),
+                GUARDIAN_MELEE_SHARE.get(), GUARDIAN_DEFENSE_SHARE.get(), GUARDIAN_KI_SHARE.get(), GUARDIAN_HEALTH_SHARE.get(),
+                KI_SPECIALIST_MELEE_SHARE.get(), KI_SPECIALIST_DEFENSE_SHARE.get(), KI_SPECIALIST_KI_SHARE.get(), KI_SPECIALIST_HEALTH_SHARE.get());
+    }
+
+    private static void applyArchetypeShares(List<Double> values) {
+        if (values == null || values.size() != 20) return;
+        ForgeConfigSpec.DoubleValue[] targets = {BRAWLER_MELEE_SHARE,BRAWLER_DEFENSE_SHARE,BRAWLER_KI_SHARE,BRAWLER_HEALTH_SHARE,
+                MARTIAL_ARTIST_MELEE_SHARE,MARTIAL_ARTIST_DEFENSE_SHARE,MARTIAL_ARTIST_KI_SHARE,MARTIAL_ARTIST_HEALTH_SHARE,
+                SPEED_FIGHTER_MELEE_SHARE,SPEED_FIGHTER_DEFENSE_SHARE,SPEED_FIGHTER_KI_SHARE,SPEED_FIGHTER_HEALTH_SHARE,
+                GUARDIAN_MELEE_SHARE,GUARDIAN_DEFENSE_SHARE,GUARDIAN_KI_SHARE,GUARDIAN_HEALTH_SHARE,
+                KI_SPECIALIST_MELEE_SHARE,KI_SPECIALIST_DEFENSE_SHARE,KI_SPECIALIST_KI_SHARE,KI_SPECIALIST_HEALTH_SHARE};
+        for (int i=0;i<targets.length;i++) targets[i].set(clamp(values.get(i), 0D, 10D));
     }
 
     private static int clamp(int value, int min, int max) { return Math.max(min, Math.min(max, value)); }
+    private static double clamp(double value, double min, double max) { return Math.max(min, Math.min(max, value)); }
 
     public record Snapshot(int activityPreset, int nearbyFighterCap, int nearbyHostileCap,
                            boolean factionEncounters, boolean dynamicEncounters, boolean recurringFighters,
@@ -386,5 +442,11 @@ public final class LivingWorldConfig {
                            int talkCooldownMinSeconds, int talkCooldownMaxSeconds,
                            boolean npcSocializing, int npcChaosPercent, boolean companionSagaHelp, int npcKiMode,
                            int npcStrengthPercent, int npcGrowthPercent, boolean attackMinecraftMobs,
-                           int npcChatFrequencyPercent, int earthGuardianResponsePercent) {}
+                           int npcChatFrequencyPercent, int earthGuardianResponsePercent,
+                           int maxRememberedDeadFighters, int npcDespawnProtectionRadius,
+                           double levelMultiplierPerSaga, double maxDefenseMitigation, double bpVisualMultiplier,
+                           boolean canMeditationProcSkillProgression, List<String> npcRaceBlacklist,
+                           boolean treatRaceBlacklistAsWhitelist, List<String> canUseClothes,
+                           List<String> dimensionWhitelist, boolean treatDimensionWhitelistAsBlacklist,
+                           List<Double> archetypeShares) {}
 }

@@ -25,7 +25,7 @@ public final class FighterPowerStatScaler {
 
     public static double baseHealth(AmbientFighterEntity fighter, double livedMultiplier) {
         double lived = Math.min(1.22D, 1.0D + (Math.max(1.0D, livedMultiplier) - 1.0D) * 0.55D);
-        double calculated = 20.0D + shares(fighter).health * effectiveStatBudget(fighter) * lived;
+        double calculated = 20.0D + healthShare(fighter) * effectiveStatBudget(fighter) * lived;
         double stable = fighter.getLegacyData().getDouble(STABLE_MAX_HEALTH);
         double result = Math.max(calculated, Double.isFinite(stable) ? stable : 0.0D);
         fighter.getLegacyData().putDouble(STABLE_MAX_HEALTH, result);
@@ -41,28 +41,29 @@ public final class FighterPowerStatScaler {
     }
 
     public static double baseAttack(AmbientFighterEntity fighter, double livedMultiplier) {
-        return Math.max(1.0D, shares(fighter).melee * effectiveStatBudget(fighter)
+        return Math.max(1.0D, meleeShare(fighter) * effectiveStatBudget(fighter)
                 * Math.max(1.0D, livedMultiplier));
     }
 
     public static double baseDefense(AmbientFighterEntity fighter) {
         double lived = Math.max(1.0D, FighterBattleGrowthManager.combatMultiplier(fighter));
-        return Math.max(0.0D, shares(fighter).defense * effectiveStatBudget(fighter) * lived
+        return Math.max(0.0D, defenseShare(fighter) * effectiveStatBudget(fighter) * lived
                 * FighterPassiveSkillManager.healthMultiplier(fighter));
     }
 
     public static float baseKi(AmbientFighterEntity fighter, float ignoredHistoricalKi) {
-        return (float)Math.max(1.0D, shares(fighter).ki * effectiveStatBudget(fighter));
+        return (float)Math.max(1.0D, kiShare(fighter) * effectiveStatBudget(fighter));
     }
 
     public static double transformedBattlePower(AmbientFighterEntity fighter, double meleeMultiplier,
                                                  double defenseMultiplier, double vitalityMultiplier,
                                                  double kiMultiplier) {
-        Shares s = shares(fighter);
-        double post = effectiveStatBudget(fighter) * (s.melee * meleeMultiplier
-                + s.defense * defenseMultiplier + s.ki * kiMultiplier + s.health * vitalityMultiplier);
-        double ratio = post / Math.max(1.0D, effectiveStatBudget(fighter));
-        return battlePowerForStats(fighter, effectiveStatBudget(fighter)) * Math.pow(Math.max(0.0D, ratio), 1.2D);
+        double effective = effectiveStatBudget(fighter);
+        double post = effective * (meleeShare(fighter) * meleeMultiplier
+                + defenseShare(fighter) * defenseMultiplier + kiShare(fighter) * kiMultiplier
+                + healthShare(fighter) * vitalityMultiplier);
+        double ratio = post / Math.max(1.0D, effective);
+        return battlePowerForStats(fighter, effective) * Math.pow(Math.max(0.0D, ratio), 1.2D);
     }
 
     public static double currentTotalStats(AmbientFighterEntity fighter) {
@@ -77,8 +78,8 @@ public final class FighterPowerStatScaler {
 
     /** BP of a freshly distributed budget, before lived/passive/form modifiers are applied. */
     public static double battlePowerForEffectiveBudget(AmbientFighterEntity fighter, double effective) {
-        Shares s = shares(fighter);
-        double distributed = Math.max(1.0D, effective * (s.melee + s.defense + s.ki + s.health));
+        double distributed = Math.max(1.0D, effective * (meleeShare(fighter) + defenseShare(fighter)
+                + kiShare(fighter) + healthShare(fighter)));
         return battlePowerForStats(fighter, distributed);
     }
 
@@ -101,20 +102,43 @@ public final class FighterPowerStatScaler {
         return BattlePowerFormula.effectiveFromBattlePower(Math.max(1.0D, battlePower));
     }
 
-    private static Shares shares(AmbientFighterEntity fighter) {
+    private static double meleeShare(AmbientFighterEntity fighter) {
         return switch (fighter.getArchetype()) {
-            case BRAWLER -> new Shares(LivingWorldConfig.BRAWLER_MELEE_SHARE.get(), LivingWorldConfig.BRAWLER_DEFENSE_SHARE.get(),
-                    LivingWorldConfig.BRAWLER_KI_SHARE.get(), LivingWorldConfig.BRAWLER_HEALTH_SHARE.get());
-            case MARTIAL_ARTIST -> new Shares(LivingWorldConfig.MARTIAL_ARTIST_MELEE_SHARE.get(), LivingWorldConfig.MARTIAL_ARTIST_DEFENSE_SHARE.get(),
-                    LivingWorldConfig.MARTIAL_ARTIST_KI_SHARE.get(), LivingWorldConfig.MARTIAL_ARTIST_HEALTH_SHARE.get());
-            case SPEEDSTER -> new Shares(LivingWorldConfig.SPEED_FIGHTER_MELEE_SHARE.get(), LivingWorldConfig.SPEED_FIGHTER_DEFENSE_SHARE.get(),
-                    LivingWorldConfig.SPEED_FIGHTER_KI_SHARE.get(), LivingWorldConfig.SPEED_FIGHTER_HEALTH_SHARE.get());
-            case GUARDIAN -> new Shares(LivingWorldConfig.GUARDIAN_MELEE_SHARE.get(), LivingWorldConfig.GUARDIAN_DEFENSE_SHARE.get(),
-                    LivingWorldConfig.GUARDIAN_KI_SHARE.get(), LivingWorldConfig.GUARDIAN_HEALTH_SHARE.get());
-            case KI_SPECIALIST -> new Shares(LivingWorldConfig.KI_SPECIALIST_MELEE_SHARE.get(), LivingWorldConfig.KI_SPECIALIST_DEFENSE_SHARE.get(),
-                    LivingWorldConfig.KI_SPECIALIST_KI_SHARE.get(), LivingWorldConfig.KI_SPECIALIST_HEALTH_SHARE.get());
+            case BRAWLER -> LivingWorldConfig.BRAWLER_MELEE_SHARE.get();
+            case MARTIAL_ARTIST -> LivingWorldConfig.MARTIAL_ARTIST_MELEE_SHARE.get();
+            case SPEEDSTER -> LivingWorldConfig.SPEED_FIGHTER_MELEE_SHARE.get();
+            case GUARDIAN -> LivingWorldConfig.GUARDIAN_MELEE_SHARE.get();
+            case KI_SPECIALIST -> LivingWorldConfig.KI_SPECIALIST_MELEE_SHARE.get();
         };
     }
 
-    private record Shares(double melee, double defense, double ki, double health) {}
+    private static double defenseShare(AmbientFighterEntity fighter) {
+        return switch (fighter.getArchetype()) {
+            case BRAWLER -> LivingWorldConfig.BRAWLER_DEFENSE_SHARE.get();
+            case MARTIAL_ARTIST -> LivingWorldConfig.MARTIAL_ARTIST_DEFENSE_SHARE.get();
+            case SPEEDSTER -> LivingWorldConfig.SPEED_FIGHTER_DEFENSE_SHARE.get();
+            case GUARDIAN -> LivingWorldConfig.GUARDIAN_DEFENSE_SHARE.get();
+            case KI_SPECIALIST -> LivingWorldConfig.KI_SPECIALIST_DEFENSE_SHARE.get();
+        };
+    }
+
+    private static double kiShare(AmbientFighterEntity fighter) {
+        return switch (fighter.getArchetype()) {
+            case BRAWLER -> LivingWorldConfig.BRAWLER_KI_SHARE.get();
+            case MARTIAL_ARTIST -> LivingWorldConfig.MARTIAL_ARTIST_KI_SHARE.get();
+            case SPEEDSTER -> LivingWorldConfig.SPEED_FIGHTER_KI_SHARE.get();
+            case GUARDIAN -> LivingWorldConfig.GUARDIAN_KI_SHARE.get();
+            case KI_SPECIALIST -> LivingWorldConfig.KI_SPECIALIST_KI_SHARE.get();
+        };
+    }
+
+    private static double healthShare(AmbientFighterEntity fighter) {
+        return switch (fighter.getArchetype()) {
+            case BRAWLER -> LivingWorldConfig.BRAWLER_HEALTH_SHARE.get();
+            case MARTIAL_ARTIST -> LivingWorldConfig.MARTIAL_ARTIST_HEALTH_SHARE.get();
+            case SPEEDSTER -> LivingWorldConfig.SPEED_FIGHTER_HEALTH_SHARE.get();
+            case GUARDIAN -> LivingWorldConfig.GUARDIAN_HEALTH_SHARE.get();
+            case KI_SPECIALIST -> LivingWorldConfig.KI_SPECIALIST_HEALTH_SHARE.get();
+        };
+    }
 }
