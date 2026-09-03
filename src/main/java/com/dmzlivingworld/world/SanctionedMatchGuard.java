@@ -266,7 +266,11 @@ public final class SanctionedMatchGuard {
             if (!(responsible instanceof ServerPlayer player) || !fighter.isSanctionedOpponent(player)) return;
             float floor = Math.max(1.0F, fighter.getMaxHealth() * 0.30F);
             if (fighter.getHealth() - event.getAmount() <= floor) {
-                event.setAmount(Math.max(0.0F, fighter.getHealth() - floor));
+                // LivingDamageEvent already contains the post-mitigation amount. Cancel its
+                // application entirely and place the target exactly on the sanctioned floor.
+                event.setCanceled(true);
+                fighter.setHealth(floor);
+                fighter.restoreSanctionedLivingState(false);
                 SparManager.finishFromFinalDamage(player, fighter, true);
             }
             return;
@@ -276,7 +280,8 @@ public final class SanctionedMatchGuard {
                 && SparManager.isSanctionedPlayerOpponent(player, fighter)) {
             float floor = Math.max(1.0F, player.getMaxHealth() * 0.30F);
             if (player.getHealth() - event.getAmount() <= floor) {
-                event.setAmount(Math.max(0.0F, player.getHealth() - floor));
+                event.setCanceled(true);
+                player.setHealth(floor);
                 player.setPose(Pose.STANDING);
                 SparManager.finishFromFinalDamage(player, fighter, false);
             }

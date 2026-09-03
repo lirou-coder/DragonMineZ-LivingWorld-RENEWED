@@ -1,6 +1,9 @@
 package com.kunyo.dbzmeditation;
 
 import com.mojang.logging.LogUtils;
+import com.dragonminez.common.config.ConfigManager;
+import com.dragonminez.common.stats.StatsCapability;
+import com.dragonminez.common.stats.StatsProvider;
 import com.dragonminez.server.util.GravityLogic;
 import com.dragonminez.server.util.GravityStateSync;
 import net.minecraft.ChatFormatting;
@@ -31,6 +34,7 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
@@ -146,6 +150,10 @@ public final class DBZMeditation {
     private static final String BASE_X = "dbzm_base_x";
     private static final String BASE_Y = "dbzm_base_y";
     private static final String BASE_Z = "dbzm_base_z";
+    private static final String GRAVITY_TRAINING_BONUS = "dbzm_gravity_training_bonus";
+    private static final String GRAVITY_MASTERY_BONUS = "dbzm_gravity_mastery_bonus";
+    private static final String GRAVITY_STAT_REDUCTION = "dbzm_gravity_stat_reduction";
+    private static final String GRAVITY_MACHINE = "dbzm_gravity_machine";
 
     private static final String LIFETIME_TICKS = "dbzm_lifetime_ticks";
     private static final String LONGEST_TICKS = "dbzm_longest_ticks";
@@ -315,6 +323,13 @@ public final class DBZMeditation {
         data.putDouble(BASE_X, player.getX());
         data.putDouble(BASE_Y, player.getY());
         data.putDouble(BASE_Z, player.getZ());
+        // DMZ resolves gravity from the player's physical position. Meditation seats the player on
+        // an invisible carrier, and some DMZ builds consequently stop resolving the chamber/zone.
+        // Capture only the environmental gravity state before mounting; weight bonuses remain separate.
+        data.putDouble(GRAVITY_TRAINING_BONUS, safeGravity(() -> GravityLogic.getTrainingBonusGravity(player)));
+        data.putDouble(GRAVITY_MASTERY_BONUS, safeGravity(() -> GravityLogic.getBonusGravity(player)));
+        data.putDouble(GRAVITY_STAT_REDUCTION, safeGravity(() -> GravityLogic.getStatReduction(player)));
+        data.putDouble(GRAVITY_MACHINE, safeGravity(() -> GravityLogic.getMachineGravity(player)));
         data.putInt(SESSIONS, data.getInt(SESSIONS) + 1);
 
         ServerLevel level = player.serverLevel();
@@ -548,7 +563,7 @@ public final class DBZMeditation {
         data.remove(SEAT_UUID);
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         if (!(event.player instanceof ServerPlayer player)) return;
@@ -601,6 +616,10 @@ public final class DBZMeditation {
 
         int multiplier = getMultiplier(ticks);
 
+        // Reapply DMZ's own gravity stat split after its regular player tick. This is limited to
+        // meditation because mounting can make DMZ regard the player as outside the gravity zone.
+        preserveMeditationGravityStats(player, data.getDouble(GRAVITY_STAT_REDUCTION));
+
         if (ticks % 200 == 0) {
             com.dmzlivingworld.world.DMZSkillProgressionCompat.onMeditationPulse(player, multiplier);
         }
@@ -609,9 +628,8 @@ public final class DBZMeditation {
         // processed once per second. They augment DMZ's own systems rather
         // than replacing them, and never touch health.
         if (ticks % 20 == 0) {
-            applyNativeMeditationTraining(player, stage);
-            double trainingGravity = 0.0D;
-            try { trainingGravity = GravityLogic.getTrainingBonusGravity(player); } catch (Throwable ignored) {}
+            applyNativeMeditationTraining(player, stage, gravityMasteryMultiplier(player, data));
+            double trainingGravity = data.getDouble(GRAVITY_TRAINING_BONUS);
             DMZGravityGrowthBridge.pulse(player, trainingGravity, ticks);
         }
 
@@ -622,7 +640,7 @@ public final class DBZMeditation {
 
         if (rewardTimer >= rewardInterval) {
             rewardTimer = 0;
-            awardMeditationTp(player, multiplier);
+            awardMeditationTp(player, multiplier, gravityTpMultiplier(player, data));
         }
         data.putInt(REWARD_TIMER, rewardTimer);
 
@@ -706,7 +724,8 @@ public final class DBZMeditation {
 
     private static void applyNativeMeditationTraining(
         ServerPlayer player,
-        int stage
+        int stage,
+        double gravityMultiplier
     ) {
         /*
          * Release scope: Meditation no longer modifies Ki/Energy or Stamina.
@@ -741,7 +760,7 @@ public final class DBZMeditation {
         DMZTrainingBridge.FormProgress progress =
             DMZTrainingBridge.gainActiveFormMastery(
                 player,
-                perMinute / 60.0D
+                perMinute / 60.0D * gravityMultiplier
             );
 
         if (progress.gained() <= 0.0D) {
@@ -813,6 +832,9 @@ public final class DBZMeditation {
         int total = player.getPersistentData().getInt(TOTAL);
         double machineGravity = 0.0D;
         try { machineGravity = GravityLogic.getMachineGravity(player); } catch (Throwable ignored) {}
+        if (isMeditating(player) && machineGravity <= 1.0001D) {
+            machineGravity = player.getPersistentData().getDouble(GRAVITY_MACHINE);
+        }
         String message = "Meditation  •  " + getStageName(ticks)
                 + "  •  x" + multiplier
                 + (machineGravity > 1.0001D ? "  •  Gravity x" + Math.round(machineGravity * 10.0D) / 10.0D : "")
@@ -853,6 +875,12 @@ public final class DBZMeditation {
         } catch (Throwable ignored) {
             // DMZ owns gravity; meditation must remain safe if an older compatible DMZ build lacks a helper.
         }
+        // The carrier can move the player's logical sample point outside the chamber bounds.
+        // Fall back to the pre-mount environmental snapshot only for this meditation seat.
+        if (machineGravity <= 1.0001D) machineGravity = data.getDouble(GRAVITY_MACHINE);
+        if (gravityReduction <= 0.0D) gravityReduction = data.getDouble(GRAVITY_STAT_REDUCTION);
+        if (machineGravity <= 1.0001D) machineGravity = data.getDouble(GRAVITY_MACHINE);
+        if (gravityReduction <= 0.0D) gravityReduction = data.getDouble(GRAVITY_STAT_REDUCTION);
 
         // The carrier is intentionally no-gravity for a stable seated pose, but it must not act as
         // a gravity-chamber exemption. Machine gravity suppresses the cosmetic levitation entirely
@@ -1696,19 +1724,67 @@ public final class DBZMeditation {
 
     private static void awardMeditationTp(
         ServerPlayer player,
-        int stageMultiplier
+        int stageMultiplier,
+        double gravityMultiplier
     ) {
         if (!MeditationConfig.SERVER.tpRewardsEnabled.get()) return;
         int scale = MeditationConfig.SERVER.tpRewardScalePercent.get();
         if (scale <= 0) return;
         CompoundTag data = player.getPersistentData();
         int progressionUnit = DMZTrainingBridge.getMeditationTpUnit(player);
-        long raw = (long)stageMultiplier * progressionUnit;
+        double raw = stageMultiplier * (double)progressionUnit * gravityMultiplier;
         int actualGain = (int)Math.max(1L, Math.min(MAX_SAFE_TP_AWARD, Math.round(raw * scale / 100.0D)));
         data.putInt(TP_CARRY, 0);
         queueTpBridge(player, actualGain);
         addTpStats(player, actualGain);
         syncMeditationState(player);
+    }
+
+    private static double gravityTpMultiplier(ServerPlayer player, CompoundTag data) {
+        double bonusGravity = data.getDouble(GRAVITY_TRAINING_BONUS);
+        if (bonusGravity <= 0.0D) return 1.0D;
+        try {
+            var config = ConfigManager.getServerConfig().getGravity();
+            if (!config.getTpEnabled()) return 1.0D;
+            return Math.max(1.0D, 1.0D + bonusGravity * config.getTpGravityBonusPerGravity());
+        } catch (Throwable ignored) {
+            return 1.0D;
+        }
+    }
+
+    private static double gravityMasteryMultiplier(ServerPlayer player, CompoundTag data) {
+        double bonusGravity = data.getDouble(GRAVITY_MASTERY_BONUS);
+        if (bonusGravity <= 0.0D) return 1.0D;
+        try {
+            return Math.max(1.0D, 1.0D + bonusGravity
+                    * ConfigManager.getServerConfig().getGravity().getMasteryBonusPerGravity());
+        } catch (Throwable ignored) {
+            return 1.0D;
+        }
+    }
+
+    private static void preserveMeditationGravityStats(ServerPlayer player, double reduction) {
+        if (reduction <= 0.0D) return;
+        try {
+            var config = ConfigManager.getServerConfig().getGravity();
+            double multiplier = 1.0D - Math.max(0.0D, Math.min(config.getMaxStatReduction(), reduction));
+            StatsProvider.get(StatsCapability.INSTANCE, player).ifPresent(data -> {
+                for (String stat : config.getAffectedStats()) {
+                    data.getBonusStats().addBonusSplit(stat, "Gravity", "*", multiplier, false);
+                }
+            });
+        } catch (Throwable ignored) {
+            // Older compatible DMZ versions may not expose all gravity configuration helpers.
+        }
+    }
+
+    private static double safeGravity(java.util.function.DoubleSupplier supplier) {
+        try {
+            double value = supplier.getAsDouble();
+            return Double.isFinite(value) ? Math.max(0.0D, value) : 0.0D;
+        } catch (Throwable ignored) {
+            return 0.0D;
+        }
     }
 
     private static void awardFixedTp(
@@ -1816,6 +1892,11 @@ public final class DBZMeditation {
         for (int denomination : TP_BRIDGE_DENOMINATIONS) {
             player.removeTag("dbzm_tp_reward_" + denomination);
         }
+        CompoundTag data = player.getPersistentData();
+        data.remove(GRAVITY_TRAINING_BONUS);
+        data.remove(GRAVITY_MASTERY_BONUS);
+        data.remove(GRAVITY_STAT_REDUCTION);
+        data.remove(GRAVITY_MACHINE);
     }
 
     private static int getMeditatingGroupCount(ServerPlayer player) {

@@ -357,14 +357,15 @@ public final class LivingWorldCommands {
                 Commands.literal("livingworld")
                         .executes(ctx -> openWorldOverview(ctx.getSource().getPlayerOrException()))
                         .then(Commands.literal("summon")
-                                .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(), null, null, null, null))
+                                .requires(source -> source.hasPermission(2))
+                                .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(), null, null, null, null, null, null))
                                 .then(Commands.argument("race", StringArgumentType.word())
                                         .suggests((ctx, builder) -> {
                                             for (String value : new String[]{"human", "saiyan", "namekian", "frostdemon", "bioandroid", "majin"}) builder.suggest(value);
                                             return builder.buildFuture();
                                         })
                                         .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
-                                                StringArgumentType.getString(ctx, "race"), null, null, null))
+                                                StringArgumentType.getString(ctx, "race"), null, null, null, null, null))
                                         .then(Commands.argument("rank", StringArgumentType.word())
                                                 .suggests((ctx, builder) -> {
                                                     for (String value : new String[]{"rokie", "rookie", "trained", "veteran"}) builder.suggest(value);
@@ -372,7 +373,7 @@ public final class LivingWorldCommands {
                                                 })
                                                 .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
                                                         StringArgumentType.getString(ctx, "race"),
-                                                        StringArgumentType.getString(ctx, "rank"), null, null))
+                                                        StringArgumentType.getString(ctx, "rank"), null, null, null, null))
                                                 .then(Commands.argument("archetype", StringArgumentType.word())
                                                         .suggests((ctx, builder) -> {
                                                             for (String value : new String[]{"brawler", "martial_artist", "speed_fighter", "guardian", "ki_specialist"}) builder.suggest(value);
@@ -381,13 +382,36 @@ public final class LivingWorldCommands {
                                                         .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
                                                                 StringArgumentType.getString(ctx, "race"),
                                                                 StringArgumentType.getString(ctx, "rank"),
-                                                                StringArgumentType.getString(ctx, "archetype"), null))
-                                                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                                                StringArgumentType.getString(ctx, "archetype"), null, null, null))
+                                                        .then(Commands.argument("personality", StringArgumentType.word())
+                                                                .suggests((ctx, builder) -> {
+                                                                    for (String value : new String[]{"heroic", "calm", "proud", "aggressive", "cautious"}) builder.suggest(value);
+                                                                    return builder.buildFuture();
+                                                                })
                                                                 .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
                                                                         StringArgumentType.getString(ctx, "race"),
                                                                         StringArgumentType.getString(ctx, "rank"),
                                                                         StringArgumentType.getString(ctx, "archetype"),
-                                                                        StringArgumentType.getString(ctx, "name"))))))))
+                                                                        StringArgumentType.getString(ctx, "personality"), null, null))
+                                                                .then(Commands.argument("alignment", StringArgumentType.word())
+                                                                        .suggests((ctx, builder) -> {
+                                                                            for (String value : new String[]{"friendly", "neutral", "hostile"}) builder.suggest(value);
+                                                                            return builder.buildFuture();
+                                                                        })
+                                                                        .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
+                                                                                StringArgumentType.getString(ctx, "race"),
+                                                                                StringArgumentType.getString(ctx, "rank"),
+                                                                                StringArgumentType.getString(ctx, "archetype"),
+                                                                                StringArgumentType.getString(ctx, "personality"),
+                                                                                StringArgumentType.getString(ctx, "alignment"), null))
+                                                                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                                                                .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
+                                                                                        StringArgumentType.getString(ctx, "race"),
+                                                                                        StringArgumentType.getString(ctx, "rank"),
+                                                                                        StringArgumentType.getString(ctx, "archetype"),
+                                                                                        StringArgumentType.getString(ctx, "personality"),
+                                                                                        StringArgumentType.getString(ctx, "alignment"),
+                                                                                        StringArgumentType.getString(ctx, "name"))))))))))
                         .then(Commands.literal("factions")
                                 .executes(ctx -> openPlayerFactionList(ctx.getSource().getPlayerOrException())))
                         .then(Commands.literal("faction")
@@ -1504,12 +1528,15 @@ public final class LivingWorldCommands {
     }
 
     private static int summonFighter(ServerPlayer player, String raceName, String rankName,
-                                     String archetypeName, String customName) {
+                                     String archetypeName, String personalityName,
+                                     String alignmentName, String customName) {
         if (!(player.level() instanceof ServerLevel level)) return 0;
 
         FighterRace race = raceName == null ? AmbientFighterSpawner.rollRaceForLevel(level, player.getRandom()) : parseRace(raceName);
         FighterRank rank = rankName == null ? FighterRank.roll(player.getRandom()) : parseRank(rankName);
         FighterArchetype archetype = archetypeName == null ? null : parseStyle(archetypeName);
+        FighterPersonality personality = personalityName == null ? null : parsePersonality(personalityName);
+        FighterAlignment alignment = alignmentName == null ? null : parseAlignment(alignmentName);
         if (race == null) {
             player.displayClientMessage(Component.literal("[Living World] Races: human, saiyan, namekian, frostdemon, bioandroid, majin")
                     .withStyle(ChatFormatting.RED), false);
@@ -1525,7 +1552,19 @@ public final class LivingWorldCommands {
                     .withStyle(ChatFormatting.RED), false);
             return 0;
         }
+        if (personalityName != null && personality == null) {
+            player.displayClientMessage(Component.literal("[Living World] Personalities: heroic, calm, proud, aggressive, cautious")
+                    .withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
+        if (alignmentName != null && alignment == null) {
+            player.displayClientMessage(Component.literal("[Living World] Alignments: friendly, neutral, hostile")
+                    .withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
         if (archetype == null) archetype = FighterArchetype.roll(player.getRandom(), rank);
+        if (alignment == null) alignment = FighterAlignment.roll(player.getRandom());
+        if (personality == null) personality = FighterPersonality.roll(player.getRandom(), alignment);
 
         BlockPos pos = AmbientFighterSpawner.findSafeGroundAround(level, player.blockPosition(), player.getRandom(), 7, 13, 18);
         if (pos == null) {
@@ -1534,8 +1573,6 @@ public final class LivingWorldCommands {
             return 0;
         }
 
-        FighterAlignment alignment = FighterAlignment.roll(player.getRandom());
-        FighterPersonality personality = FighterPersonality.roll(player.getRandom(), alignment);
         AmbientFighterEntity fighter = AmbientFighterSpawner.spawnAt(level, pos, alignment, rank,
                 personality, race, archetype, player.getRandom());
         if (fighter == null) return 0;
@@ -2263,6 +2300,26 @@ public final class LivingWorldCommands {
             case "rokie", "rookie" -> FighterRank.ROOKIE;
             case "trained" -> FighterRank.TRAINED;
             case "veteran" -> FighterRank.VETERAN;
+            default -> null;
+        };
+    }
+
+    private static FighterPersonality parsePersonality(String value) {
+        return switch (value.toLowerCase(java.util.Locale.ROOT)) {
+            case "heroic" -> FighterPersonality.HEROIC;
+            case "calm" -> FighterPersonality.CALM;
+            case "proud" -> FighterPersonality.PROUD;
+            case "aggressive" -> FighterPersonality.AGGRESSIVE;
+            case "cautious" -> FighterPersonality.CAUTIOUS;
+            default -> null;
+        };
+    }
+
+    private static FighterAlignment parseAlignment(String value) {
+        return switch (value.toLowerCase(java.util.Locale.ROOT)) {
+            case "friendly", "good", "amigavel", "amigável" -> FighterAlignment.GOOD;
+            case "neutral", "neutro" -> FighterAlignment.NEUTRAL;
+            case "hostile", "bad", "hostil" -> FighterAlignment.BAD;
             default -> null;
         };
     }
