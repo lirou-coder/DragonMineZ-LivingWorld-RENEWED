@@ -11,11 +11,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** One persistent world-level history shared by all dimensions. */
+/** Persistent numeric world era and the completed saga currently supplying its power anchor. */
 public final class WorldEraData extends SavedData {
     private static final String DATA_NAME = "dmzlivingworld_world_era";
-
-    private WorldEra era = WorldEra.EARLY_EARTH;
+    private int eraNumber;
+    private String anchorSagaId = "";
     private final List<String> milestones = new ArrayList<>();
 
     public static WorldEraData get(ServerLevel anyLevel) {
@@ -23,25 +23,20 @@ public final class WorldEraData extends SavedData {
         return overworld.getDataStorage().computeIfAbsent(WorldEraData::load, WorldEraData::new, DATA_NAME);
     }
 
-    public WorldEra era() { return era; }
+    public int eraNumber() { return eraNumber; }
+    public String anchorSagaId() { return anchorSagaId; }
+    public String displayName() { return "Era " + eraNumber; }
     public List<String> milestones() { return Collections.unmodifiableList(milestones); }
 
-    public boolean advanceTo(WorldEra target, String reason) {
-        if (target == null || target.id() <= era.id()) return false;
-        WorldEra previous = era;
-        era = target;
-        addMilestone("World era advanced: " + previous.displayName() + " -> " + target.displayName()
-                + (reason == null || reason.isBlank() ? "" : " (" + reason + ")"));
+    public boolean advanceTo(int targetNumber, String sagaId, String sagaName) {
+        if (targetNumber <= eraNumber || sagaId == null || sagaId.isBlank()) return false;
+        int previous = eraNumber;
+        eraNumber = targetNumber;
+        anchorSagaId = sagaId;
+        addMilestone("World era advanced: " + previous + " -> " + targetNumber
+                + (sagaName == null || sagaName.isBlank() ? "" : " (" + sagaName + ")"));
         setDirty();
         return true;
-    }
-
-    public void recordSagaCompletion(String sagaName) {
-        if (sagaName == null || sagaName.isBlank()) return;
-        String entry = "Saga completed: " + sagaName;
-        if (milestones.contains(entry)) return;
-        addMilestone(entry);
-        setDirty();
     }
 
     private void addMilestone(String entry) {
@@ -52,7 +47,8 @@ public final class WorldEraData extends SavedData {
 
     @Override
     public CompoundTag save(CompoundTag tag) {
-        tag.putInt("Era", era.id());
+        tag.putInt("EraNumber", eraNumber);
+        tag.putString("AnchorSaga", anchorSagaId);
         ListTag list = new ListTag();
         for (String milestone : milestones) list.add(StringTag.valueOf(milestone));
         tag.put("Milestones", list);
@@ -61,7 +57,10 @@ public final class WorldEraData extends SavedData {
 
     public static WorldEraData load(CompoundTag tag) {
         WorldEraData data = new WorldEraData();
-        data.era = WorldEra.byId(tag.getInt("Era"));
+        // Legacy named-era data is intentionally re-evaluated from real player completion on login.
+        data.eraNumber = tag.contains("EraNumber", Tag.TAG_INT) ? tag.getInt("EraNumber") : 0;
+        data.anchorSagaId = tag.getString("AnchorSaga");
+        if (data.anchorSagaId.isBlank()) data.eraNumber = 0;
         if (tag.contains("Milestones", Tag.TAG_LIST)) {
             ListTag list = tag.getList("Milestones", Tag.TAG_STRING);
             for (int i = 0; i < list.size(); i++) data.milestones.add(list.getString(i));

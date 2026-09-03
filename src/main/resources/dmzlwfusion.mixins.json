@@ -16,6 +16,7 @@
     ,"NamekianRevampTargetMixin"
     ,"MajinRevampFriendlyFistMixin"
     ,"WishTypeAdapterMixin"
+    ,"TargetHelperCompanionMixin"
   ],
   "client": [
     "FighterModelAnimationMixin",

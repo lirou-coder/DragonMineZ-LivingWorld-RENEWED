@@ -662,6 +662,13 @@ public final class FighterMemoryManager {
         }
 
         CompoundTag record = index >= 0 ? list.getCompound(index) : new CompoundTag();
+        // If the owner was offline when a wish revived this fighter, the entity still carries
+        // the exact old bond and can seed its missing player-side directory entry on reunion.
+        if (index < 0 && fighter.isRememberedFor(player)) {
+            record.putInt("Relationship", fighter.getMemoryRelationship());
+            record.putInt("Encounters", Math.max(1, fighter.getMemoryEncounters()));
+            record.putBoolean("Rescued", fighter.wasRescuedByMemoryOwner());
+        }
         UUID recordId = record.hasUUID("RecordId") ? record.getUUID("RecordId") : UUID.randomUUID();
         int encounters = Math.max(1, record.getInt("Encounters"));
         if (index < 0) encounters = 1;
@@ -725,6 +732,36 @@ public final class FighterMemoryManager {
         if (index >= 0) list.set(index, updated);
         root.put(RIVALS_KEY, list);
         saveRoot(player, root);
+    }
+
+    /** Reinstates the exact player-side directory entry carried by a wished-back fighter. */
+    public static void restoreRevivedBond(AmbientFighterEntity fighter) {
+        if (fighter == null || fighter.getMemoryOwnerId() == null || fighter.getMemoryRecordId() == null
+                || !(fighter.level() instanceof ServerLevel level)) return;
+        ServerPlayer owner = level.getServer().getPlayerList().getPlayer(fighter.getMemoryOwnerId());
+        if (owner == null) return;
+        CompoundTag root = getRoot(owner);
+        ListTag list = root.getList(RIVALS_KEY, Tag.TAG_COMPOUND);
+        int index = findRecordIndex(list, fighter.getMemoryRecordId());
+        CompoundTag record = index >= 0 ? list.getCompound(index) : new CompoundTag();
+        record.putUUID("RecordId", fighter.getMemoryRecordId());
+        record.putInt("Relationship", fighter.getMemoryRelationship());
+        record.putInt("Encounters", Math.max(1, fighter.getMemoryEncounters()));
+        record.putBoolean("Rescued", fighter.wasRescuedByMemoryOwner());
+        record.putString("LastOutcome", "Returned to life by a wish");
+        long now = level.getServer().overworld().getGameTime();
+        if (!record.contains("FirstSeen", Tag.TAG_ANY_NUMERIC)) record.putLong("FirstSeen", now);
+        record.putLong("LastSeen", now);
+        record.putLong("NextEligible", now + 12000L);
+        captureSeenProfile(record, owner, fighter);
+        recordWhereabouts(record, fighter, now, "Returned to life");
+        if (index >= 0) list.set(index, record);
+        else {
+            if (list.size() >= MAX_RECORDS) list.remove(oldestRecordIndex(list));
+            list.add(record);
+        }
+        root.put(RIVALS_KEY, list);
+        saveRoot(owner, root);
     }
 
     private static void forgetIfKilled(ServerPlayer player, AmbientFighterEntity fighter) {

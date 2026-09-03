@@ -53,6 +53,13 @@ public final class WorldMenaceData extends SavedData {
         this.returnAt = Math.max(1L, returnAt); this.x=x; this.y=y; this.z=z; setDirty();
     }
 
+    /** Removes a sighting without counting it as a defeat/return. */
+    public void markAbsent(CompoundTag profile, long returnAt, double x, double y, double z) {
+        initialized = true; active = false; entityId = null;
+        this.profile = profile == null ? new CompoundTag() : profile.copy();
+        this.returnAt = Math.max(1L, returnAt); this.x=x; this.y=y; this.z=z; setDirty();
+    }
+
     @Override
     public CompoundTag save(CompoundTag tag) {
         tag.putBoolean("Initialized", initialized);

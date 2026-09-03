@@ -16,7 +16,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -67,6 +70,8 @@ public final class WorldMenaceManager {
         int shadowMoves;
         Vec3 lastPlayerPos;
         boolean omenSent;
+        long observedSince;
+        long closeDisappearAt;
         WatchSession(UUID playerId, long endsAt, boolean shadowing, long now, Vec3 playerPos) {
             this.playerId = playerId; this.endsAt = endsAt; this.shadowing = shadowing;
             this.nextShadowStep = now + 75L; this.lastPlayerPos = playerPos;
@@ -144,6 +149,21 @@ public final class WorldMenaceManager {
         fighter.getPersistentData().putString(MENACE_STATE, "HUNTING");
         fighter.setTarget(attacker);
         markSpotted(attacker, fighter);
+    }
+
+    /** Handles ranged intimidation before any damage is applied. */
+    public static boolean interceptRangedAttack(AmbientFighterEntity fighter, DamageSource source, ServerPlayer attacker) {
+        if (fighter == null || source == null || attacker == null || !isHerobrine(fighter)
+                || fighter.level().isClientSide || source.getDirectEntity() == attacker) return false;
+        double playerPower = PlayerWorldManager.playerBattlePower(attacker);
+        double menacePower = Math.max(1.0D, fighter.getBattlePower());
+        markSpotted(attacker, fighter);
+        if (playerPower <= menacePower * 0.80D) {
+            disappear(fighter, attacker, fighter.level().getGameTime());
+            return true;
+        }
+        engage(fighter, attacker, fighter.level().getGameTime());
+        return false;
     }
 
 
@@ -317,6 +337,14 @@ public final class WorldMenaceManager {
 
     @SubscribeEvent
     public static void onDeath(LivingDeathEvent event) {
+        // Winning a hunt ends the current manifestation. Use the same disappearance path as
+        // the observation encounters so state, return scheduling and the cave sound cannot drift.
+        if (event.getEntity() instanceof ServerPlayer slain
+                && event.getSource().getEntity() instanceof AmbientFighterEntity killer
+                && isHerobrine(killer)) {
+            disappear(killer, slain, killer.level().getGameTime());
+            return;
+        }
         if (!(event.getEntity() instanceof AmbientFighterEntity fighter) || !isHerobrine(fighter)
                 || !(fighter.level() instanceof ServerLevel level)) return;
         WATCHES.remove(fighter.getUUID());
@@ -335,8 +363,10 @@ public final class WorldMenaceManager {
 
     private static AmbientFighterEntity spawn(ServerLevel level, ServerPlayer anchor, WorldMenaceData data, boolean closeDebug) {
         int deaths = data.deaths();
-        int minDistance = closeDebug ? 8 : (deaths <= 0 ? 72 : Math.min(250, 138 + deaths * 18));
-        int maxDistance = closeDebug ? 18 : (deaths <= 0 ? 126 : Math.min(380, 230 + deaths * 28));
+        // Per-client entity render distance is not available to the logical server. Use the
+        // requested deterministic fallback: a distant appearance approximately 100 blocks away.
+        int minDistance = closeDebug ? 8 : 96;
+        int maxDistance = closeDebug ? 18 : 104;
         BlockPos pos = AmbientFighterSpawner.findSafeGroundAroundSeparated(level, anchor.blockPosition(), anchor.getRandom(),
                 minDistance, maxDistance, Math.max(52, maxDistance / 2), closeDebug ? 22.0D : 44.0D);
         // A natural return is allowed to wait for a later tick instead of betraying the menace by
@@ -359,6 +389,11 @@ public final class WorldMenaceManager {
         enforceStrength(fighter, deaths);
         if (!level.addFreshEntity(fighter)) return null;
         data.markActive(fighter.getUUID(), fighter.writeMemoryProfile(), fighter.getX(), fighter.getY(), fighter.getZ());
+        if (!closeDebug) {
+            WATCHES.put(fighter.getUUID(), new WatchSession(anchor.getUUID(), level.getGameTime() + 12_000L,
+                    false, level.getGameTime(), anchor.position()));
+            fighter.getPersistentData().putString(MENACE_STATE, "WATCHING");
+        }
         return fighter;
     }
 
@@ -475,85 +510,61 @@ public final class WorldMenaceManager {
         fighter.getPersistentData().remove(INSPECTION_RELOCATE_AT);
         fighter.getPersistentData().remove(INSPECTION_RELOCATE_PLAYER);
 
-        // Outside combat Herobrine actively refuses close personal space. He does not turn and
-        // flee like an ordinary NPC: he keeps looking at the approaching player while backing away,
-        // occasionally lifting into a slow retreat when pressed especially close.
-        ServerPlayer close = level.players().stream()
-                .filter(player -> !player.isSpectator() && player.isAlive() && fighter.distanceToSqr(player) < 52.0D * 52.0D)
-                .min(java.util.Comparator.comparingDouble(fighter::distanceToSqr)).orElse(null);
-        if (close != null && keepSpaceFrom(fighter, close)) {
-            markSpotted(close, fighter);
-            return true;
-        }
-
         WatchSession session = WATCHES.get(fighter.getUUID());
         if (session != null) {
             ServerPlayer watched = level.getServer().getPlayerList().getPlayer(session.playerId);
             if (watched == null || watched.isSpectator() || watched.serverLevel() != level || now >= session.endsAt) {
                 endWatch(fighter, now);
-                return false;
+                return holdStill(fighter, null);
             }
-            fighter.getPersistentData().putString(MENACE_STATE, session.shadowing ? "SHADOWING" : "WATCHING");
-            fighter.getNavigation().stop();
+            fighter.getPersistentData().putString(MENACE_STATE, "WATCHING");
+            holdStill(fighter, watched);
             boolean observed = isClearlyObserved(watched, fighter);
 
-            // A minority of sightings actually shadow the player's movement from behind. He only
-            // repositions while unobserved, never forces chunks, and stops the moment the player
-            // catches him. This makes him feel intentional without turning the easter egg into a
-            // constant teleporting jumpscare.
-            if (session.shadowing && session.lastPlayerPos != null
-                    && watched.position().distanceToSqr(session.lastPlayerPos) >= 4.0D * 4.0D) {
-                // Track the player, but do not relocate the already-present menace. Physical retreat below owns distance.
-                session.lastPlayerPos = watched.position();
-            }
+            double playerPower = PlayerWorldManager.playerBattlePower(watched);
+            double menacePower = Math.max(1.0D, fighter.getBattlePower());
+            boolean playerAtLeastEqual = playerPower >= menacePower;
+            double distance = fighter.distanceTo(watched);
 
-            if (fighter.distanceToSqr(watched) < 56.0D * 56.0D) {
-                keepSpaceFrom(fighter, watched);
-            } else {
-                fighter.setFlyingFast(false); fighter.setFlying(false);
-                Vec3 motion = fighter.getDeltaMovement();
-                fighter.setDeltaMovement(0.0D, motion.y, 0.0D);
-                stareAt(fighter, watched);
-            }
-
-            if (!session.omenSent && now + 70L >= session.endsAt && fighter.distanceToSqr(watched) > 34.0D * 34.0D
-                    && fighter.getRandom().nextFloat() < 0.055F) {
-                session.omenSent = true;
-                watched.displayClientMessage(Component.literal(pick(fighter,
-                        "A distant footstep stops when you stop.",
-                        "For a moment, the world behind you is too quiet.",
-                        "Something moves once, far outside your focus.",
-                        "You get the feeling that turning around would change something.",
-                        "A movement behind you matches your pace, then doesn't.",
-                        "You hear one step where there should have been two.",
-                        "For a second, the ambient sounds feel farther away than they should."))
-                        .withStyle(ChatFormatting.DARK_GRAY), true);
-            }
-
-            if (observed) {
-                markSpotted(watched, fighter);
-                session.lastObservedAt = now;
-                if (session.noticedAt <= 0L) {
-                    session.noticedAt = now;
-                    session.lingerUntil = now + 28L + fighter.getRandom().nextInt(55);
-                }
-                // Sometimes he lets the player stare back for a few seconds instead of instantly
-                // popping away. If they keep looking, he eventually moves; if they look away first,
-                // the next branch makes him disappear almost immediately.
-                if (now >= session.lingerUntil) {
-                    // Do not chain-teleport while the player is watching. Ending the stalking session
-                    // in place makes the encounter readable; a later clean watch may relocate him.
-                    fighter.getPersistentData().putLong(NEXT_WATCH, now + 8400L + fighter.getRandom().nextInt(7201));
-                    ReactiveWorldManager.rememberEvent(fighter, "SIGHTING", watched.getGameProfile().getName(), "the player held eye contact");
-                    WATCHES.remove(fighter.getUUID());
-                    return false;
-                }
-            } else if (session.noticedAt > 0L && now - session.lastObservedAt >= 18L) {
-                // Looking away no longer causes a teleport. The same physical entity remains in-world;
-                // a later sighting can begin only after the ordinary watch cooldown.
-                ReactiveWorldManager.rememberEvent(fighter, "SIGHTING", watched.getGameProfile().getName(), "the player lost sight of him");
-                endWatch(fighter, now);
+            // Reaching Herobrine physically is an unconditional challenge, regardless of BP.
+            if (distance < 4.0D) {
+                engage(fighter, watched, now);
                 return false;
+            }
+
+            // A stronger/equal player turns either clear observation or entering the 40-block
+            // challenge radius into combat immediately.
+            if (playerAtLeastEqual && (observed || distance <= 40.0D)) {
+                engage(fighter, watched, now);
+                return false;
+            }
+
+            if (!playerAtLeastEqual) {
+                if (distance <= 20.0D) {
+                    if (session.closeDisappearAt <= 0L) session.closeDisappearAt = now + 10L;
+                    if (now >= session.closeDisappearAt) {
+                        disappear(fighter, watched, now);
+                        return true;
+                    }
+                } else {
+                    session.closeDisappearAt = 0L;
+                }
+                if (observed) {
+                    markSpotted(watched, fighter);
+                    if (session.observedSince <= 0L) session.observedSince = now;
+                    if (now - session.observedSince >= 200L) {
+                        disappear(fighter, watched, now);
+                        return true;
+                    }
+                } else {
+                    session.observedSince = 0L;
+                }
+            }
+
+            // When the watched player leaves the intended sighting range, relocate instantly to
+            // another safe point around 100 blocks away. Never fly or navigate to the new position.
+            if (distance > 125.0D && relocateAround(fighter, watched)) {
+                session.lastPlayerPos = watched.position();
             }
             return true;
         }
@@ -561,37 +572,74 @@ public final class WorldMenaceManager {
         long next = fighter.getPersistentData().getLong(NEXT_WATCH);
         if (next <= 0L) {
             fighter.getPersistentData().putLong(NEXT_WATCH, now + 7200L + fighter.getRandom().nextInt(7801));
-            return false;
+            return holdStill(fighter, null);
         }
-        if (now < next) return false;
+        if (now < next) return holdStill(fighter, null);
 
         List<ServerPlayer> candidates = level.players().stream()
                 .filter(player -> !player.isSpectator() && player.isAlive())
                 .toList();
         if (candidates.isEmpty()) {
             fighter.getPersistentData().putLong(NEXT_WATCH, now + 1200L);
-            return false;
+            return holdStill(fighter, null);
         }
         ServerPlayer watched = candidates.get(fighter.getRandom().nextInt(candidates.size()));
-        // Do not teleport out of someone's current close view. Wait for a cleaner opportunity.
-        if (fighter.distanceToSqr(watched) < 68.0D * 68.0D || isClearlyObserved(watched, fighter)) {
-            fighter.getPersistentData().putLong(NEXT_WATCH, now + 700L + fighter.getRandom().nextInt(801));
-            return false;
-        }
-        // R16: once Herobrine exists, a stalking scene never teleports that physical entity into
-        // position. A watch may begin only from where he genuinely is in the world. The initial
-        // menace spawn is what creates the distant sighting; every later distance change is real
-        // movement through keepSpaceFrom/native combat locomotion.
-        double realDistance = fighter.distanceTo(watched);
-        if (realDistance < 68.0D || realDistance > 380.0D) {
+        if (!relocateAround(fighter, watched)) {
             fighter.getPersistentData().putLong(NEXT_WATCH, now + 700L + fighter.getRandom().nextInt(1001));
-            return false;
+            return holdStill(fighter, watched);
         }
-        boolean shadowing = fighter.getRandom().nextFloat() < 0.34F;
-        long duration = shadowing ? 240L + fighter.getRandom().nextInt(241) : 130L + fighter.getRandom().nextInt(201);
-        WATCHES.put(fighter.getUUID(), new WatchSession(watched.getUUID(), now + duration, shadowing, now, watched.position()));
-        fighter.getPersistentData().putString(MENACE_STATE, shadowing ? "SHADOWING" : "WATCHING");
+        WATCHES.put(fighter.getUUID(), new WatchSession(watched.getUUID(), now + 12_000L, false, now, watched.position()));
+        fighter.getPersistentData().putString(MENACE_STATE, "WATCHING");
         disturbNearbyFighters(fighter, watched);
+        return true;
+    }
+
+    private static boolean holdStill(AmbientFighterEntity fighter, ServerPlayer watched) {
+        fighter.getNavigation().stop();
+        fighter.setFlyingFast(false);
+        fighter.setFlying(false);
+        fighter.setNoGravity(false);
+        fighter.setDeltaMovement(Vec3.ZERO);
+        if (watched != null) stareAt(fighter, watched);
+        return true;
+    }
+
+    private static void engage(AmbientFighterEntity fighter, ServerPlayer player, long now) {
+        WATCHES.remove(fighter.getUUID());
+        fighter.getPersistentData().putUUID(RETALIATE_PLAYER, player.getUUID());
+        fighter.getPersistentData().putLong(RETALIATE_UNTIL, now + 20L * 45L);
+        fighter.getPersistentData().putString(MENACE_STATE, "HUNTING");
+        fighter.setTarget(player);
+        markSpotted(player, fighter);
+    }
+
+    private static void disappear(AmbientFighterEntity fighter, ServerPlayer responsiblePlayer, long now) {
+        if (!(fighter.level() instanceof ServerLevel level)) return;
+        WATCHES.remove(fighter.getUUID());
+        CompoundTag profile = fighter.writeMemoryProfile();
+        profile.putBoolean(HEROBRINE_TAG, true);
+        WorldMenaceData.get(level).markAbsent(profile, now + 2400L + fighter.getRandom().nextInt(3601),
+                fighter.getX(), fighter.getY(), fighter.getZ());
+        if (responsiblePlayer != null && responsiblePlayer.serverLevel() == level) {
+            level.playSound(null, responsiblePlayer.getX(), responsiblePlayer.getY(), responsiblePlayer.getZ(),
+                    SoundEvents.AMBIENT_CAVE.value(), SoundSource.AMBIENT, 1.0F, 1.0F);
+        }
+        fighter.discard();
+    }
+
+    private static boolean relocateAround(AmbientFighterEntity fighter, ServerPlayer player) {
+        if (!(fighter.level() instanceof ServerLevel level) || player.serverLevel() != level) return false;
+        BlockPos pos = AmbientFighterSpawner.findSafeGroundAroundSeparated(level, player.blockPosition(),
+                fighter.getRandom(), 96, 104, 64, 72.0D);
+        if (pos == null) return false;
+        fighter.getNavigation().stop();
+        fighter.setFlyingFast(false);
+        fighter.setFlying(false);
+        fighter.setNoGravity(false);
+        fighter.moveTo(pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D, fighter.getYRot(), 0.0F);
+        fighter.setDeltaMovement(Vec3.ZERO);
+        stareAt(fighter, player);
+        WorldMenaceData.get(level).updateSnapshot(fighter.writeMemoryProfile(), fighter.getX(), fighter.getY(), fighter.getZ());
         return true;
     }
 

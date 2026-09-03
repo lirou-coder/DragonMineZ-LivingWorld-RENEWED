@@ -559,7 +559,7 @@ public final class LivingWorldCommands {
         } else lines.add(". No active faction request.");
 
         lines.add("## World");
-        lines.add("* " + LivingWorldDimensions.realm(level).displayName() + " • " + WorldEraData.get(level).era().displayName());
+        lines.add("* " + LivingWorldDimensions.realm(level).displayName() + " • " + WorldEraData.get(level).displayName());
 
         // R40 restores the useful pre-declutter world-power snapshot without restoring the old
         // prose-heavy presentation. These two institutions are public knowledge and remain clickable.
@@ -2360,7 +2360,7 @@ public final class LivingWorldCommands {
         player.displayClientMessage(Component.literal("[Living World] Fighters within 160 blocks: " + fighters.size()
                 + " (good " + good + ", neutral " + neutral + ", bad " + bad + ", defeated " + defeated
                 + ", awakened " + awakened + ", affiliated " + affiliated + ", gendered F/M " + female + "/" + male + ")"
-                + " • world era " + (player.level() instanceof ServerLevel server ? WorldEraData.get(server).era().displayName() : "unknown")
+                + " • world era " + (player.level() instanceof ServerLevel server ? WorldEraData.get(server).eraNumber() : "unknown")
                 + " • era power anchor " + Math.round(anchor)
                 + " • remembered " + FighterMemoryManager.count(player))
                 .withStyle(ChatFormatting.GRAY), false);

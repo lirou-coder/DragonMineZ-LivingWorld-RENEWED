@@ -7,6 +7,10 @@ import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
 import com.dmzlivingworld.entity.FighterRank;
 import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
+import com.dragonminez.common.quest.PartyManager;
+import com.dragonminez.server.events.QuestEvents;
+import com.dragonminez.common.stats.StatsCapability;
+import com.dragonminez.common.stats.StatsProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -16,6 +20,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
@@ -105,17 +110,24 @@ public final class LivingBondManager {
      * miss the fight. Latch the real attacker briefly so the companion has time to acquire,
      * approach and engage it through DMZ's native combat brain.
      */
-    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = false)
+    @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = false)
     public static void onPlayerHurt(LivingHurtEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || event.getAmount() <= 0.0F) return;
         if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) return;
 
         LivingEntity attacker = responsibleAttacker(event.getSource());
         if (attacker == null || attacker == player || !attacker.isAlive()) return;
-        UUID companionId = companionId(player);
-        if (companionId != null && companionId.equals(attacker.getUUID())) return;
+        // A voluntary spar temporarily supersedes every Come Along friendly-fire/ally rule.
+        // This must precede the companion-hit cancellation below so the companion can damage
+        // its owner through DMZ's normal sanctioned-match pipeline.
         if (SparManager.isSanctionedPlayerOpponent(player, attacker)) return;
-
+        UUID companionId = companionId(player);
+        if (companionId != null && companionId.equals(attacker.getUUID())) {
+            if (attacker instanceof AmbientFighterEntity companion && companion.getTarget() != null) {
+                event.setCanceled(true);
+            }
+            return;
+        }
         latchDefenseThreat(player, attacker, level.getServer().overworld().getGameTime(), 240L);
     }
 
@@ -494,9 +506,27 @@ public final class LivingBondManager {
                 companion.getNavigation().stop();
                 companion.setTarget(threat);
             }
+            boolean followTargetInFlight = companion.hasFlightUnlocked() && isActuallyFlying(threat);
+            companion.setCanFly(followTargetInFlight);
+            if (!followTargetInFlight) {
+                companion.setFlying(false);
+                companion.setFlyingFast(false);
+                companion.setNoGravity(false);
+            }
         } else if (companion.getTarget() == null || !sagaHelpAllowed(companion.getTarget())) {
             if (companion.getTarget() != null && !sagaHelpAllowed(companion.getTarget())) companion.setTarget(null);
             followPlayer(player, companion, companionDistance, false);
+        } else {
+            // The original trigger may have expired while native combat still owns a valid target.
+            // Keep the same grounded/airborne rule for the rest of that engagement.
+            LivingEntity currentTarget = companion.getTarget();
+            boolean followTargetInFlight = companion.hasFlightUnlocked() && isActuallyFlying(currentTarget);
+            companion.setCanFly(followTargetInFlight);
+            if (!followTargetInFlight) {
+                companion.setFlying(false);
+                companion.setFlyingFast(false);
+                companion.setNoGravity(false);
+            }
         }
         maybeCompanionChatter(player, companion, root, now);
     }
@@ -511,136 +541,102 @@ public final class LivingBondManager {
 
     private static void followPlayer(ServerPlayer player, AmbientFighterEntity companion, double distanceSq, boolean cautious) {
         if (player == null || companion == null || companion.isMeditating() || companion.isPreparingMeditation()) return;
-        ServerLevel level = player.serverLevel();
-        double horizontalDx = player.getX() - companion.getX();
-        double horizontalDz = player.getZ() - companion.getZ();
-        double horizontalSq = horizontalDx * horizontalDx + horizontalDz * horizontalDz;
+        CompoundTag travelData = companion.getPersistentData();
         double vertical = player.getY() - companion.getY();
-        boolean playerAirborne = !player.onGround() && (Math.abs(vertical) > 1.8D || player.getDeltaMovement().y > 0.08D);
+        boolean playerAirborne = isActuallyFlying(player);
+
+        // If the owner gets five blocks above an earthbound companion, capture that exact point.
+        // The rescue flight deliberately does not chase the owner's later positions: it reaches
+        // the captured ledge first, then returns to ordinary pet-style following.
+        boolean rescueFlight = travelData.getBoolean("LWCompanionRescueFlight");
+        if (!rescueFlight && vertical >= 5.0D && companion.hasFlightUnlocked() && !companion.isNonCombatant()) {
+            rescueFlight = true;
+            travelData.putBoolean("LWCompanionRescueFlight", true);
+            travelData.putDouble("LWCompanionRescueX", player.getX());
+            travelData.putDouble("LWCompanionRescueY", player.getY() + 0.5D);
+            travelData.putDouble("LWCompanionRescueZ", player.getZ());
+        }
+        Vec3 flightTarget = rescueFlight
+                ? new Vec3(travelData.getDouble("LWCompanionRescueX"), travelData.getDouble("LWCompanionRescueY"),
+                        travelData.getDouble("LWCompanionRescueZ"))
+                : player.position().add(0.0D, 1.0D, 0.0D);
+        double flightDistanceSq = companion.position().distanceToSqr(flightTarget);
+        if (rescueFlight && flightDistanceSq <= 2.25D) {
+            rescueFlight = false;
+            travelData.remove("LWCompanionRescueFlight");
+        }
+
+        // Keep an already airborne companion under direct flight control while descending. This
+        // mirrors DBSagasEntity instead of handing a flying entity to ground navigation, which was
+        // the source of the stationary-in-air and unable-to-descend failures.
+        boolean controlledDescent = companion.isFlying() && !companion.onGround() && distanceSq > 7.0D * 7.0D;
         boolean shouldFly = companion.hasFlightUnlocked() && !companion.isNonCombatant()
-                && (companion.isInWater() || playerAirborne || vertical > 3.0D || distanceSq > 26.0D * 26.0D);
-        int stall = travelStallTicks(companion, player.position());
+                && (rescueFlight || playerAirborne || controlledDescent);
+        companion.setCanFly(shouldFly);
 
         if (shouldFly) {
             companion.getNavigation().stop();
             companion.setFlying(true);
             companion.setNoGravity(true);
-            companion.setFlyingFast(distanceSq > 18.0D * 18.0D);
             companion.setSprinting(false);
-            Vec3 look = player.getLookAngle();
-            Vec3 directTarget = player.position().add(-look.x * 2.8D, playerAirborne ? 0.55D : 1.8D, -look.z * 2.8D);
-            Vec3 target = flightTrailTarget(level, companion, player, directTarget);
-            // R22: companion flight used to continuously cross the follow point, reverse, cross it
-            // again and converge in smaller arcs. Give the follow point an arrival dead-zone plus
-            // hysteresis: once settled, the companion only resumes steering after the player has
-            // genuinely moved away again.
-            CompoundTag travelData = companion.getPersistentData();
-            double followPointSq = companion.position().distanceToSqr(target);
-            boolean holdingFollowPoint = travelData.getBoolean("LWTravelFlightHolding");
-            if ((!holdingFollowPoint && followPointSq <= 3.2D * 3.2D)
-                    || (holdingFollowPoint && followPointSq <= 5.5D * 5.5D)) {
-                travelData.putBoolean("LWTravelFlightHolding", true);
+            double stopRadiusSq = rescueFlight ? 2.25D : 7.0D * 7.0D;
+            if (flightDistanceSq <= stopRadiusSq) {
                 companion.setFlyingFast(false);
-                Vec3 damped = companion.getDeltaMovement().scale(0.28D);
-                if (damped.lengthSqr() < 0.0025D) damped = Vec3.ZERO;
-                companion.setDeltaMovement(damped);
+                companion.setDeltaMovement(companion.getDeltaMovement().scale(0.25D));
                 companion.getLookControl().setLookAt(player, 28.0F, 24.0F);
                 return;
             }
-            travelData.putBoolean("LWTravelFlightHolding", false);
-            Vec3 flatToward = new Vec3(target.x - companion.getX(), 0.0D, target.z - companion.getZ());
-            Vec3 dir = flatToward.lengthSqr() > 0.01D ? flatToward.normalize() : Vec3.ZERO;
-            boolean blocked = false;
-            int climb = 0;
-            for (int step = 1; step <= 3 && dir.lengthSqr() > 0.0D; step++) {
-                Vec3 probe = companion.position().add(dir.scale(step * 1.25D));
-                BlockPos feet = BlockPos.containing(probe.x, companion.getY() + 0.35D, probe.z);
-                BlockPos head = feet.above();
-                if (travelBlocked(level, feet) || travelBlocked(level, head)) { blocked = true; climb = Math.max(climb, 2); break; }
-                if (travelBlocked(level, feet.below())) climb = Math.max(climb, 1);
+
+            // Exact DBSagasEntity flight rule: normalized three-dimensional movement, native fly
+            // speed, fast-flight beyond 15 blocks, and a small downward drag that permits descent.
+            double distance = Math.sqrt(flightDistanceSq);
+            companion.setFlyingFast(distance > 15.0D);
+            double speed = Math.max(0.18D, companion.getFlySpeed()) * (companion.isFlyingFast() ? 2.0D : 1.0D);
+            Vec3 toward = flightTarget.subtract(companion.position());
+            if (toward.lengthSqr() >= 1.0D) {
+                double gravityDrag = toward.y < -0.5D ? -0.05D : -0.03D;
+                companion.setDeltaMovement(toward.normalize().scale(speed).add(0.0D, gravityDrag, 0.0D));
             }
-            if (blocked || climb > 0) target = new Vec3(target.x, Math.max(target.y, companion.getY() + 1.15D + climb), target.z);
-            // Do not dive onto the destination while still horizontally far away.
-            if (horizontalSq > 7.0D * 7.0D && target.y < companion.getY() + 0.15D)
-                target = new Vec3(target.x, companion.getY() + 0.15D, target.z);
-            if ((blocked && stall >= 20) || stall >= 38) {
-                double sign = ((companion.getUUID().hashCode() + companion.tickCount / 30) & 1) == 0 ? 1.0D : -1.0D;
-                Vec3 lateral = dir.lengthSqr() > 0.0D ? new Vec3(-dir.z, 0.0D, dir.x).scale(4.2D * sign) : new Vec3(4.2D * sign, 0.0D, 0.0D);
-                target = companion.position().add(lateral).add(0.0D, 2.6D, 0.0D).add(dir.scale(2.0D));
-                companion.getPersistentData().putInt("LWTravelStall", Math.max(0, stall - 20));
-            }
-            Vec3 toward = target.subtract(companion.position());
-            if (toward.lengthSqr() > 0.04D) {
-                double speed = cautious ? 0.34D : distanceSq > 18.0D * 18.0D ? 0.62D : 0.46D;
-                companion.steerAmbientFlightToward(target, speed);
-            }
-            companion.getLookControl().setLookAt(target.x, target.y, target.z, 35.0F, 30.0F);
+            companion.getLookControl().setLookAt(flightTarget.x, flightTarget.y, flightTarget.z, 35.0F, 30.0F);
             return;
         }
 
-        companion.getPersistentData().remove("LWTravelFlightHolding");
         if (companion.isFlying() || companion.isNoGravity()) {
             companion.setFlying(false);
             companion.setFlyingFast(false);
             companion.setNoGravity(false);
         }
-        boolean far = distanceSq > 11.0D * 11.0D;
-        companion.setSprinting(far);
-        CompoundTag data = companion.getPersistentData();
-        long now = level.getGameTime();
-        // Heightmaps describe the open-air surface, not the cave floor. Below Y=0 they made a
-        // companion abandon its owner and route straight upward. The player's current feet are a
-        // valid local navigation goal underground; surface-safe sampling remains useful above it.
-        BlockPos dryDestination = player.getY() <= 0.0D
-                ? player.blockPosition()
-                : AmbientFighterSpawner.findSafeGroundAround(
-                        level, player.blockPosition(), companion.getRandom(), 0, 5, 24);
-        if (dryDestination == null) {
-            // There is no legitimate ground route target right now. Holding is preferable to
-            // repeatedly stepping into adjacent water and being pushed back out by WaterSafety.
-            companion.getNavigation().stop();
+
+        // Ground following deliberately follows vanilla FollowOwnerGoal's shape: leave the pet
+        // alone in its comfort radius and periodically ask navigation for a fresh path directly to
+        // the owner. No synthetic surface point, waypoint or forced jump competes with navigation.
+        if (distanceSq <= 6.0D * 6.0D) {
+            if (!travelData.getBoolean("LWCompanionComfortZone")) {
+                companion.getNavigation().stop();
+                travelData.putBoolean("LWCompanionComfortZone", true);
+            }
             companion.setSprinting(false);
+            companion.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
             return;
         }
-        Vec3 destination = Vec3.atBottomCenterOf(dryDestination);
-        Vec3 waypoint = destination;
-        if (companion.position().distanceToSqr(destination) > 8.0D * 8.0D) {
-            boolean refresh = now >= data.getLong("LWTravelWaypointUntil") || stall >= 28;
-            if (refresh) {
-                Vec3 toward = destination.subtract(companion.position());
-                Vec3 flat = new Vec3(toward.x, 0.0D, toward.z);
-                Vec3 candidate = flat.lengthSqr() > 0.01D ? companion.position().add(flat.normalize().scale(Math.min(8.0D, Math.sqrt(horizontalSq)))) : destination;
-                if (stall >= 28 && flat.lengthSqr() > 0.01D) {
-                    double sign = ((companion.getUUID().hashCode() + companion.tickCount / 24) & 1) == 0 ? 1.0D : -1.0D;
-                    Vec3 lateral = new Vec3(-flat.normalize().z, 0.0D, flat.normalize().x).scale(3.0D * sign);
-                    candidate = companion.position().add(flat.normalize().scale(4.5D)).add(lateral);
-                }
-                BlockPos safe = AmbientFighterSpawner.findSafeGroundAround(level, BlockPos.containing(candidate), companion.getRandom(), 0, 3, 12);
-                if (safe == null) {
-                    companion.getNavigation().stop();
-                    companion.setSprinting(false);
-                    data.putLong("LWTravelWaypointUntil", now + 12L);
-                    return;
-                }
-                waypoint = Vec3.atBottomCenterOf(safe);
-                data.putDouble("LWTravelWaypointX", waypoint.x); data.putDouble("LWTravelWaypointY", waypoint.y); data.putDouble("LWTravelWaypointZ", waypoint.z);
-                data.putLong("LWTravelWaypointUntil", now + 18L);
-            } else {
-                waypoint = new Vec3(data.getDouble("LWTravelWaypointX"), data.getDouble("LWTravelWaypointY"), data.getDouble("LWTravelWaypointZ"));
-            }
+        travelData.remove("LWCompanionComfortZone");
+        boolean far = distanceSq > 20.0D * 20.0D;
+        companion.setSprinting(far);
+        companion.setLocomotionMode(far ? DBSagasEntity.LocomotionMode.RUN : DBSagasEntity.LocomotionMode.WALK);
+        if (companion.getNavigation().isDone() || companion.tickCount % 10 == 0)
+            companion.getNavigation().moveTo(player, cautious ? 1.05D : far ? 1.42D : 1.16D);
+    }
+
+    private static boolean isActuallyFlying(LivingEntity entity) {
+        if (entity instanceof AmbientFighterEntity fighter) return fighter.isFlying();
+        if (entity instanceof DBSagasEntity saga) return saga.isFlying();
+        if (entity instanceof ServerPlayer player) {
+            if (player.getAbilities().flying || player.isFallFlying()) return true;
+            return StatsProvider.get(StatsCapability.INSTANCE, player)
+                    .map(data -> data.getSkills().isSkillActive("fly"))
+                    .orElse(false);
         }
-        if (companion.position().distanceToSqr(waypoint) > 2.0D * 2.0D
-                && (companion.getNavigation().isDone() || companion.tickCount % 8 == 0 || stall >= 28)) {
-            companion.getNavigation().moveTo(waypoint.x, waypoint.y, waypoint.z, cautious ? 1.08D : far ? 1.42D : 1.16D);
-        }
-        Vec3 toGoal = destination.subtract(companion.position());
-        Vec3 flatGoal = new Vec3(toGoal.x, 0.0D, toGoal.z);
-        if (companion.onGround() && flatGoal.lengthSqr() > 0.01D) {
-            Vec3 probe = companion.position().add(flatGoal.normalize().scale(1.1D));
-            BlockPos ahead = BlockPos.containing(probe.x, companion.getY() + 0.2D, probe.z);
-            if (travelBlocked(level, ahead) || travelBlocked(level, ahead.above()) || stall >= 28
-                    || (vertical > 0.8D && horizontalSq < 7.0D * 7.0D)) companion.getJumpControl().jump();
-        }
+        return false;
     }
 
     private static boolean travelBlocked(ServerLevel level, BlockPos pos) {
@@ -1067,9 +1063,22 @@ public final class LivingBondManager {
         return false;
     }
 
+    /** DMZ-facing ownership/team check used by relation, healing and buff targeting. */
+    public static boolean isCompanionAlly(Player player, AmbientFighterEntity fighter) {
+        if (player == null || fighter == null || !(fighter.level() instanceof ServerLevel level)) return false;
+        if (fighter.isSanctionedMatchParticipant() && fighter.isSanctionedOpponent(player)) return false;
+        UUID ownerId = fighter.getPersistentData().hasUUID("LWCompanionOwner")
+                ? fighter.getPersistentData().getUUID("LWCompanionOwner") : null;
+        if (ownerId == null) return false;
+        ServerPlayer owner = level.getServer().getPlayerList().getPlayer(ownerId);
+        if (owner == null || !fighter.getUUID().equals(companionId(owner))) return false;
+        return player.getUUID().equals(ownerId) || PartyManager.areInSameParty(owner, player);
+    }
+
     /** True only while this player's current travelling companion has an active combat target. */
     public static boolean isCombatProtectedCompanion(ServerPlayer player, AmbientFighterEntity npc) {
         if (player == null || npc == null || npc.getTarget() == null) return false;
+        if (npc.isSanctionedMatchParticipant() && npc.isSanctionedOpponent(player)) return false;
         UUID current = companionId(player);
         return current != null && current.equals(npc.getUUID());
     }
@@ -1081,6 +1090,7 @@ public final class LivingBondManager {
      */
     public static boolean protectCompanionFromFriendlyFire(ServerPlayer player, AmbientFighterEntity npc) {
         if (player == null || npc == null) return false;
+        if (npc.isSanctionedMatchParticipant() && npc.isSanctionedOpponent(player)) return false;
         UUID current = companionId(player);
         if (current == null || !current.equals(npc.getUUID())) return false;
 
@@ -1221,7 +1231,21 @@ public final class LivingBondManager {
 
     @SubscribeEvent
     public static void onDeath(LivingDeathEvent event) {
-        if (!(event.getEntity() instanceof AmbientFighterEntity npc) || !(npc.level() instanceof ServerLevel level)) return;
+        if (!(event.getEntity().level() instanceof ServerLevel level)) return;
+
+        // DMZ's native kill event requires a ServerPlayer damage source. Forward a companion's
+        // finishing blow to its owner once, so saga/custom quest objectives use the same public
+        // credit pipeline as a direct player kill.
+        LivingEntity killer = responsibleAttacker(event.getSource());
+        if (killer instanceof AmbientFighterEntity companion
+                && companion.getPersistentData().hasUUID("LWCompanionOwner")) {
+            ServerPlayer owner = level.getServer().getPlayerList().getPlayer(
+                    companion.getPersistentData().getUUID("LWCompanionOwner"));
+            if (owner != null && companion.getUUID().equals(companionId(owner)))
+                QuestEvents.creditQuestKill(owner, event.getEntity());
+        }
+
+        if (!(event.getEntity() instanceof AmbientFighterEntity npc)) return;
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
             UUID id = companionId(player);
             if (id != null && id.equals(npc.getUUID())) clearCompanion(player);

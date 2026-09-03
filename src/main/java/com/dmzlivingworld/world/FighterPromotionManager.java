@@ -26,7 +26,7 @@ public final class FighterPromotionManager {
         CompoundTag legacy = fighter.getLegacyData();
         if (!legacy.contains(ORIGIN_POWER)) legacy.putInt(ORIGIN_POWER, fighter.getPermanentBattlePower());
         if (!legacy.contains(BIRTH_ERA) && fighter.level() instanceof ServerLevel level) {
-            legacy.putString(BIRTH_ERA, WorldEraData.get(level).era().displayName());
+        legacy.putString(BIRTH_ERA, WorldEraData.get(level).displayName());
         }
     }
 

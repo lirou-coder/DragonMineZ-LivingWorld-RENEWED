@@ -11,6 +11,7 @@ import com.dragonminez.common.stats.character.Character;
 import com.dragonminez.common.stats.character.Status;
 import com.dragonminez.common.stats.extras.ActionMode;
 import com.dragonminez.server.util.FusionLogic;
+import com.dmzlivingworld.entity.AmbientFighterEntity;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -617,6 +618,21 @@ public final class LWFusionManager {
             mob.setNoAi(backup.getBoolean("PartnerNoAI"));
             mob.setTarget(null);
             mob.getNavigation().stop();
+        }
+        // Hidden fusion partners can enter the fusion while flying. Riding the fusion keeps
+        // their old no-gravity/flight flags alive, so merely restoring NoAI leaves them hanging
+        // motionless until a later watchdog happens to reclaim locomotion. Hand control back to
+        // the fighter immediately; learned flight remains available, but no flight mode owns it.
+        if (partner instanceof AmbientFighterEntity fighter && !fighter.isCaptive()) {
+            fighter.setFlying(false);
+            fighter.setFlyingFast(false);
+            fighter.setNoGravity(false);
+            fighter.setCanFly(fighter.hasFlightUnlocked() && !fighter.isNonCombatant());
+            fighter.setAmbientFlightActivity(false);
+            fighter.setSocialLifeActivity(false);
+            fighter.getPersistentData().remove("LWIdleFlightTravel");
+            fighter.getPersistentData().remove("LWTravelFlightHolding");
+            fighter.getPersistentData().remove("LWCompanionComfortZone");
         }
         partner.setDeltaMovement(Vec3.ZERO);
     }

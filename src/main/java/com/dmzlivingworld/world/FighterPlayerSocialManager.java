@@ -260,17 +260,9 @@ public final class FighterPlayerSocialManager {
                 return "I was thinking about when we " + lowerEvent(last) + ". Funny how much has happened since.";
         }
 
-        WorldEra era = WorldEraData.get(player.serverLevel()).era();
-        if (era != WorldEra.EARLY_EARTH && fighter.getRandom().nextFloat() < 0.55F) {
-            return switch (era) {
-                case SAIYAN -> "Since the Saiyan fighting, even ordinary fighters are taking training more seriously.";
-                case NAMEK_FRIEZA -> "Things haven't felt small since Namek and Frieza entered the picture.";
-                case ANDROID_CELL -> "After the Android and Cell battles, nobody sensible assumes power has a ceiling anymore.";
-                case BUU -> "After everything with Majin Buu, a quiet day feels different, doesn't it?";
-                case GOD -> "God ki changed what people think 'strong' even means.";
-                case SUPER -> "The world keeps getting bigger. Every new battle seems to prove it.";
-                default -> "Things have changed a lot lately.";
-            };
+        int era = WorldEraData.get(player.serverLevel()).eraNumber();
+        if (era > 0 && fighter.getRandom().nextFloat() < 0.55F) {
+            return "Things have changed since the latest saga ended. Even ordinary fighters are training more seriously.";
         }
 
         return switch (FighterHobby.of(fighter)) {

@@ -4,6 +4,7 @@ import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;
 import com.dragonminez.common.init.entities.IBattlePower;
 import com.dragonminez.common.init.MainSounds;
+import com.dragonminez.common.init.MainParticles;
 import com.dragonminez.common.init.MainDamageTypes;
 import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
 import com.dragonminez.common.init.entities.sagas.helper.DBSagasAnimations;
@@ -59,6 +60,7 @@ import com.dmzlivingworld.world.LivingBondManager;
 import com.dmzlivingworld.world.MercyManager;
 import com.dmzlivingworld.world.PeacekeeperManager;
 import com.dmzlivingworld.world.PlayerCreationSafety;
+import com.dmzlivingworld.world.PlayerSpawnCombatSafety;
 import com.dmzlivingworld.world.OrganicThreatManager;
 import com.dmzlivingworld.world.ReactiveFusionManager;
 import com.dmzlivingworld.world.SanctionedMatchGuard;
@@ -1940,9 +1942,13 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         Entity attackerEntity = source.getEntity();
+        if (!level().isClientSide && attackerEntity instanceof ServerPlayer player && amount > 0.0F)
+            PlayerSpawnCombatSafety.notePlayerAttack(this, player);
         if (!level().isClientSide && SanctionedMatchGuard.isPostSparInvulnerable(this)) return false;
         if (!level().isClientSide && attackerEntity instanceof ServerPlayer player
                 && PlayerCreationSafety.isCreating(player)) return false;
+        if (!level().isClientSide && attackerEntity instanceof ServerPlayer player
+                && WorldMenaceManager.interceptRangedAttack(this, source, player)) return false;
         if (!level().isClientSide && !source.is(DamageTypeTags.BYPASSES_ARMOR)) {
             if (attackerEntity instanceof ServerPlayer player && source.getDirectEntity() == player) {
                 var stats = player.getCapability(StatsCapability.INSTANCE).orElse(null);
@@ -2204,6 +2210,11 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             super.setTarget(null);
             return;
         }
+        if (!level().isClientSide && target instanceof ServerPlayer player
+                && PlayerSpawnCombatSafety.blocksTarget(this, player)) {
+            super.setTarget(null);
+            return;
+        }
         if (!level().isClientSide && target != null && !LivingWorldConfig.attackMinecraftMobs()
                 && isVanillaMinecraftMob(target) && !isCompanionDefenseTarget(target)) {
             // Enforce the setting at the assignment boundary as well as in canAttack(). Native
@@ -2245,12 +2256,33 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         // Peaceful. Dragon Mine Z already ships a physical strike damage type whose data definition
         // uses scaling=never, so use that native source only for this otherwise-valid Peaceful hit.
         // Every other difficulty remains on R12.2's exact known-good super.doHurtTarget path.
+        boolean hit;
         if (!level().isClientSide && level().getDifficulty() == Difficulty.PEACEFUL && target instanceof ServerPlayer player) {
             float damage = (float)Math.max(0.0D, getAttributeValue(Attributes.ATTACK_DAMAGE));
             if (damage <= 0.0F) return false;
-            return player.hurt(MainDamageTypes.strikeAttack(level(), this, "generic"), damage);
+            hit = player.hurt(MainDamageTypes.strikeAttack(level(), this, "generic"), damage);
+        } else {
+            hit = super.doHurtTarget(target);
         }
-        return super.doHurtTarget(target);
+        if (hit && !level().isClientSide && target instanceof LivingEntity living && !(target instanceof Player))
+            playDmzPunchFeedback(living);
+        return hit;
+    }
+
+    private void playDmzPunchFeedback(LivingEntity target) {
+        var sound = switch (getRandom().nextInt(6)) {
+            case 0 -> MainSounds.GOLPE1.get();
+            case 1 -> MainSounds.GOLPE2.get();
+            case 2 -> MainSounds.GOLPE3.get();
+            case 3 -> MainSounds.GOLPE4.get();
+            case 4 -> MainSounds.GOLPE5.get();
+            default -> MainSounds.GOLPE6.get();
+        };
+        level().playSound(null, target.getX(), target.getY() + target.getBbHeight() * 0.55D, target.getZ(),
+                sound, SoundSource.PLAYERS, 1.0F, 0.94F + getRandom().nextFloat() * 0.12F);
+        if (level() instanceof ServerLevel server)
+            server.sendParticles(MainParticles.PUNCH_PARTICLE.get(), target.getX(),
+                    target.getY() + target.getBbHeight() * 0.55D, target.getZ(), 0, 1.0D, 1.0D, 1.0D, 1.0D);
     }
 
     /**
@@ -2285,6 +2317,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     @Override
     public boolean canAttack(LivingEntity target) {
         if (target instanceof ServerPlayer player && PlayerCreationSafety.isCreating(player)) return false;
+        if (target instanceof ServerPlayer player && PlayerSpawnCombatSafety.blocksTarget(this, player)) return false;
         if (!com.dmzlivingworld.world.FactionRequestMissionManager.allowsMissionTarget(this, target)) return false;
         if (isPostSparOpponent(target)) return false;
         if (isDefeated() || isCaptive() || isNonCombatant() || isMeditating()) return false;
@@ -2352,6 +2385,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     @Override
     public boolean isAlliedTo(Entity entity) {
+        if (entity instanceof Player player && isSanctionedMatchParticipant() && isSanctionedOpponent(player)) return false;
+        if (entity instanceof Player player && LivingBondManager.isCompanionAlly(player, this)) return true;
         if (entity instanceof AmbientFighterEntity other) {
             if (isFactionMember() && other.isFactionMember()) {
                 if (getFactionId().equals(other.getFactionId())) return !isDuelOpponent(other);
@@ -3204,6 +3239,12 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         tag.putInt("RacialSkillLevel", getRacialSkillLevel());
         tag.putInt("RacialTrainingProgress", racialTrainingProgress);
         tag.putBoolean("Awakened", isAwakened());
+        // Wishes rebuild an NPC from this compact profile, so the personal bond is identity data too.
+        if (memoryOwnerId != null) tag.putUUID("MemoryOwner", memoryOwnerId);
+        if (memoryRecordId != null) tag.putUUID("MemoryRecord", memoryRecordId);
+        tag.putInt("MemoryEncounters", memoryEncounters);
+        tag.putInt("MemoryRelationship", memoryRelationship);
+        tag.putBoolean("MemoryRescued", memoryRescued);
         tag.putFloat("DisplayScale", getDisplayScale());
         tag.putInt("Gender", entityData.get(GENDER));
         tag.putInt("BodyType", getBodyType());
@@ -3362,6 +3403,12 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         boolean rememberedAwakened = profile.contains("Awakened") && profile.getBoolean("Awakened");
         entityData.set(AWAKENED, rememberedAwakened);
         setLightning(rememberedAwakened);
+        memoryOwnerId = profile.hasUUID("MemoryOwner") ? profile.getUUID("MemoryOwner") : null;
+        memoryRecordId = profile.hasUUID("MemoryRecord") ? profile.getUUID("MemoryRecord") : null;
+        memoryEncounters = profile.contains("MemoryEncounters") ? Math.max(1, profile.getInt("MemoryEncounters")) : 0;
+        memoryRelationship = profile.contains("MemoryRelationship") ? profile.getInt("MemoryRelationship") : 0;
+        memoryRescued = profile.getBoolean("MemoryRescued");
+        if (memoryRecordId != null) setPersistenceRequired();
         combatConfigured = false;
         configureCombatProfile(true);
     }

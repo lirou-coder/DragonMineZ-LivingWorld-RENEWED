@@ -227,7 +227,7 @@ public final class FighterAfterlifeManager {
                 (int)Math.round(Math.sin(angle) * radius));
         BlockPos at = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, horizontal);
         fighter.moveTo(at.getX() + 0.5D, at.getY(), at.getZ() + 0.5D, fighter.getRandom().nextFloat() * 360F, 0F);
-        level.addFreshEntity(fighter);
+        if (level.addFreshEntity(fighter)) FighterMemoryManager.restoreRevivedBond(fighter);
     }
 
     private static void discardSoul(MinecraftServer server, UUID id) {

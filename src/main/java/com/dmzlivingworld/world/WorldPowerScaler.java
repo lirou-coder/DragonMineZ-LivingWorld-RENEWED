@@ -10,6 +10,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import com.dragonminez.common.quest.Quest;
 import com.dragonminez.common.quest.QuestRegistry;
+import com.dragonminez.common.quest.Saga;
 import com.dragonminez.common.quest.objectives.KillObjective;
 
 /**
@@ -45,25 +46,18 @@ public final class WorldPowerScaler {
 
     /** Canonical totalStats budget. Every era is anchored to configured QUEST enemy stats. */
     public static double rollEffectiveStats(ServerLevel level, FighterRank rank, RandomSource random) {
-        WorldEra era = WorldEraData.get(level).era();
-        double reference = sagaKillReference(era) * LivingWorldConfig.npcStrengthScale();
+        double reference = sagaKillReference(level) * LivingWorldConfig.npcStrengthScale();
         return Math.max(1.0D, reference * rollReferenceFactor(rank, random));
     }
 
-    /** Base-stat reference of the last configured QUEST-spawned kill in the era's saga. */
-    private static double sagaKillReference(WorldEra era) {
-        boolean first = era == WorldEra.EARLY_EARTH;
-        String sagaId = switch (era) {
-            case EARLY_EARTH -> "saiyan_saga";
-            case SAIYAN -> "saiyan_saga";
-            case NAMEK_FRIEZA -> "frieza_saga";
-            case ANDROID_CELL -> "android_saga";
-            case BUU -> "buu_saga";
-            case GOD -> "super_01_bog_rof_v2";
-            case SUPER -> "super_05_dbs_broly_v2";
-            default -> "";
-        };
-        var saga = QuestRegistry.getSaga(sagaId);
+    /**
+     * Before any completion, use the first QUEST kill reachable from the first root saga. After
+     * that, use the final configured QUEST kill in the furthest completed saga recorded by world.
+     */
+    private static double sagaKillReference(ServerLevel level) {
+        WorldEraData data = WorldEraData.get(level);
+        boolean first = data.eraNumber() == 0 || data.anchorSagaId().isBlank();
+        Saga saga = first ? WorldEraProgression.initialSaga() : QuestRegistry.getSaga(data.anchorSagaId());
         if (saga != null) {
             int questIndex = first ? 0 : saga.getQuests().size() - 1;
             int questEnd = first ? saga.getQuests().size() : -1;
@@ -84,20 +78,12 @@ public final class WorldPowerScaler {
                 }
             }
         }
-        // Safe compatibility fallback for a removed/invalid saga. It is not used when a valid
-        // QUEST kill exists and deliberately preserves the former level-based emergency values.
-        return era == WorldEra.EARLY_EARTH ? 450.0D
-                : fallbackRequiredLevel(era) * LivingWorldConfig.levelMultiplierPerSaga();
-    }
-
-    private static int fallbackRequiredLevel(WorldEra era) {
-        return switch (era) { case SAIYAN -> 20; case NAMEK_FRIEZA -> 40; case ANDROID_CELL -> 60;
-            case BUU -> 80; case GOD -> 100; case SUPER -> 120; default -> 10; };
+        // Invalid or temporarily absent custom files must not crash generation.
+        return 450.0D;
     }
 
     /** World/faction maintenance retains the original era-only baseline and never reacts to a passerby. */
     public static int rollWorldBattlePower(ServerLevel level, BlockPos pos, FighterRank rank, RandomSource random) {
-        WorldEra era = WorldEraData.get(level).era();
         return rollBattlePowerFromAnchor(resolveWorldAnchor(level, pos), rank, random, true);
     }
 
@@ -148,11 +134,10 @@ public final class WorldPowerScaler {
      * accelerator; this can never look at player BP.
      */
     public static double resolveWorldAnchor(ServerLevel level, BlockPos ignored) {
-        WorldEra era = WorldEraData.get(level).era();
         double days = level.getServer().overworld().getGameTime() / 24000.0D;
         double ageFactor = 1.0D + Math.min(0.35D, Math.max(0.0D, days) / 900.0D);
         double difficulty = LivingWorldConfig.npcStrengthScale();
-        double effectiveReference = sagaKillReference(era) * ageFactor * difficulty;
+        double effectiveReference = sagaKillReference(level) * ageFactor * difficulty;
         return Math.max(90.0D, BattlePowerFormula.battlePower(Math.max(1.0D, effectiveReference)));
     }
 
