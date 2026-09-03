@@ -32,6 +32,12 @@ public final class PlayerSpawnCombatSafety {
                 && fighter.getPersistentData().getUUID(ATTACKER).equals(player.getUUID())
                 && fighter.getPersistentData().getLong(ATTACK_UNTIL) >= now) return false;
 
+        return isInsideProtectedArea(player);
+    }
+
+    /** Raw location check for encounters which must withdraw even after the player strikes first. */
+    public static boolean isInsideProtectedArea(ServerPlayer player) {
+        if (player == null || !(player.level() instanceof ServerLevel level)) return false;
         ResourceKey<Level> spawnDimension = player.getRespawnDimension();
         BlockPos spawn = player.getRespawnPosition();
         if (spawn == null) {

@@ -704,7 +704,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         // Establish a canonical permanent BP only after the fresh legacy container exists.
         // The current DMZ field above is still needed during construction, but it is not an
         // authoritative source once temporary power layers are possible.
-        legacyData.putInt(PERMANENT_BATTLE_POWER, Math.max(1, getBattlePower()));
+        legacyData.putLong(PERMANENT_BATTLE_POWER, Math.max(1L, getPermanentBattlePowerLong()));
         entityData.set(LEGACY_TITLE, "");
         arsenalInitialized = false;
         arsenalWeaponCooldown = 0;
@@ -833,7 +833,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             // temporary state, treat that as a permanent authoritative adjustment and rebuild
             // the physical profile instead of allowing display BP to drift from real stats.
             if (getBattlePower() != getPermanentBattlePower())
-                legacyData.putInt(PERMANENT_BATTLE_POWER, Math.max(1, getBattlePower()));
+                legacyData.putLong(PERMANENT_BATTLE_POWER, Math.max(1L, getBattlePower()));
             refreshCombatStatsFromPower();
         }
         // custom_BP.json can be reloaded without touching this entity. Reproject the synced
@@ -1502,20 +1502,29 @@ public final class AmbientFighterEntity extends DBSagasEntity {
      * comparison can change native DMZ's visible BP, but none is allowed to overwrite this base.
      */
     public int getPermanentBattlePower() {
+        return (int)Math.min(Integer.MAX_VALUE - 1L, getPermanentBattlePowerLong());
+    }
+
+    /** Authoritative Living World BP; the inherited DMZ field remains a saturated int mirror. */
+    public long getPermanentBattlePowerLong() {
         double effective = legacyData.getDouble(FighterPowerStatScaler.EFFECTIVE_STATS);
         if (effective > 0.0D && Double.isFinite(effective)) {
             double totalStats = entityData.get(READY) && getAttribute(Attributes.ATTACK_DAMAGE) != null
                     ? FighterPowerStatScaler.currentTotalStats(this) : effective;
-            return (int)Math.min(Integer.MAX_VALUE - 1L,
-                    Math.max(1L, Math.round(FighterPowerStatScaler.battlePowerForStats(this, totalStats))));
+            double calculated = FighterPowerStatScaler.battlePowerForStats(this, totalStats);
+            return calculated >= Long.MAX_VALUE ? Long.MAX_VALUE : Math.max(1L, Math.round(calculated));
         }
-        int stored = legacyData.getInt(PERMANENT_BATTLE_POWER);
+        long stored = legacyData.getLong(PERMANENT_BATTLE_POWER);
         return Math.max(1, stored > 0 ? stored : getBattlePower());
     }
 
     /** Presentation/fusion reading; never use this for Living World progression or stat scaling. */
     public int getVisualBattlePower() {
         return com.dmzlivingworld.world.FighterVisualPower.of(this);
+    }
+
+    public long getVisualBattlePowerLong() {
+        return com.dmzlivingworld.world.FighterVisualPower.ofLong(this);
     }
 
     /**
@@ -1540,7 +1549,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         int permanent = Math.max(1, battlePower);
         FighterPowerStatScaler.setEffectiveStatBudget(this,
                 FighterPowerStatScaler.effectiveForPowerChange(this, previous, permanent));
-        legacyData.putInt(PERMANENT_BATTLE_POWER, permanent);
+        legacyData.putLong(PERMANENT_BATTLE_POWER, permanent);
         if (earned && permanent > previous) {
             legacyData.putInt(EARNED_BATTLE_POWER_FLOOR,
                     Math.max(permanent, legacyData.getInt(EARNED_BATTLE_POWER_FLOOR)));
@@ -3161,6 +3170,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     /** Fixed classic-inspired appearance for the unique World Menace easter egg. */
     public void configureHerobrineAppearance() {
         entityData.set(FIGHTER_NAME, "Herobrine");
+        entityData.set(SPEECH, "");
+        speechTicks = 0;
+        dialogueHistory.clear();
         entityData.set(RACE, FighterRace.HUMAN.id());
         entityData.set(DISPLAY_SCALE, 1.0F);
         setScaleVal(1.0F);
@@ -3225,8 +3237,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         tag.putString("Name", getFighterName());
         // A memory is a person's permanent history, never the momentary reading from a form,
         // fruit or social flare. The visible current reading remains available in live play.
-        tag.putInt("BattlePower", getPermanentBattlePower());
-        tag.putInt("PermanentBattlePower", getPermanentBattlePower());
+        tag.putLong("BattlePower", getPermanentBattlePowerLong());
+        tag.putLong("PermanentBattlePower", getPermanentBattlePowerLong());
         // Keep one stable person-id across physical unload/re-materialization. NPC social bonds already
         // use this key; memory/Instant Transmission now relies on the same identity instead of names.
         if (!legacyData.hasUUID("NpcSocialIdentity")) legacyData.putUUID("NpcSocialIdentity", getUUID());
@@ -3288,8 +3300,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         entityData.set(RACE, FighterRace.byId(profile.getInt("Race")).id());
         entityData.set(ARCHETYPE, FighterArchetype.byId(profile.getInt("Archetype")).id());
         if (profile.contains("Name")) entityData.set(FIGHTER_NAME, profile.getString("Name"));
-        if (profile.contains("PermanentBattlePower")) setBattlePower(Math.max(1, profile.getInt("PermanentBattlePower")));
-        else if (profile.contains("BattlePower")) setBattlePower(Math.max(1, profile.getInt("BattlePower")));
+        if (profile.contains("PermanentBattlePower")) setBattlePower((int)Math.min(Integer.MAX_VALUE - 1L, Math.max(1L, profile.getLong("PermanentBattlePower"))));
+        else if (profile.contains("BattlePower")) setBattlePower((int)Math.min(Integer.MAX_VALUE - 1L, Math.max(1L, profile.getLong("BattlePower"))));
 
         float scale = profile.contains("DisplayScale") ? profile.getFloat("DisplayScale") : 1.0F;
         entityData.set(DISPLAY_SCALE, Math.max(0.45F, Math.min(2.4F, scale)));
@@ -3351,13 +3363,13 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         com.dmzlivingworld.world.WorldMenaceManager.restoreProfile(this, profile);
 
         if (profile.contains("Name")) entityData.set(FIGHTER_NAME, profile.getString("Name"));
-        int rememberedPower = profile.contains("PermanentBattlePower") ? profile.getInt("PermanentBattlePower")
-                : (profile.contains("BattlePower") ? profile.getInt("BattlePower") : getBattlePower());
+        long rememberedPower = profile.contains("PermanentBattlePower") ? profile.getLong("PermanentBattlePower")
+                : (profile.contains("BattlePower") ? profile.getLong("BattlePower") : getBattlePower());
         legacyData = sanitizeLegacyData(profile.contains("Legacy", Tag.TAG_COMPOUND) ? profile.getCompound("Legacy").copy() : new CompoundTag());
-        int canonicalPower = legacyData.getInt(PERMANENT_BATTLE_POWER);
+        long canonicalPower = legacyData.getLong(PERMANENT_BATTLE_POWER);
         if (canonicalPower <= 0) canonicalPower = Math.max(1, rememberedPower);
-        legacyData.putInt(PERMANENT_BATTLE_POWER, canonicalPower);
-        setBattlePower(canonicalPower);
+        legacyData.putLong(PERMANENT_BATTLE_POWER, canonicalPower);
+        setBattlePower((int)Math.min(Integer.MAX_VALUE - 1L, canonicalPower));
         syncLegacyTitle();
         FighterArsenalManager.readProfile(this, profile);
         // initializeAs() creates a fresh body and may roll fresh cosmetics; remembered people
@@ -4519,6 +4531,11 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     public void speak(String text, int ticks) {
         if (level().isClientSide || text == null || text.isBlank()) return;
+        // Herobrine has no ambient, social or combat dialogue. Only the two explicit encounter
+        // warnings are allowed through this central gate.
+        if (WorldMenaceManager.isHerobrine(this)
+                && !"You are not yet ready".equals(text)
+                && !"I'll see you at another place".equals(text)) return;
         // The hidden NPC inside an active player/NPC fusion is persistence state, not a world
         // speaker. This central gate prevents every ambient/reactive/debug system from making the
         // invisible passenger talk even if a future caller forgets to filter its entity query.
@@ -4682,7 +4699,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (retreatThreatId != null) tag.putUUID("LWRetreatThreat", retreatThreatId);
         if (duelOpponentId != null) tag.putUUID("LWDuelOpponent", duelOpponentId);
         tag.putString("LWFighterName", getFighterName());
-        tag.putInt("LWBattlePower", getBattlePower());
+        tag.putLong("LWBattlePower", Math.max(1L, getPermanentBattlePowerLong()));
         tag.putBoolean("LWAwakened", isAwakened());
         tag.putInt("LWAwakeningTicks", awakeningTicks);
         tag.putFloat("LWDisplayScale", getDisplayScale());

@@ -12,6 +12,7 @@ import com.dragonminez.common.quest.Quest;
 import com.dragonminez.common.quest.QuestRegistry;
 import com.dragonminez.common.quest.Saga;
 import com.dragonminez.common.quest.objectives.KillObjective;
+import java.util.List;
 
 /**
  * Procedural power starts from the world's actual era. A nearby, active player can add a
@@ -57,16 +58,17 @@ public final class WorldPowerScaler {
     private static double sagaKillReference(ServerLevel level) {
         WorldEraData data = WorldEraData.get(level);
         boolean first = data.eraNumber() == 0 || data.anchorSagaId().isBlank();
-        Saga saga = first ? WorldEraProgression.initialSaga() : QuestRegistry.getSaga(data.anchorSagaId());
+        if (first) return initialAvailableReference();
+        Saga saga = QuestRegistry.getSaga(data.anchorSagaId());
         if (saga != null) {
-            int questIndex = first ? 0 : saga.getQuests().size() - 1;
-            int questEnd = first ? saga.getQuests().size() : -1;
-            int questStep = first ? 1 : -1;
+            int questIndex = saga.getQuests().size() - 1;
+            int questEnd = -1;
+            int questStep = -1;
             for (; questIndex != questEnd; questIndex += questStep) {
                 Quest quest = saga.getQuests().get(questIndex);
-                int objectiveIndex = first ? 0 : quest.getObjectives().size() - 1;
-                int objectiveEnd = first ? quest.getObjectives().size() : -1;
-                int objectiveStep = first ? 1 : -1;
+                int objectiveIndex = quest.getObjectives().size() - 1;
+                int objectiveEnd = -1;
+                int objectiveStep = -1;
                 for (; objectiveIndex != objectiveEnd; objectiveIndex += objectiveStep) {
                     if (!(quest.getObjectives().get(objectiveIndex) instanceof KillObjective kill)
                             || kill.getSpawnMode() != KillObjective.SpawnMode.QUEST) continue;
@@ -80,6 +82,44 @@ public final class WorldPowerScaler {
         }
         // Invalid or temporarily absent custom files must not crash generation.
         return 450.0D;
+    }
+
+    /** Only the literal first quest of each root/available saga may seed an untouched world. */
+    private static double initialAvailableReference() {
+        double weakest = Double.POSITIVE_INFINITY;
+        for (Saga saga : QuestRegistry.getAllSagas().values()) {
+            if (WorldEraProgression.isMovies(saga) || saga.getQuests().isEmpty()) continue;
+            Saga.SagaRequirements requirements = saga.getRequirements();
+            if (requirements != null && requirements.previousSagaId() != null
+                    && !requirements.previousSagaId().isBlank()) continue;
+            Quest firstQuest = saga.getQuests().get(0);
+            for (var objective : firstQuest.getObjectives()) {
+                if (!(objective instanceof KillObjective kill) || kill.getSpawnMode() != KillObjective.SpawnMode.QUEST) continue;
+                double reference = killReference(kill);
+                if (reference > 0.0D) weakest = Math.min(weakest, reference);
+            }
+        }
+        return Double.isFinite(weakest) ? weakest : 450.0D;
+    }
+
+    public static double lastKillReference(Saga saga) {
+        if (saga == null) return -1.0D;
+        for (int q = saga.getQuests().size() - 1; q >= 0; q--) {
+            List<?> objectives = saga.getQuests().get(q).getObjectives();
+            for (int o = objectives.size() - 1; o >= 0; o--) {
+                if (objectives.get(o) instanceof KillObjective kill
+                        && kill.getSpawnMode() == KillObjective.SpawnMode.QUEST) return killReference(kill);
+            }
+        }
+        return -1.0D;
+    }
+
+    private static double killReference(KillObjective kill) {
+        double hp = Math.max(0.0D, kill.getHealth());
+        double melee = Math.max(0.0D, kill.getMeleeDamage());
+        double ki = Math.max(0.0D, kill.getKiDamage());
+        double reference = (hp * 2.0D + melee + ki) / 2.0D;
+        return Double.isFinite(reference) ? reference : -1.0D;
     }
 
     /** World/faction maintenance retains the original era-only baseline and never reacts to a passerby. */

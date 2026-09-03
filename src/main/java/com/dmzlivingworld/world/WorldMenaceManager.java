@@ -70,11 +70,14 @@ public final class WorldMenaceManager {
         int shadowMoves;
         Vec3 lastPlayerPos;
         boolean omenSent;
+        boolean hadLineOfSight;
         long observedSince;
         long closeDisappearAt;
+        long nextPositionAudit;
         WatchSession(UUID playerId, long endsAt, boolean shadowing, long now, Vec3 playerPos) {
             this.playerId = playerId; this.endsAt = endsAt; this.shadowing = shadowing;
             this.nextShadowStep = now + 75L; this.lastPlayerPos = playerPos;
+            this.nextPositionAudit = now;
         }
     }
 
@@ -143,6 +146,11 @@ public final class WorldMenaceManager {
     public static void onAttacked(AmbientFighterEntity fighter, ServerPlayer attacker) {
         if (fighter == null || attacker == null || !isHerobrine(fighter) || fighter.level().isClientSide) return;
         long now = fighter.level().getGameTime();
+        if (PlayerSpawnCombatSafety.isInsideProtectedArea(attacker)) {
+            fighter.speak("I'll see you at another place", 60);
+            disappear(fighter, attacker, now);
+            return;
+        }
         WATCHES.remove(fighter.getUUID());
         fighter.getPersistentData().putUUID(RETALIATE_PLAYER, attacker.getUUID());
         fighter.getPersistentData().putLong(RETALIATE_UNTIL, now + 20L * 45L);
@@ -158,12 +166,19 @@ public final class WorldMenaceManager {
         double playerPower = PlayerWorldManager.playerBattlePower(attacker);
         double menacePower = Math.max(1.0D, fighter.getBattlePower());
         markSpotted(attacker, fighter);
-        if (playerPower <= menacePower * 0.80D) {
+        if (playerPower < menacePower * 0.81D) {
+            fighter.speak("You are not yet ready", 60);
             disappear(fighter, attacker, fighter.level().getGameTime());
             return true;
         }
+        if (PlayerSpawnCombatSafety.isInsideProtectedArea(attacker)) {
+            fighter.speak("I'll see you at another place", 60);
+            disappear(fighter, attacker, fighter.level().getGameTime());
+            return true;
+        }
+        teleportInFront(fighter, attacker);
         engage(fighter, attacker, fighter.level().getGameTime());
-        return false;
+        return true;
     }
 
 
@@ -484,7 +499,10 @@ public final class WorldMenaceManager {
         if (fighter.getTarget() != null || fighter.isDefeated() || fighter.isCaptive() || fighter.isMeditating()
                 || fighter.isTransforming() || FighterAmbientActivityManager.isActive(fighter)
                 || LivingBondManager.isTravellingCompanion(fighter)) {
-            if (fighter.getTarget() instanceof ServerPlayer targetPlayer) markSpotted(targetPlayer, fighter);
+            if (fighter.getTarget() instanceof ServerPlayer targetPlayer) {
+                markSpotted(targetPlayer, fighter);
+                stareAt(fighter, targetPlayer);
+            }
             WATCHES.remove(fighter.getUUID());
             fighter.getPersistentData().putString(MENACE_STATE, fighter.getTarget() != null ? "HUNTING" : "UNREADABLE");
             return false;
@@ -519,11 +537,21 @@ public final class WorldMenaceManager {
             }
             fighter.getPersistentData().putString(MENACE_STATE, "WATCHING");
             holdStill(fighter, watched);
+            // Rotation remains continuous, while all positional/range decisions are explicitly
+            // re-audited once per second so a stale session can never retain an old distance.
+            if (now < session.nextPositionAudit) return true;
+            session.nextPositionAudit = now + 20L;
             boolean observed = isClearlyObserved(watched, fighter);
+            boolean lineOfSight = fighter.hasLineOfSight(watched);
+            if (lineOfSight) session.hadLineOfSight = true;
+            else if (session.hadLineOfSight) {
+                disappear(fighter, watched, now);
+                return true;
+            }
 
             double playerPower = PlayerWorldManager.playerBattlePower(watched);
             double menacePower = Math.max(1.0D, fighter.getBattlePower());
-            boolean playerAtLeastEqual = playerPower >= menacePower;
+            boolean playerReady = playerPower >= menacePower * 0.81D;
             double distance = fighter.distanceTo(watched);
 
             // Reaching Herobrine physically is an unconditional challenge, regardless of BP.
@@ -532,27 +560,23 @@ public final class WorldMenaceManager {
                 return false;
             }
 
-            // A stronger/equal player turns either clear observation or entering the 40-block
-            // challenge radius into combat immediately.
-            if (playerAtLeastEqual && (observed || distance <= 40.0D)) {
+            if (distance <= 50.0D && playerReady) {
+                teleportInFront(fighter, watched);
                 engage(fighter, watched, now);
                 return false;
             }
 
-            if (!playerAtLeastEqual) {
-                if (distance <= 20.0D) {
-                    if (session.closeDisappearAt <= 0L) session.closeDisappearAt = now + 10L;
-                    if (now >= session.closeDisappearAt) {
-                        disappear(fighter, watched, now);
-                        return true;
-                    }
-                } else {
-                    session.closeDisappearAt = 0L;
+            if (!playerReady) {
+                if (distance <= 50.0D) {
+                    fighter.speak("You are not yet ready", 60);
+                    disappear(fighter, watched, now);
+                    return true;
                 }
                 if (observed) {
                     markSpotted(watched, fighter);
                     if (session.observedSince <= 0L) session.observedSince = now;
                     if (now - session.observedSince >= 200L) {
+                        fighter.speak("You are not yet ready", 60);
                         disappear(fighter, watched, now);
                         return true;
                     }
@@ -605,12 +629,29 @@ public final class WorldMenaceManager {
     }
 
     private static void engage(AmbientFighterEntity fighter, ServerPlayer player, long now) {
+        if (PlayerSpawnCombatSafety.isInsideProtectedArea(player)) {
+            fighter.speak("I'll see you at another place", 60);
+            disappear(fighter, player, now);
+            return;
+        }
         WATCHES.remove(fighter.getUUID());
         fighter.getPersistentData().putUUID(RETALIATE_PLAYER, player.getUUID());
         fighter.getPersistentData().putLong(RETALIATE_UNTIL, now + 20L * 45L);
         fighter.getPersistentData().putString(MENACE_STATE, "HUNTING");
         fighter.setTarget(player);
         markSpotted(player, fighter);
+    }
+
+    private static void teleportInFront(AmbientFighterEntity fighter, ServerPlayer player) {
+        Vec3 look = player.getLookAngle();
+        Vec3 flat = new Vec3(look.x, 0.0D, look.z);
+        if (flat.lengthSqr() < 0.001D) flat = new Vec3(0.0D, 0.0D, 1.0D);
+        Vec3 destination = player.position().add(flat.normalize().scale(3.0D));
+        fighter.teleportTo(destination.x, player.getY(), destination.z);
+        fighter.setDeltaMovement(Vec3.ZERO);
+        if (fighter.level() instanceof ServerLevel level)
+            WorldMenaceData.get(level).updateSnapshot(fighter.writeMemoryProfile(),
+                    fighter.getX(), fighter.getY(), fighter.getZ());
     }
 
     private static void disappear(AmbientFighterEntity fighter, ServerPlayer responsiblePlayer, long now) {

@@ -8,6 +8,7 @@ import com.dmzlivingworld.entity.LWEntities;
 import com.dmzlivingworld.network.FighterProfilePacket;
 import com.dmzlivingworld.network.LWNetwork;
 import com.dmzlivingworld.world.FighterRelationshipManager;
+import com.dmzlivingworld.world.BattlePowerDisplay;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -397,10 +398,11 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
         }
 
         if (showModel) {
-            String powerLabel = profile.combatOnly() ? "Live Power Level: " + profile.battlePower()
-                    : isWorldMenace() ? "Power Level: " + profile.battlePower()
-                    : profile.rememberedSnapshot() ? "Last known PL: " + profile.battlePower()
-                    : hasLivePowerRead() ? "Live Power Level: " + profile.battlePower() : "Live PL: scouter / Ki Sense required";
+            String formattedPower = BattlePowerDisplay.format(profile.battlePower());
+            String powerLabel = profile.combatOnly() ? "Live Power Level: " + formattedPower
+                    : isWorldMenace() ? "Power Level: " + formattedPower
+                    : profile.rememberedSnapshot() ? "Last known PL: " + formattedPower
+                    : hasLivePowerRead() ? "Live Power Level: " + formattedPower : "Live PL: scouter / Ki Sense required";
             LivingWorldGuiStyle.drawCentered(graphics, font, powerLabel, left + 7, top + 145, right - left - 14, 12,
                     hasLivePowerRead() ? 0xFF8ED6FF : LivingWorldGuiStyle.MUTED);
         }

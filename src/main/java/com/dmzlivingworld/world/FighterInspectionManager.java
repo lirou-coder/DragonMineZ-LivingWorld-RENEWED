@@ -219,7 +219,7 @@ public final class FighterInspectionManager {
                 relationshipKnown, relationship, relationshipStage, nextStage, nextThreshold,
                 relationshipKnown ? Math.max(1, fighter.getMemoryEncounters()) : 0,
                 factionRep, factionRepLabel, goal, goalProgress, fightingStyle, techniques,
-                activeForm, FighterVisualPower.of(fighter), scouter || menace, rememberedSnapshot, false,
+                activeForm, FighterVisualPower.ofLong(fighter), scouter || menace, rememberedSnapshot, false,
                 requestLocked, supplyReceiver, supplyRequestLine, profileSnapshotForPanel(fighter, rememberedSnapshot, rememberedRecord),
                 equipment, overview, story, combat, science, messages));
     }
@@ -379,11 +379,11 @@ public final class FighterInspectionManager {
         List<String> lines = new ArrayList<>();
         boolean menace = WorldMenaceManager.isWorldMenace(fighter);
         lines.add("## Combat");
-        int currentPower = FighterVisualPower.of(fighter);
-        int permanentPower = FighterVisualPower.scale(fighter.getPermanentBattlePower());
-        lines.add("* Current Power Level: " + currentPower);
+        long currentPower = FighterVisualPower.ofLong(fighter);
+        long permanentPower = FighterVisualPower.scaleLong(fighter.getPermanentBattlePowerLong());
+        lines.add("* Current Power Level: " + BattlePowerDisplay.format(currentPower));
         if (currentPower != permanentPower)
-            lines.add("* Base permanent Power Level: " + permanentPower + " • temporary form/power state is included above");
+            lines.add("* Base permanent Power Level: " + BattlePowerDisplay.format(permanentPower) + " • temporary form/power state is included above");
         lines.add(String.format(java.util.Locale.ROOT, "* Health %.1f • Melee %.1f • Ki %.1f • Speed %.3f",
                 fighter.getMaxHealth(), fighter.getAttributeValue(Attributes.ATTACK_DAMAGE), fighter.getKiBlastDamage(),
                 fighter.getAttributeValue(Attributes.MOVEMENT_SPEED)));

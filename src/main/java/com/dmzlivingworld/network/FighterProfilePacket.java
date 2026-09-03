@@ -44,7 +44,7 @@ public record FighterProfilePacket(
         String fightingStyle,
         String techniques,
         String activeForm,
-        int battlePower,
+        long battlePower,
         boolean scouter,
         boolean rememberedSnapshot,
         boolean combatOnly,
@@ -131,7 +131,7 @@ public record FighterProfilePacket(
         write(buf, msg.fightingStyle, 192);
         write(buf, msg.techniques, 768);
         write(buf, msg.activeForm, 192);
-        buf.writeVarInt(Math.max(1, msg.battlePower));
+        buf.writeVarLong(Math.max(1L, msg.battlePower));
         buf.writeBoolean(msg.scouter);
         buf.writeBoolean(msg.rememberedSnapshot);
         buf.writeBoolean(msg.combatOnly);
@@ -185,7 +185,7 @@ public record FighterProfilePacket(
         String fightingStyle = buf.readUtf(192);
         String techniques = buf.readUtf(768);
         String activeForm = buf.readUtf(192);
-        int battlePower = buf.readVarInt();
+        long battlePower = buf.readVarLong();
         boolean scouter = buf.readBoolean();
         boolean rememberedSnapshot = buf.readBoolean();
         boolean combatOnly = buf.readBoolean();

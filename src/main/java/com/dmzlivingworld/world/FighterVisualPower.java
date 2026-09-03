@@ -8,12 +8,20 @@ public final class FighterVisualPower {
     private FighterVisualPower() {}
 
     public static int of(AmbientFighterEntity fighter) {
-        return fighter == null ? 1 : scale(fighter.getBattlePower());
+        return (int)Math.min(Integer.MAX_VALUE - 1L, ofLong(fighter));
+    }
+
+    public static long ofLong(AmbientFighterEntity fighter) {
+        return fighter == null ? 1L : scaleLong(fighter.getPermanentBattlePowerLong());
     }
 
     public static int scale(int realBattlePower) {
+        return (int)Math.min(Integer.MAX_VALUE - 1L, scaleLong(realBattlePower));
+    }
+
+    public static long scaleLong(long realBattlePower) {
         double visual = Math.max(1, realBattlePower) * LivingWorldConfig.bpVisualMultiplier();
-        if (!Double.isFinite(visual) || visual >= Integer.MAX_VALUE - 1.0D) return Integer.MAX_VALUE - 1;
-        return Math.max(1, (int)Math.round(visual));
+        if (!Double.isFinite(visual) || visual >= Long.MAX_VALUE) return Long.MAX_VALUE;
+        return Math.max(1L, Math.round(visual));
     }
 }
