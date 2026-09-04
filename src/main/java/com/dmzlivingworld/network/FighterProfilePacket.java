@@ -48,6 +48,7 @@ public record FighterProfilePacket(
         boolean scouter,
         boolean rememberedSnapshot,
         boolean combatOnly,
+        boolean travellingCompanion,
         boolean requestLocked,
         boolean supplyReceiver,
         String supplyRequestLine,
@@ -135,6 +136,7 @@ public record FighterProfilePacket(
         buf.writeBoolean(msg.scouter);
         buf.writeBoolean(msg.rememberedSnapshot);
         buf.writeBoolean(msg.combatOnly);
+        buf.writeBoolean(msg.travellingCompanion);
         buf.writeBoolean(msg.requestLocked);
         buf.writeBoolean(msg.supplyReceiver);
         write(buf, msg.supplyRequestLine, 768);
@@ -189,6 +191,7 @@ public record FighterProfilePacket(
         boolean scouter = buf.readBoolean();
         boolean rememberedSnapshot = buf.readBoolean();
         boolean combatOnly = buf.readBoolean();
+        boolean travellingCompanion = buf.readBoolean();
         boolean requestLocked = buf.readBoolean();
         boolean supplyReceiver = buf.readBoolean();
         String supplyRequestLine = buf.readUtf(768);
@@ -204,7 +207,7 @@ public record FighterProfilePacket(
                 dispositionId, dispositionLabel, attitudeReason, relationshipKnown, relationship,
                 relationshipStage, nextRelationshipStage, nextRelationshipThreshold, encounters,
                 factionReputation, factionReputationLabel, currentGoal, goalProgress, fightingStyle,
-                techniques, activeForm, battlePower, scouter, rememberedSnapshot, combatOnly, requestLocked, supplyReceiver, supplyRequestLine, appearanceSnapshot, equipment,
+                techniques, activeForm, battlePower, scouter, rememberedSnapshot, combatOnly, travellingCompanion, requestLocked, supplyReceiver, supplyRequestLine, appearanceSnapshot, equipment,
                 readLines(buf), readLines(buf), readLines(buf), readLines(buf), readLines(buf));
     }
 

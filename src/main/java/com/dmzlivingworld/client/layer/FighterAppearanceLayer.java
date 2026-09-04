@@ -187,29 +187,57 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
                              MultiBufferSource buffers, float pt, int light, int overlay) {
         String root = "textures/entity/races/frostdemon/";
         int bodyType = Math.floorMod(e.getBodyType(), 3);
-        String modelKey = e.getActiveRacialForm() == null ? "" : e.getActiveRacialForm().modelKey();
-        String prefix = switch (modelKey) {
-            case "frostdemon_third" -> "thirdform_";
-            case "frostdemon_fp" -> "finalform_";
-            case "frostdemon_fifth" -> "fifth_";
-            default -> "";
-        };
-        int layers = switch (prefix) {
-            case "finalform_", "fifth_" -> bodyType == 0 ? 2 : bodyType == 1 ? 4 : 3;
-            default -> bodyType == 0 ? 5 : 4;
-        };
-        float[][] tints = {rgb(e.getBodyColor()), rgb(e.getBodyColor2()), rgb(e.getBodyColor3()), WHITE, WHITE};
-        for (int i = 1; i <= layers; i++) {
-            layer(model, pose, buffers, e, dmz(root + prefix + "bodytype_" + bodyType + "_layer" + i + ".png"),
-                    tints[i - 1], pt, light, overlay);
+        var activeForm = e.getActiveRacialForm();
+        String modelKey = activeForm == null ? "" : activeForm.modelKey();
+        String formId = activeForm == null ? "" : activeForm.id();
+        float[] body1 = rgb(e.getBodyColor());
+        float[] body2 = rgb(e.getBodyColor2());
+        float[] body3 = rgb(e.getBodyColor3());
+        float[] hair = rgb(e.getHairColor());
+
+        // Mirror DMZ SkinGathererProvider.resolveBodyFrostDemon exactly. Second form uses
+        // the normal body textures; Third has its own bulky atlas; Final/Full Power and
+        // Fifth use their respective slim atlases with body-type-specific layer colours.
+        boolean third = "frostdemon_third".equals(modelKey);
+        boolean fifth = "fifth".equals(formId) || "frostdemon_fifth".equals(modelKey);
+        boolean finalFamily = "final".equals(formId) || "fullpower".equals(formId)
+                || "frostdemon_fp".equals(modelKey) || fifth;
+        if (!finalFamily) {
+            String prefix = third ? "thirdform_bodytype_" : "bodytype_";
+            String base = root + prefix + bodyType + "_layer";
+            layer(model, pose, buffers, e, dmz(base + "1.png"), body1, pt, light, overlay);
+            layer(model, pose, buffers, e, dmz(base + "2.png"), body2, pt, light, overlay);
+            layer(model, pose, buffers, e, dmz(base + "3.png"), body3, pt, light, overlay);
+            layer(model, pose, buffers, e, dmz(base + "4.png"), hair, pt, light, overlay);
+            if (bodyType == 0)
+                layer(model, pose, buffers, e, dmz(base + "5.png"), new float[]{1.0F, 0.6471F, 0.0F}, pt, light, overlay);
+        } else {
+            String prefix = fifth ? "fifth_bodytype_" : "finalform_bodytype_";
+            String base = root + prefix + bodyType + "_layer";
+            layer(model, pose, buffers, e, dmz(base + "1.png"), body1, pt, light, overlay);
+            layer(model, pose, buffers, e, dmz(base + "2.png"), bodyType == 1 ? body2 : hair, pt, light, overlay);
+            if (bodyType == 1) {
+                layer(model, pose, buffers, e, dmz(base + "3.png"), body3, pt, light, overlay);
+                layer(model, pose, buffers, e, dmz(base + "4.png"), hair, pt, light, overlay);
+            } else if (bodyType == 2) {
+                layer(model, pose, buffers, e, dmz(base + "3.png"), hair, pt, light, overlay);
+                // DMZ deliberately emits layer 2 again with bodyColor2 for body type 2.
+                layer(model, pose, buffers, e, dmz(base + "2.png"), body2, pt, light, overlay);
+            }
         }
         String face = root + "faces/";
-        String eye = face + "frostdemon_eye_" + e.getEyesType() + "_";
-        layer(model, pose, buffers, e, dmz(eye + "0.png"), WHITE, pt, light, overlay);
+        int eyeType = Math.floorMod(e.getEyesType(), 6);
+        String eye = face + "frostdemon_eye_" + eyeType + "_";
+        layer(model, pose, buffers, e, dmz(eye + "0.png"), fifth ? new float[]{0.8196F, 0.102F, 0.0667F} : new float[]{0.949F, 0.949F, 0.949F}, pt, light, overlay);
         layer(model, pose, buffers, e, dmz(eye + "1.png"), rgb(e.getEye1Color()), pt, light, overlay);
         layer(model, pose, buffers, e, dmz(eye + "2.png"), rgb(e.getEye2Color()), pt, light, overlay);
-        layer(model, pose, buffers, e, dmz(face + "frostdemon_nose_" + e.getNoseType() + ".png"), rgb(e.getBodyColor()), pt, light, overlay);
-        layer(model, pose, buffers, e, dmz(face + "frostdemon_mouth_" + e.getMouthType() + ".png"), rgb(e.getBodyColor()), pt, light, overlay);
+        if (fifth) {
+            layer(model, pose, buffers, e, dmz(face + "frostdemon_fifth_mouth.png"), body1, pt, light, overlay);
+        } else {
+            float[] detail = (!finalFamily || bodyType == 1) ? body2 : body1;
+            layer(model, pose, buffers, e, dmz(face + "frostdemon_nose_" + Math.floorMod(e.getNoseType(), 2) + ".png"), detail, pt, light, overlay);
+            layer(model, pose, buffers, e, dmz(face + "frostdemon_mouth_" + Math.floorMod(e.getMouthType(), 2) + ".png"), detail, pt, light, overlay);
+        }
     }
 
     private void renderBio(PoseStack pose, AmbientFighterEntity e, BakedGeoModel model,

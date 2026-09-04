@@ -65,7 +65,7 @@ public final class FighterInspectionManager {
         LWNetwork.sendFighterProfile(player, new FighterProfilePacket(
                 specimen.getId(), specimen.getUUID(), "Saibaman Specimen", "", "", "", "Saibaman", "Specimen",
                 "", "", "", "", "", 0, "", "", false, 0, "", "", 0, 0,
-                0, "", "", "", "", "", "", bp, true, false, true, false, false, "",
+                0, "", "", "", "", "", "", bp, true, false, true, false, false, false, "",
                 new CompoundTag(), List.of(), List.of(), List.of(), combat, List.of(), List.of()));
     }
 
@@ -220,7 +220,7 @@ public final class FighterInspectionManager {
                 relationshipKnown ? Math.max(1, fighter.getMemoryEncounters()) : 0,
                 factionRep, factionRepLabel, goal, goalProgress, fightingStyle, techniques,
                 activeForm, FighterVisualPower.ofLong(fighter), scouter || menace, rememberedSnapshot, false,
-                requestLocked, supplyReceiver, supplyRequestLine, profileSnapshotForPanel(fighter, rememberedSnapshot, rememberedRecord),
+                !rememberedSnapshot && LivingBondManager.isCompanion(player, fighter), requestLocked, supplyReceiver, supplyRequestLine, profileSnapshotForPanel(fighter, rememberedSnapshot, rememberedRecord),
                 equipment, overview, story, combat, science, messages));
     }
 

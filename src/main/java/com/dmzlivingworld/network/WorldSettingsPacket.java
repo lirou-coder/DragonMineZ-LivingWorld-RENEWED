@@ -46,7 +46,7 @@ public record WorldSettingsPacket(LivingWorldConfig.Snapshot world,
         b.writeDouble(v.levelMultiplierPerSaga()); b.writeDouble(v.maxDefenseMitigation()); b.writeDouble(v.bpVisualMultiplier());
         b.writeBoolean(v.canMeditationProcSkillProgression()); writeStrings(b, v.npcRaceBlacklist());
         b.writeBoolean(v.treatRaceBlacklistAsWhitelist()); writeStrings(b, v.canUseClothes()); writeStrings(b, v.dimensionWhitelist());
-        b.writeBoolean(v.treatDimensionWhitelistAsBlacklist()); b.writeVarInt(v.archetypeShares().size());
+        b.writeBoolean(v.treatDimensionWhitelistAsBlacklist()); writeStrings(b, v.companionDimensionBlacklist()); b.writeVarInt(v.archetypeShares().size());
         for (double share : v.archetypeShares()) b.writeDouble(share);
     }
 
@@ -55,7 +55,7 @@ public record WorldSettingsPacket(LivingWorldConfig.Snapshot world,
                 b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readVarInt(),
                 b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readVarInt(), b.readBoolean(), b.readVarInt(),
                 b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readVarInt(),
-                b.readVarInt(), b.readVarInt(), b.readDouble(), b.readDouble(), b.readDouble(), b.readBoolean(), readStrings(b), b.readBoolean(), readStrings(b), readStrings(b), b.readBoolean(), readDoubles(b));
+                b.readVarInt(), b.readVarInt(), b.readDouble(), b.readDouble(), b.readDouble(), b.readBoolean(), readStrings(b), b.readBoolean(), readStrings(b), readStrings(b), b.readBoolean(), readStrings(b), readDoubles(b));
     }
 
     private static void writeStrings(FriendlyByteBuf b, java.util.List<String> values) {

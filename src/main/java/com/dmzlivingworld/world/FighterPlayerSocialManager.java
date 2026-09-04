@@ -164,7 +164,7 @@ public final class FighterPlayerSocialManager {
             else if (rel >= 35) score += 4;
             else if (rel >= 15) score += 2;
         }
-        if (LivingBondManager.companionId(player) != null && LivingBondManager.companionId(player).equals(fighter.getUUID())) score += 4;
+        if (LivingBondManager.isCompanion(player, fighter)) score += 4;
         return score;
     }
 

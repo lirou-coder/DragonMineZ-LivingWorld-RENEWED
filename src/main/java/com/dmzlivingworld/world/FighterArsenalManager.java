@@ -513,7 +513,7 @@ public final class FighterArsenalManager {
     public static boolean canReceiveGift(ServerPlayer player, AmbientFighterEntity fighter) {
         if (fighter.getTarget() == player || fighter.isCaptive() || fighter.isDefeated()) return false;
         if (fighter.isRememberedFor(player) && fighter.getMemoryRelationship() >= 20) return true;
-        if (LivingBondManager.companionId(player) != null && LivingBondManager.companionId(player).equals(fighter.getUUID())) return true;
+        if (LivingBondManager.isCompanion(player, fighter)) return true;
         return fighter.isFactionMember() && FactionManager.getReputation(player, fighter.getFactionId()) >= FactionManager.FRIENDLY_REP;
     }
 

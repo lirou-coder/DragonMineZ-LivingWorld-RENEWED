@@ -13,6 +13,9 @@ import com.dragonminez.common.stats.StatsCapability;
 import com.dragonminez.common.stats.StatsProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -58,6 +61,7 @@ public final class LivingBondManager {
     private static final Map<UUID, DefenseThreat> DEFENSE_THREATS = new HashMap<>();
     private static final Map<UUID, Deque<Vec3>> TRAVEL_TRAILS = new HashMap<>();
     private static final int MAX_MEDITATION_PARTNERS = 4;
+    private static final int MAX_COMPANIONS = 5;
     private static final long FRIENDLY_FIRE_RESET_TICKS = 2400L;
     private enum InviteType { TRAVEL }
     private record Invite(UUID npc, InviteType type, long expires) {}
@@ -85,9 +89,10 @@ public final class LivingBondManager {
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
-            if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) continue;
+            if (!(player.level() instanceof ServerLevel level)) continue;
             long now = level.getServer().overworld().getGameTime();
             tickCompanion(player, level, now);
+            tickAdditionalCompanions(player, level, now);
             tickMeditationBonds(player, level, now);
             // Offers and discovery are human-scale decisions; only active companion/meditation
             // state needs per-tick control.
@@ -113,7 +118,7 @@ public final class LivingBondManager {
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = false)
     public static void onPlayerHurt(LivingHurtEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || event.getAmount() <= 0.0F) return;
-        if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) return;
+        if (!(player.level() instanceof ServerLevel level)) return;
 
         LivingEntity attacker = responsibleAttacker(event.getSource());
         if (attacker == null || attacker == player || !attacker.isAlive()) return;
@@ -121,8 +126,7 @@ public final class LivingBondManager {
         // This must precede the companion-hit cancellation below so the companion can damage
         // its owner through DMZ's normal sanctioned-match pipeline.
         if (SparManager.isSanctionedPlayerOpponent(player, attacker)) return;
-        UUID companionId = companionId(player);
-        if (companionId != null && companionId.equals(attacker.getUUID())) {
+        if (attacker instanceof AmbientFighterEntity member && isCompanion(player, member)) {
             if (attacker instanceof AmbientFighterEntity companion && companion.getTarget() != null) {
                 event.setCanceled(true);
             }
@@ -442,16 +446,27 @@ public final class LivingBondManager {
             save(player, root);
         }
 
-        if (!companion.isAlive()) { clearCompanion(player); return; }
+        if (!companion.isAlive()) { removeCompanion(player, companion); return; }
         if (!companion.level().dimension().equals(player.level().dimension())) {
-            if (now - root.getLong("LastCompanionRegroup") >= 60L) recoverCompanion(player, true);
+            if (!companionDimensionBlocked(level)) {
+                CompoundTag profile = companion.writeMemoryProfile();
+                companion.discard();
+                AmbientFighterEntity moved = AmbientFighterSpawner.spawnCompanionByPlayer(player, profile);
+                if (moved != null) {
+                    List<UUID> ids = companionIds(player);
+                    if (!ids.isEmpty()) ids.set(0, moved.getUUID());
+                    writeCompanionIds(root, ids);
+                    moved.getPersistentData().putUUID("LWCompanionOwner", player.getUUID());
+                    rememberCompanionState(player, root, moved);
+                }
+            }
             return;
         }
 
         long joined = root.getLong("CompanionJoined");
         if (joined > 0 && now - joined > 96000L) {
             companion.speak("I should head back for a while. We'll meet again.", 82);
-            clearCompanion(player);
+            removeCompanion(player, companion);
             return;
         }
         if (companion.isFactionMember()) {
@@ -460,7 +475,7 @@ public final class LivingBondManager {
                     && now - joined > 24000L && Math.floorMod(now + companion.getUUID().hashCode(), 24000L) == 0L
                     && companion.getRandom().nextFloat() < 0.35F) {
                 companion.speak("My people are at war. I need to go back.", 82);
-                clearCompanion(player);
+                removeCompanion(player, companion);
                 return;
             }
         }
@@ -529,6 +544,41 @@ public final class LivingBondManager {
             }
         }
         maybeCompanionChatter(player, companion, root, now);
+    }
+
+    private static void tickAdditionalCompanions(ServerPlayer player, ServerLevel level, long now) {
+        List<UUID> ids = companionIds(player);
+        if (ids.size() <= 1) return;
+        for (int index = 1; index < ids.size(); index++) {
+            AmbientFighterEntity companion = findLoadedCompanion(player, ids.get(index));
+            if (companion == null || !companion.isAlive()) continue;
+            if (!companion.level().dimension().equals(level.dimension())) {
+                if (companionDimensionBlocked(level)) continue;
+                CompoundTag profile = companion.writeMemoryProfile();
+                companion.discard();
+                AmbientFighterEntity moved = AmbientFighterSpawner.spawnCompanionByPlayer(player, profile);
+                if (moved == null) continue;
+                moved.getPersistentData().putUUID("LWCompanionOwner", player.getUUID());
+                ids.set(index, moved.getUUID());
+                writeCompanionIds(root(player), ids);
+                companion = moved;
+            }
+            FighterAmbientActivityManager.cancel(companion);
+            companion.setSocialLifeActivity(false);
+            LivingEntity threat = latchedDefenseThreat(player, level, now);
+            if (!validCompanionThreat(player, companion, threat, 96.0D)) threat = player.getLastHurtByMob();
+            if (validCompanionThreat(player, companion, threat, 96.0D)
+                    && !loyaltyConflict(companion, threat) && sagaHelpAllowed(threat)) {
+                if (companion.getTarget() != threat) companion.setTarget(threat);
+            } else if (companion.getTarget() == null) {
+                followPlayer(player, companion, player.distanceToSqr(companion), false);
+            }
+        }
+    }
+
+    private static boolean companionDimensionBlocked(ServerLevel level) {
+        return level != null && LivingWorldConfig.companionDimensionBlacklist().contains(
+                level.dimension().location().toString().toLowerCase(java.util.Locale.ROOT));
     }
 
     private static boolean validCompanionThreat(ServerPlayer player, AmbientFighterEntity companion, LivingEntity threat, double maxDistance) {
@@ -880,19 +930,19 @@ public final class LivingBondManager {
 
     private static void latchDefenseThreat(ServerPlayer player, LivingEntity attacker, long now, long duration) {
         if (player == null || attacker == null || attacker == player || !attacker.isAlive()) return;
-        UUID companionId = companionId(player);
-        if (companionId != null && companionId.equals(attacker.getUUID())) return;
+        if (attacker instanceof AmbientFighterEntity member && isCompanion(player, member)) return;
         DEFENSE_THREATS.put(player.getUUID(), new DefenseThreat(attacker.getUUID(), now + Math.max(40L, duration)));
 
-        AmbientFighterEntity companion = findLoadedCompanion(player, companionId);
-        if (companion == null || !companion.isAlive() || companion.level() != player.level()
-                || companion.getHealth() < companion.getMaxHealth() * 0.18F) return;
-        if (loyaltyConflict(companion, attacker) || !sagaHelpAllowed(attacker)) return;
-
-        if (companion.isMeditating()) companion.stopMeditation(false);
-        FighterAmbientActivityManager.cancel(companion);
-        companion.setSocialLifeActivity(false);
-        companion.setTarget(attacker);
+        for (UUID id : companionIds(player)) {
+            AmbientFighterEntity companion = findLoadedCompanion(player, id);
+            if (companion == null || !companion.isAlive() || companion.level() != player.level()
+                    || companion.getHealth() < companion.getMaxHealth() * 0.18F) continue;
+            if (loyaltyConflict(companion, attacker) || !sagaHelpAllowed(attacker)) continue;
+            if (companion.isMeditating()) companion.stopMeditation(false);
+            FighterAmbientActivityManager.cancel(companion);
+            companion.setSocialLifeActivity(false);
+            companion.setTarget(attacker);
+        }
     }
 
     private static LivingEntity latchedDefenseThreat(ServerPlayer player, ServerLevel level, long now) {
@@ -969,10 +1019,14 @@ public final class LivingBondManager {
     /** Player-facing Come Along request. Friendship helps, but fighters can still be busy or decline. */
     public static boolean requestCompanion(ServerPlayer player, AmbientFighterEntity npc) {
         if (player == null || npc == null || !(player.level() instanceof ServerLevel level)) return false;
-        UUID current = companionId(player);
-        if (current != null) {
-            if (current.equals(npc.getUUID())) npc.speak("I'm already with you.", 58);
-            else player.displayClientMessage(net.minecraft.network.chat.Component.literal("[Living World] Someone is already travelling with you."), false);
+        if (isCompanion(player, npc)) {
+            removeCompanion(player, npc);
+            npc.speak("I'll head out on my own again.", 58);
+            return true;
+        }
+        if (companionIds(player).size() >= MAX_COMPANIONS) {
+            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                    "You can't have more than 5 companions!").withStyle(net.minecraft.ChatFormatting.RED), false);
             return false;
         }
         if (!npc.isAlive() || npc.isCaptive() || npc.isDefeated() || npc.isRecovering() || npc.isMeditating()
@@ -1031,9 +1085,15 @@ public final class LivingBondManager {
 
     private static void setCompanion(ServerPlayer player, AmbientFighterEntity npc) {
         CompoundTag root = root(player);
-        root.putUUID("Companion", npc.getUUID());
-        root.putString("CompanionName", npc.getFighterName());
-        root.putLong("CompanionJoined", player.serverLevel().getServer().overworld().getGameTime());
+        boolean firstCompanion = companionIds(player).isEmpty();
+        List<UUID> roster = companionIds(player);
+        if (!roster.contains(npc.getUUID())) roster.add(npc.getUUID());
+        writeCompanionIds(root, roster);
+        if (firstCompanion) {
+            root.putUUID("Companion", npc.getUUID());
+            root.putString("CompanionName", npc.getFighterName());
+            root.putLong("CompanionJoined", player.serverLevel().getServer().overworld().getGameTime());
+        }
         root.remove("CompanionMissingSince");
         root.remove("CompanionFriendlyFireStrikes");
         root.remove("CompanionLastFriendlyFire");
@@ -1043,13 +1103,61 @@ public final class LivingBondManager {
         Deque<Vec3> trail = new ArrayDeque<>();
         trail.add(player.position().add(0.0D, 0.8D, 0.0D));
         TRAVEL_TRAILS.put(player.getUUID(), trail);
-        rememberCompanionState(player, root, npc);
+        if (firstCompanion) rememberCompanionState(player, root, npc); else save(player, root);
         npc.setPersistenceRequired();
     }
 
     public static UUID companionId(ServerPlayer player) {
+        List<UUID> ids = companionIds(player);
+        return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    public static List<UUID> companionIds(ServerPlayer player) {
+        if (player == null) return new ArrayList<>();
         CompoundTag root = root(player);
-        return root.hasUUID("Companion") ? root.getUUID("Companion") : null;
+        List<UUID> result = new ArrayList<>();
+        if (root.contains("CompanionIds", Tag.TAG_LIST)) {
+            ListTag list = root.getList("CompanionIds", Tag.TAG_STRING);
+            for (int i = 0; i < list.size() && result.size() < MAX_COMPANIONS; i++) {
+                try { UUID id = UUID.fromString(list.getString(i)); if (!result.contains(id)) result.add(id); }
+                catch (IllegalArgumentException ignored) { }
+            }
+        }
+        if (root.hasUUID("Companion") && !result.contains(root.getUUID("Companion"))) result.add(0, root.getUUID("Companion"));
+        if (!result.isEmpty()) writeCompanionIds(root, result);
+        return result;
+    }
+
+    private static void writeCompanionIds(CompoundTag root, List<UUID> ids) {
+        ListTag list = new ListTag();
+        ids.stream().limit(MAX_COMPANIONS).forEach(id -> list.add(StringTag.valueOf(id.toString())));
+        root.put("CompanionIds", list);
+        if (ids.isEmpty()) root.remove("Companion"); else root.putUUID("Companion", ids.get(0));
+    }
+
+    public static boolean isCompanion(ServerPlayer player, AmbientFighterEntity npc) {
+        return player != null && npc != null && companionIds(player).contains(npc.getUUID());
+    }
+
+    public static void removeCompanion(ServerPlayer player, AmbientFighterEntity npc) {
+        if (player == null || npc == null) return;
+        CompoundTag root = root(player);
+        List<UUID> ids = companionIds(player);
+        if (!ids.remove(npc.getUUID())) return;
+        writeCompanionIds(root, ids);
+        npc.getPersistentData().remove("LWCompanionOwner");
+        npc.getNavigation().stop(); npc.setTarget(null); npc.setFlying(false); npc.setFlyingFast(false); npc.setNoGravity(false);
+        if (ids.isEmpty()) {
+            clearCompanion(player);
+        } else {
+            AmbientFighterEntity promoted = findLoadedCompanion(player, ids.get(0));
+            root.putLong("CompanionJoined", player.serverLevel().getServer().overworld().getGameTime());
+            root.remove("CompanionMissingSince");
+            if (promoted != null) {
+                root.putString("CompanionName", promoted.getFighterName());
+                rememberCompanionState(player, root, promoted);
+            } else save(player, root);
+        }
     }
 
     public static String companionName(ServerPlayer player) { return root(player).getString("CompanionName"); }
@@ -1057,8 +1165,7 @@ public final class LivingBondManager {
     public static boolean isTravellingCompanion(AmbientFighterEntity fighter) {
         if (fighter == null || !(fighter.level() instanceof ServerLevel level)) return false;
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-            UUID current = companionId(player);
-            if (current != null && current.equals(fighter.getUUID())) return true;
+            if (isCompanion(player, fighter)) return true;
         }
         return false;
     }
@@ -1071,7 +1178,7 @@ public final class LivingBondManager {
                 ? fighter.getPersistentData().getUUID("LWCompanionOwner") : null;
         if (ownerId == null) return false;
         ServerPlayer owner = level.getServer().getPlayerList().getPlayer(ownerId);
-        if (owner == null || !fighter.getUUID().equals(companionId(owner))) return false;
+        if (owner == null || !isCompanion(owner, fighter)) return false;
         return player.getUUID().equals(ownerId) || PartyManager.areInSameParty(owner, player);
     }
 
@@ -1079,8 +1186,7 @@ public final class LivingBondManager {
     public static boolean isCombatProtectedCompanion(ServerPlayer player, AmbientFighterEntity npc) {
         if (player == null || npc == null || npc.getTarget() == null) return false;
         if (npc.isSanctionedMatchParticipant() && npc.isSanctionedOpponent(player)) return false;
-        UUID current = companionId(player);
-        return current != null && current.equals(npc.getUUID());
+        return isCompanion(player, npc);
     }
 
     /**
@@ -1091,8 +1197,7 @@ public final class LivingBondManager {
     public static boolean protectCompanionFromFriendlyFire(ServerPlayer player, AmbientFighterEntity npc) {
         if (player == null || npc == null) return false;
         if (npc.isSanctionedMatchParticipant() && npc.isSanctionedOpponent(player)) return false;
-        UUID current = companionId(player);
-        if (current == null || !current.equals(npc.getUUID())) return false;
+        if (!isCompanion(player, npc)) return false;
 
         CompoundTag root = root(player);
         long now = player.serverLevel().getServer().overworld().getGameTime();
@@ -1191,6 +1296,10 @@ public final class LivingBondManager {
     public static void clearCompanion(ServerPlayer player) {
         TRAVEL_TRAILS.remove(player.getUUID());
         CompoundTag root = root(player);
+        for (UUID id : companionIds(player)) {
+            AmbientFighterEntity member = findLoadedCompanion(player, id);
+            if (member != null) member.getPersistentData().remove("LWCompanionOwner");
+        }
         UUID currentId = root.hasUUID("Companion") ? root.getUUID("Companion") : null;
         AmbientFighterEntity current = findLoadedCompanion(player, currentId);
         if (current != null) {
@@ -1202,7 +1311,7 @@ public final class LivingBondManager {
             current.setNoGravity(false);
             current.getPersistentData().remove("LWCompanionOwner");
         }
-        root.remove("Companion"); root.remove("CompanionName"); root.remove("CompanionJoined");
+        root.remove("Companion"); root.remove("CompanionIds"); root.remove("CompanionName"); root.remove("CompanionJoined");
         root.remove("CompanionRecord"); root.remove("CompanionProfile"); root.remove("CompanionDimension");
         root.remove("CompanionLastX"); root.remove("CompanionLastY"); root.remove("CompanionLastZ");
         root.remove("CompanionMissingSince"); root.remove("LastCompanionRegroup");
@@ -1241,14 +1350,13 @@ public final class LivingBondManager {
                 && companion.getPersistentData().hasUUID("LWCompanionOwner")) {
             ServerPlayer owner = level.getServer().getPlayerList().getPlayer(
                     companion.getPersistentData().getUUID("LWCompanionOwner"));
-            if (owner != null && companion.getUUID().equals(companionId(owner)))
+            if (owner != null && isCompanion(owner, companion))
                 QuestEvents.creditQuestKill(owner, event.getEntity());
         }
 
         if (!(event.getEntity() instanceof AmbientFighterEntity npc)) return;
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-            UUID id = companionId(player);
-            if (id != null && id.equals(npc.getUUID())) clearCompanion(player);
+            if (isCompanion(player, npc)) removeCompanion(player, npc);
         }
     }
 

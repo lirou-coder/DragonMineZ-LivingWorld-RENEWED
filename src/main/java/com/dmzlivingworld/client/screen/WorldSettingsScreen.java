@@ -39,7 +39,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     private int maxRememberedDeadFighters, npcDespawnProtectionRadius;
     private double levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier;
     private boolean canMeditationProcSkillProgression, treatRaceBlacklistAsWhitelist, treatDimensionWhitelistAsBlacklist;
-    private String npcRaceBlacklist, canUseClothes, dimensionWhitelist;
+    private String npcRaceBlacklist, canUseClothes, dimensionWhitelist, companionDimensionBlacklist;
     private double[] archetypeShares = new double[20];
 
     // Living World client values
@@ -119,6 +119,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         npcRaceBlacklist=String.join(",",v.npcRaceBlacklist()); treatRaceBlacklistAsWhitelist=v.treatRaceBlacklistAsWhitelist();
         canUseClothes=String.join(",",v.canUseClothes()); dimensionWhitelist=String.join(",",v.dimensionWhitelist());
         treatDimensionWhitelistAsBlacklist=v.treatDimensionWhitelistAsBlacklist();
+        companionDimensionBlacklist=String.join(",",v.companionDimensionBlacklist());
         for(int i=0;i<Math.min(20,v.archetypeShares().size());i++) archetypeShares[i]=v.archetypeShares().get(i);
     }
 
@@ -160,7 +161,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 npcChatFrequencyPercent, earthGuardianResponsePercent, maxRememberedDeadFighters, npcDespawnProtectionRadius,
                 levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier, canMeditationProcSkillProgression,
                 csv(npcRaceBlacklist), treatRaceBlacklistAsWhitelist, csv(canUseClothes), csv(dimensionWhitelist),
-                treatDimensionWhitelistAsBlacklist, java.util.Arrays.stream(archetypeShares).boxed().toList());
+                treatDimensionWhitelistAsBlacklist, csv(companionDimensionBlacklist), java.util.Arrays.stream(archetypeShares).boxed().toList());
     }
 
     private LivingWorldClientConfig.Snapshot clientSnapshot() {
@@ -183,7 +184,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     }
 
     private int rowCount() {
-        return switch (tab) { case 0 -> 12; case 1 -> 6; case 2 -> 11; case 3 -> 15; case 4 -> 10; case 6 -> 31; default -> 8; };
+        return switch (tab) { case 0 -> 12; case 1 -> 6; case 2 -> 11; case 3 -> 15; case 4 -> 10; case 6 -> 32; default -> 8; };
     }
 
     private boolean serverTab() { return tab == 0 || tab == 1 || tab == 3 || tab == 5 || tab == 6; }
@@ -806,6 +807,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         canMeditationProcSkillProgression=d.canMeditationProcSkillProgression(); npcRaceBlacklist=String.join(",",d.npcRaceBlacklist());
         treatRaceBlacklistAsWhitelist=d.treatRaceBlacklistAsWhitelist(); canUseClothes=String.join(",",d.canUseClothes());
         dimensionWhitelist=String.join(",",d.dimensionWhitelist()); treatDimensionWhitelistAsBlacklist=d.treatDimensionWhitelistAsBlacklist();
+        companionDimensionBlacklist=String.join(",",d.companionDimensionBlacklist());
         for(int i=0;i<20;i++) archetypeShares[i]=d.archetypeShares().get(i);
     }
 
@@ -1071,37 +1073,37 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         }
     }
 
-    private static boolean isTextRow(int selectedTab,int row){return selectedTab==6&&(row==6||row==8||row==9);}
+    private static boolean isTextRow(int selectedTab,int row){return selectedTab==6&&(row==6||row==8||row==9||row==11);}
     private static java.util.List<String> csv(String text){
         if(text==null||text.isBlank())return java.util.List.of();
         return java.util.Arrays.stream(text.split(",")).map(String::trim).filter(s->!s.isBlank()).toList();
     }
     private String advancedName(int r){
-        if(r<11)return switch(r){case 0->"Remembered dead fighters";case 1->"NPC despawn protection";case 2->"Saga level multiplier";
+        if(r<12)return switch(r){case 0->"Remembered dead fighters";case 1->"NPC despawn protection";case 2->"Saga level multiplier";
             case 3->"Maximum defense mitigation";case 4->"Visual BP multiplier";case 5->"Meditation skill discovery";
             case 6->"NPC race blacklist";case 7->"Race list is whitelist";case 8->"Races that use clothes";
-            case 9->"Spawn dimensions";default->"Dimension list is blacklist";};
+            case 9->"Spawn dimensions";case 10->"Dimension list is blacklist";default->"Companion dimension blacklist";};
         String[] archetypes={"Brawler","Martial Artist","Speed Fighter","Guardian","Ki Specialist"};
-        String[] stats={"Melee","Defense","Ki","Health"}; int i=r-11; return archetypes[i/4]+" "+stats[i%4]+" share";
+        String[] stats={"Melee","Defense","Ki","Health"}; int i=r-12; return archetypes[i/4]+" "+stats[i%4]+" share";
     }
     private String advancedValue(int r){
-        if(r>=11)return pct(archetypeShares[r-11]);
+        if(r>=12)return pct(archetypeShares[r-12]);
         return switch(r){case 0->Integer.toString(maxRememberedDeadFighters);case 1->npcDespawnProtectionRadius+" blocks";
             case 2->"x"+formatNumber(levelMultiplierPerSaga,2);case 3->pct(maxDefenseMitigation);case 4->"x"+formatNumber(bpVisualMultiplier,2);
             case 5->onOff(canMeditationProcSkillProgression);case 6->npcRaceBlacklist.isBlank()?"(empty)":npcRaceBlacklist;
             case 7->onOff(treatRaceBlacklistAsWhitelist);case 8->canUseClothes;case 9->dimensionWhitelist;
-            default->onOff(treatDimensionWhitelistAsBlacklist);};
+            case 10->onOff(treatDimensionWhitelistAsBlacklist);default->companionDimensionBlacklist;};
     }
-    private String advancedRawValue(int r){if(isTextRow(6,r))return r==6?npcRaceBlacklist:r==8?canUseClothes:dimensionWhitelist;
+    private String advancedRawValue(int r){if(isTextRow(6,r))return r==6?npcRaceBlacklist:r==8?canUseClothes:r==9?dimensionWhitelist:companionDimensionBlacklist;
         return formatNumber(advancedNumericValue(r),4);}
-    private double advancedNumericValue(int r){if(r>=11)return archetypeShares[r-11];return switch(r){case 0->maxRememberedDeadFighters;
+    private double advancedNumericValue(int r){if(r>=12)return archetypeShares[r-12];return switch(r){case 0->maxRememberedDeadFighters;
         case 1->npcDespawnProtectionRadius;case 2->levelMultiplierPerSaga;case 3->maxDefenseMitigation;case 4->bpVisualMultiplier;default->0D;};}
     private void changeAdvanced(int r,int d){if(r==5)canMeditationProcSkillProgression=d>0;else if(r==7)treatRaceBlacklistAsWhitelist=d>0;
-        else if(r==10)treatDimensionWhitelistAsBlacklist=d>0;else if(!isTextRow(6,r))setAdvancedNumeric(r,advancedNumericValue(r)+d*(r>=11?.01D:r==3?.01D:r==2?.1D:1D));}
-    private void setAdvancedNumeric(int r,double v){if(r>=11)archetypeShares[r-11]=clamp(v,0D,10D);else switch(r){case 0->maxRememberedDeadFighters=clamp((int)Math.round(v),0,4096);
+        else if(r==10)treatDimensionWhitelistAsBlacklist=d>0;else if(!isTextRow(6,r))setAdvancedNumeric(r,advancedNumericValue(r)+d*(r>=12?.01D:r==3?.01D:r==2?.1D:1D));}
+    private void setAdvancedNumeric(int r,double v){if(r>=12)archetypeShares[r-12]=clamp(v,0D,10D);else switch(r){case 0->maxRememberedDeadFighters=clamp((int)Math.round(v),0,4096);
         case 1->npcDespawnProtectionRadius=clamp((int)Math.round(v),96,4096);case 2->levelMultiplierPerSaga=clamp(v,.1D,1000D);
         case 3->maxDefenseMitigation=clamp(v,0D,.99D);case 4->bpVisualMultiplier=clamp(v,0D,1_000_000D);default->{}}}
-    private void commitAdvanced(int r,String raw){if(r==6)npcRaceBlacklist=raw;else if(r==8)canUseClothes=raw;else if(r==9)dimensionWhitelist=raw;
+    private void commitAdvanced(int r,String raw){if(r==6)npcRaceBlacklist=raw;else if(r==8)canUseClothes=raw;else if(r==9)dimensionWhitelist=raw;else if(r==11)companionDimensionBlacklist=raw;
         else setAdvancedNumeric(r,Double.parseDouble(raw));}
 
     @Override

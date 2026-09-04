@@ -613,7 +613,7 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
         }
         String[] actions = profile.supplyReceiver()
                 ? new String[]{"Deliver Supplies"}
-                : new String[]{"Talk", "Spar", "Go Along", "Come Along", "Fusion", "Meditate", "Go Full Power"};
+                : new String[]{"Talk", "Spar", "Go Along", profile.travellingCompanion() ? "Let go" : "Come Along", "Fusion", "Meditate", "Go Full Power"};
         int gap = 5;
         int cols = twoRowLiveFooter() ? (actions.length > 6 ? 4 : 3) : actions.length;
         int rows = (actions.length + cols - 1) / cols;

@@ -18,6 +18,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -294,6 +295,20 @@ public final class AmbientFighterSpawner {
         fighter.initializeFromMemory(profile);
         fighter.setPersistenceRequired();
         if (!level.noCollision(fighter)) return null;
+        level.addFreshEntity(fighter);
+        return fighter;
+    }
+
+    /** Dimension-transfer materialization; companions may follow into non-population dimensions. */
+    public static AmbientFighterEntity spawnCompanionByPlayer(ServerPlayer player, CompoundTag profile) {
+        if (player == null || profile == null || profile.isEmpty() || !(player.level() instanceof ServerLevel level)) return null;
+        AmbientFighterEntity fighter = LWEntities.AMBIENT_FIGHTER.get().create(level);
+        if (fighter == null) return null;
+        Vec3 look = player.getLookAngle();
+        fighter.moveTo(player.getX() - look.x * 2.0D, player.getY(), player.getZ() - look.z * 2.0D,
+                player.getYRot(), 0.0F);
+        fighter.initializeFromMemory(profile);
+        fighter.setPersistenceRequired();
         level.addFreshEntity(fighter);
         return fighter;
     }

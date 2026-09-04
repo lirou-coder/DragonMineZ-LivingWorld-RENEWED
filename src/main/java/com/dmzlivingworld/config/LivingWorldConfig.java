@@ -49,6 +49,7 @@ public final class LivingWorldConfig {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> CAN_USE_CLOTHES;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> DIMENSION_WHITELIST;
     public static final ForgeConfigSpec.BooleanValue TREAT_DIMENSION_WHITELIST_AS_BLACKLIST;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> COMPANION_DIMENSION_BLACKLIST;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -68,6 +69,12 @@ public final class LivingWorldConfig {
                 .defineListAllowEmpty(List.of("dimensionWhitelist"), List.of("minecraft:overworld", "dragonminez:namek"), LivingWorldConfig::isNonBlankId);
         TREAT_DIMENSION_WHITELIST_AS_BLACKLIST = builder.comment("When true, dimensionWhitelist is treated as a blacklist instead.")
                 .define("treatDimensionWhitelistAsBlacklist", false);
+        COMPANION_DIMENSION_BLACKLIST = builder.comment("Dimensions companions will not follow their player into.")
+                .defineListAllowEmpty(List.of("companionDimensionBlacklist"), List.of(
+                        "dmzplus:cereal_orbit", "dmzplus:earth_orbit", "dmzplus:hell_planet_orbit",
+                        "dmzplus:namek_orbit", "dmzplus:vampa_orbit", "dmzplus:vegeta_orbit",
+                        "dmzplus:yardrat_orbit", "dmzplus:otherworld_space",
+                        "dmzplus:universe_7_deep_space", "dragonminez:otherworld"), LivingWorldConfig::isNonBlankId);
         NEARBY_FIGHTER_CAP = builder.comment(
                         "Maximum Living World fighters naturally maintained near each player.",
                         "Large values increase active fighter AI cost; lowering this does not remove fighters who already exist.")
@@ -239,6 +246,8 @@ public final class LivingWorldConfig {
     public static List<String> canUseClothes() { return CAN_USE_CLOTHES.get().stream().map(String::valueOf).map(s -> s.toLowerCase(java.util.Locale.ROOT)).toList(); }
     public static List<String> dimensionWhitelist() { return DIMENSION_WHITELIST.get().stream().map(String::valueOf).map(s -> s.toLowerCase(java.util.Locale.ROOT)).toList(); }
     public static boolean treatDimensionWhitelistAsBlacklist() { return TREAT_DIMENSION_WHITELIST_AS_BLACKLIST.get(); }
+    public static List<String> companionDimensionBlacklist() { return COMPANION_DIMENSION_BLACKLIST.get().stream()
+            .map(String::valueOf).map(s -> s.toLowerCase(java.util.Locale.ROOT)).toList(); }
 
     /** Retained in the network snapshot for compatibility with older 1.9 release candidates. */
     public static int activityPreset() { return 2; }
@@ -353,7 +362,7 @@ public final class LivingWorldConfig {
                 npcSocializing(), npcChaosPercent(), companionSagaHelp(), npcKiMode(), npcStrengthPercent(), npcGrowthPercent(), attackMinecraftMobs(),
                 npcChatFrequencyPercent(), earthGuardianResponsePercent(), maxRememberedDeadFighters(), npcDespawnProtectionRadius(),
                 levelMultiplierPerSaga(), maxDefenseMitigation(), bpVisualMultiplier(), canMeditationProcSkillProgression(),
-                npcRaceBlacklist(), treatRaceBlacklistAsWhitelist(), canUseClothes(), dimensionWhitelist(), treatDimensionWhitelistAsBlacklist(),
+                npcRaceBlacklist(), treatRaceBlacklistAsWhitelist(), canUseClothes(), dimensionWhitelist(), treatDimensionWhitelistAsBlacklist(), companionDimensionBlacklist(),
                 archetypeShares());
     }
 
@@ -398,6 +407,7 @@ public final class LivingWorldConfig {
         CAN_USE_CLOTHES.set(List.copyOf(value.canUseClothes()));
         DIMENSION_WHITELIST.set(List.copyOf(value.dimensionWhitelist()));
         TREAT_DIMENSION_WHITELIST_AS_BLACKLIST.set(value.treatDimensionWhitelistAsBlacklist());
+        COMPANION_DIMENSION_BLACKLIST.set(List.copyOf(value.companionDimensionBlacklist()));
         applyArchetypeShares(value.archetypeShares());
         // ConfigValue#set updates the loaded Forge config in memory; explicitly save the
         // shared SERVER config after a GUI edit so world settings survive a restart.
@@ -409,6 +419,7 @@ public final class LivingWorldConfig {
                 true, true, true, 1400, true, 2, 20, 120, 240, true, 100, true, 1, 100, 100, true, 100, 100,
                 20, 288, 5D, .7D, 1D, true, List.of(), false,
                 List.of("human", "saiyan", "namekian", "majin"), List.of("minecraft:overworld", "dragonminez:namek"), false,
+                List.of("dmzplus:cereal_orbit", "dmzplus:earth_orbit", "dmzplus:hell_planet_orbit", "dmzplus:namek_orbit", "dmzplus:vampa_orbit", "dmzplus:vegeta_orbit", "dmzplus:yardrat_orbit", "dmzplus:otherworld_space", "dmzplus:universe_7_deep_space", "dragonminez:otherworld"),
                 List.of(.20,.10,.06,.64, .17,.14,.17,.52, .15,.08,.15,.62, .10,.20,.10,.60, .06,.10,.20,.64));
     }
 
@@ -447,6 +458,6 @@ public final class LivingWorldConfig {
                            double levelMultiplierPerSaga, double maxDefenseMitigation, double bpVisualMultiplier,
                            boolean canMeditationProcSkillProgression, List<String> npcRaceBlacklist,
                            boolean treatRaceBlacklistAsWhitelist, List<String> canUseClothes,
-                           List<String> dimensionWhitelist, boolean treatDimensionWhitelistAsBlacklist,
+                           List<String> dimensionWhitelist, boolean treatDimensionWhitelistAsBlacklist, List<String> companionDimensionBlacklist,
                            List<Double> archetypeShares) {}
 }

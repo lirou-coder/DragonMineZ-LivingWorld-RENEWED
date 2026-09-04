@@ -52,6 +52,11 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
             renderMajinHeadParts(poseStack, fighter, buffers, partialTick, packedLight);
             buffers.getBuffer(renderType);
         }
+        if ("head".equals(playerBone.getName())
+                && fighter.getRace() == com.dmzlivingworld.entity.FighterRace.FROST_DEMON) {
+            renderFrostDemonHorns(poseStack, fighter, buffers, partialTick, packedLight);
+            buffers.getBuffer(renderType);
+        }
         int id = fighter.getCosmeticAccessoryId();
         if (id <= FighterSpecialItemManager.ACCESSORY_NONE) return;
         String anchor = playerBone.getName();
@@ -138,6 +143,18 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
             renderNamekianPart(parts, body, "majin" + (Math.floorMod(fighter.getHeadBone(), 3) + 1),
                     poseStack, fighter, buffers, partialTick, packedLight, color);
         }
+    }
+
+    /** Frost Demon horns are race-parts, not bones embedded in the racial body model. */
+    private void renderFrostDemonHorns(PoseStack poseStack, AmbientFighterEntity fighter,
+                                       MultiBufferSource buffers, float partialTick, int packedLight) {
+        BakedGeoModel parts = getGeoModel().getBakedModel(RACE_PARTS_MODEL);
+        BakedGeoModel body = getGeoModel().getBakedModel(getGeoModel().getModelResource(fighter));
+        if (parts == null || body == null) return;
+        // This is the exact fixed tint used by DMZPlayer's DMZRacePartsLayer.
+        float[] hornColor = com.dragonminez.client.util.ColorUtils.hexToRgb("#1A1A1A");
+        renderNamekianPart(parts, body, "horns" + (Math.floorMod(fighter.getHeadBone(), 5) + 1),
+                poseStack, fighter, buffers, partialTick, packedLight, hornColor);
     }
 
     private void renderNamekianPart(BakedGeoModel parts, BakedGeoModel body, String boneName,

@@ -84,19 +84,23 @@ public final class WorldPowerScaler {
         return 450.0D;
     }
 
-    /** Only the literal first quest of each root/available saga may seed an untouched world. */
+    /** The first quest containing a QUEST-spawn kill in every configured non-Movies saga may seed an untouched world. */
     private static double initialAvailableReference() {
         double weakest = Double.POSITIVE_INFINITY;
         for (Saga saga : QuestRegistry.getAllSagas().values()) {
             if (WorldEraProgression.isMovies(saga) || saga.getQuests().isEmpty()) continue;
-            Saga.SagaRequirements requirements = saga.getRequirements();
-            if (requirements != null && requirements.previousSagaId() != null
-                    && !requirements.previousSagaId().isBlank()) continue;
-            Quest firstQuest = saga.getQuests().get(0);
-            for (var objective : firstQuest.getObjectives()) {
-                if (!(objective instanceof KillObjective kill) || kill.getSpawnMode() != KillObjective.SpawnMode.QUEST) continue;
-                double reference = killReference(kill);
-                if (reference > 0.0D) weakest = Math.min(weakest, reference);
+            // A custom saga may open with dialogue/travel objectives (DBClassic commonly does).
+            // Stop at its first quest which actually spawns a kill target; never compare later fights.
+            for (Quest quest : saga.getQuests()) {
+                boolean foundKillQuest = false;
+                for (var objective : quest.getObjectives()) {
+                    if (!(objective instanceof KillObjective kill)
+                            || kill.getSpawnMode() != KillObjective.SpawnMode.QUEST) continue;
+                    foundKillQuest = true;
+                    double reference = killReference(kill);
+                    if (reference > 0.0D) weakest = Math.min(weakest, reference);
+                }
+                if (foundKillQuest) break;
             }
         }
         return Double.isFinite(weakest) ? weakest : 450.0D;

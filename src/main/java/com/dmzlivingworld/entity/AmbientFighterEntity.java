@@ -2386,8 +2386,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         UUID ownerId = getPersistentData().getUUID("LWCompanionOwner");
         ServerPlayer owner = level.getServer().getPlayerList().getPlayer(ownerId);
         if (owner == null) return false;
-        UUID companionId = LivingBondManager.companionId(owner);
-        if (companionId == null || !companionId.equals(getUUID())) return false;
+        if (!LivingBondManager.isCompanion(owner, this)) return false;
         if (owner.getLastHurtByMob() == target || owner.getLastHurtMob() == target) return true;
         return target instanceof Mob mob && mob.getTarget() == owner;
     }
@@ -2599,6 +2598,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 entityData.set(MOUTH_TYPE, random.nextInt(2));
                 entityData.set(HAIR_ID, 0);
                 entityData.set(OUTFIT, 0);
+                entityData.set(HEAD_BONE, random.nextInt(5));
                 entityData.set(BODY_COLOR, pick(random, FROST_MAIN));
                 entityData.set(BODY_COLOR2, pick(random, FROST_SECOND));
                 entityData.set(BODY_COLOR3, pick(random, FROST_ACCENT));
@@ -2889,7 +2889,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     public int getNoseType() { return entityData.get(NOSE_TYPE); }
     public int getMouthType() { return entityData.get(MOUTH_TYPE); }
     public int getHairId() { return entityData.get(HAIR_ID); }
-    public int getHeadBone() { return Math.floorMod(entityData.get(HEAD_BONE), 3); }
+    public int getHeadBone() { return Math.floorMod(entityData.get(HEAD_BONE), getRace() == FighterRace.FROST_DEMON ? 5 : 3); }
     public int getOutfit() { return entityData.get(OUTFIT); }
     /** Persistent Living World cosmetic evolution; bounded to native DMZ preset hairs. */
     public void setHairIdForLivingWorld(int hairId) {
