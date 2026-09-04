@@ -185,7 +185,6 @@ public final class PeacekeeperManager {
     /** Called exclusively from AmbientFighterEntity.hurt: native saga NPC damage never reaches this path. */
     public static void onPlayerAggression(ServerPlayer player, AmbientFighterEntity victim, DamageSource source) {
         if (player == null || victim == null || source == null || !(player.level() instanceof ServerLevel level)) return;
-        if (LivingWorldDimensions.realm(level) != FactionRealm.EARTH) return;
         if (victim.getPersistentData().contains("DMZLWNpcFusionTemp")) return;
         // World Menaces are authored global threats, not civilian assaults. Keep this generic so
         // every current/future menace added to WorldMenaceManager inherits the exemption.
@@ -204,6 +203,9 @@ public final class PeacekeeperManager {
             return;
         }
         notePlayerAttack(player, victim, now);
+        // First-aggressor provenance is gameplay state, not an Earth-policing rule. Record it in
+        // every dimension, then restrict only the Guardian Corps response to Earth.
+        if (LivingWorldDimensions.realm(level) != FactionRealm.EARTH) return;
         if (victim.getAlignment() == FighterAlignment.BAD && !victim.isNonCombatant()) return;
         CompoundTag root = player.getPersistentData().getCompound(PLAYER_ROOT);
         long last = root.getLong("LastResponse");

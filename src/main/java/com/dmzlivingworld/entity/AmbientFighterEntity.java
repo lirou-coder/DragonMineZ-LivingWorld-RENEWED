@@ -59,6 +59,7 @@ import com.dmzlivingworld.world.SparManager;
 import com.dmzlivingworld.world.LivingBondManager;
 import com.dmzlivingworld.world.MercyManager;
 import com.dmzlivingworld.world.PeacekeeperManager;
+import com.dmzlivingworld.world.PlayerAlignmentManager;
 import com.dmzlivingworld.world.PlayerCreationSafety;
 import com.dmzlivingworld.world.PlayerSpawnCombatSafety;
 import com.dmzlivingworld.world.OrganicThreatManager;
@@ -275,14 +276,17 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     private static final String[] NAMEK_ACCENT = {"#BB2024", "#D13835", "#8F1A25", "#D85B42"};
     private static final String[] NAMEK_PINK = {"#FF86A6", "#EA6F96", "#FF9DB7"};
     private static final String[] MAJIN_EYE_RED = {"#D71920", "#FF3038", "#A80F18", "#E84B50"};
-    private static final String[] FROST_MAIN = {"#FFFFFF", "#E9EEFF", "#ECE4F5", "#DDEEFF"};
-    private static final String[] FROST_SECOND = {"#E8A2FF", "#B99CFF", "#88C8FF", "#F0B0E6"};
-    private static final String[] FROST_ACCENT = {"#FF39A9", "#7E59FF", "#44BCEB", "#D92774"};
     private static final String[] BIO_MAIN = {"#187600", "#247E16", "#326B24", "#0D6446"};
     private static final String[] BIO_SECOND = {"#9FE321", "#7FCF27", "#B1D54E", "#5EBF69"};
     private static final String[] BIO_ACCENT = {"#FF7600", "#E84C20", "#E9BD25", "#C84639"};
+    private static final String[] FROST_BODY_MAIN = {"#FFFFFF", "#F6FBFF", "#EAF2FF", "#FFF7FF"};
+    private static final String[] FROST_BODY_SECOND = {"#E8A2FF", "#C98DFF", "#B976EA", "#F0B7FF"};
+    private static final String[] FROST_BODY_ACCENT = {"#FF39A9", "#D936C6", "#C449FF", "#FF5A75"};
+    private static final String[] FROST_EYES = {"#FF001D", "#F000FF", "#00D4FF", "#33FF66", "#FFD500", "#7E4DFF"};
 
     private boolean combatConfigured;
+    private boolean livingWorldSleepingPoseLock;
+    private float livingWorldSleepingPoseYaw;
     private int defeatedTicks;
     private int recoveryGraceTicks;
     private int retreatTicks;
@@ -719,9 +723,28 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     @Override
     public void tick() {
         super.tick();
+        enforceLivingWorldSleepingRotation();
         if (level().isClientSide && clientWeaponAnimationWindow > 0) clientWeaponAnimationWindow--;
         if (!level().isClientSide && isAlive() && postSparPeaceTicks > 0) enforcePostSparPeace();
         if (!level().isClientSide && isAlive()) enforcePlayerAlignmentCombatRules();
+    }
+
+    private void enforceLivingWorldSleepingRotation() {
+        // Pose is synced to clients; use it there as the lock signal so client-side body-turn
+        // interpolation cannot visually rotate a sleeper between server movement packets.
+        if (!livingWorldSleepingPoseLock && getPose() != Pose.SLEEPING) return;
+        float yaw = livingWorldSleepingPoseLock ? livingWorldSleepingPoseYaw : getYRot();
+        setPose(Pose.SLEEPING);
+        setXRot(0.0F); xRotO = 0.0F;
+        setYRot(yaw); yRotO = yaw;
+        yBodyRot = yaw; yBodyRotO = yaw;
+        setYHeadRot(yaw); yHeadRotO = yaw;
+    }
+
+    public void setLivingWorldSleepingPoseLock(boolean locked, float yaw) {
+        livingWorldSleepingPoseLock = locked;
+        livingWorldSleepingPoseYaw = yaw;
+        if (!locked && getPose() == Pose.SLEEPING) setPose(Pose.STANDING);
     }
 
     private void enforcePlayerAlignmentCombatRules() {
@@ -2157,6 +2180,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         setHealth(Math.max(1.0F, getMaxHealth() * 0.08F));
         suppressCombatIntent();
         clearDuelOpponent();
+        // Reward the moral act at the actual one-shot mercy transition. MercyManager's
+        // faction bookkeeping intentionally ignores ordinary fighters, but alignment must not.
+        PlayerAlignmentManager.rewardGoodAct(player);
         MercyManager.onMercyDowned(player, this);
     }
 
@@ -2592,16 +2618,14 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 entityData.set(EYE2_COLOR, redEye);
             }
             case FROST_DEMON -> {
-                entityData.set(BODY_TYPE, random.nextInt(3));
+                entityData.set(BODY_TYPE, Math.floorMod(getUUID().hashCode(), 3));
                 entityData.set(EYES_TYPE, random.nextInt(6));
                 entityData.set(NOSE_TYPE, random.nextInt(2));
                 entityData.set(MOUTH_TYPE, random.nextInt(2));
                 entityData.set(HAIR_ID, 0);
                 entityData.set(OUTFIT, 0);
                 entityData.set(HEAD_BONE, random.nextInt(5));
-                entityData.set(BODY_COLOR, pick(random, FROST_MAIN));
-                entityData.set(BODY_COLOR2, pick(random, FROST_SECOND));
-                entityData.set(BODY_COLOR3, pick(random, FROST_ACCENT));
+                applyFrostDemonColors(random, true, true, true, true, true);
             }
             case BIO_ANDROID -> {
                 entityData.set(BODY_TYPE, random.nextInt(3));
@@ -2618,6 +2642,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     }
 
     private static float rollNaturalScale(RandomSource random, FighterRace race, boolean female) {
+        // This race's player model is authored around DMZ's exact 0.7375 default scaling.
+        // Applying the generic NPC height roll distorted every Frost geo and its external horns.
+        if (race == FighterRace.FROST_DEMON) return 0.7375F;
         // Wider natural range than the old near-uniform silhouettes. Extremes are intentionally
         // uncommon because the triangular roll below still clusters most fighters near average.
         float min = switch (race) {
@@ -2653,6 +2680,50 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         int green = Math.max(0, Math.min(255, ((rgb >> 8) & 255) + random.nextInt(variation * 2 + 1) - variation));
         int blue = Math.max(0, Math.min(255, (rgb & 255) + random.nextInt(variation * 2 + 1) - variation));
         return String.format(java.util.Locale.ROOT, "#%02X%02X%02X", red, green, blue);
+    }
+
+    private void applyFrostDemonColors(RandomSource random, boolean body1, boolean body2, boolean body3,
+                                       boolean hair, boolean eyes) {
+        boolean standardVariant = random.nextBoolean();
+        if (body1) entityData.set(BODY_COLOR, standardVariant
+                ? colorVariant(random, parseHex(pick(random, FROST_BODY_MAIN), 0xFFFFFF), 34)
+                : randomColor(random));
+        if (body2) entityData.set(BODY_COLOR2, standardVariant
+                ? colorVariant(random, parseHex(pick(random, FROST_BODY_SECOND), 0xE8A2FF), 38)
+                : randomColor(random));
+        if (body3) entityData.set(BODY_COLOR3, standardVariant
+                ? colorVariant(random, parseHex(pick(random, FROST_BODY_ACCENT), 0xFF39A9), 44)
+                : randomColor(random));
+        if (hair) entityData.set(HAIR_COLOR, standardVariant
+                ? colorVariant(random, parseHex(pick(random, FROST_BODY_ACCENT), 0xFF39A9), 52)
+                : randomColor(random));
+        if (eyes) {
+            String primary = standardVariant ? strongFrostEyeVariant(random) : pick(random, FROST_EYES);
+            String secondary = primary;
+            if (random.nextFloat() < 0.04F && FROST_EYES.length > 1) {
+                for (int tries = 0; tries < 8 && secondary.equals(primary); tries++)
+                    secondary = standardVariant ? strongFrostEyeVariant(random) : pick(random, FROST_EYES);
+            }
+            entityData.set(EYE1_COLOR, primary);
+            entityData.set(EYE2_COLOR, secondary);
+        }
+    }
+
+    private static int parseHex(String color, int fallback) {
+        try {
+            String value = color != null && color.startsWith("#") ? color.substring(1) : color;
+            return Integer.parseInt(value, 16);
+        } catch (RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    /** Hue-only variation; saturation and brightness always remain at maximum. */
+    private static String strongFrostEyeVariant(RandomSource random) {
+        float hue = 353.2F / 360.0F + (random.nextFloat() - 0.5F) * (24.0F / 360.0F);
+        hue = hue - (float)Math.floor(hue);
+        int rgb = net.minecraft.util.Mth.hsvToRgb(hue, 1.0F, 1.0F);
+        return String.format(java.util.Locale.ROOT, "#%06X", rgb & 0xFFFFFF);
     }
 
     /** Range produced by colorVariant(random, 0xFFA4FF, 30), including channel clamping. */
@@ -2925,6 +2996,17 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     public int getFoodSupplies() { return foodSupplies; }
     public int getSenzuBeans() { return senzuBeans; }
     public void receiveSenzuBean() { senzuBeans = Math.min(4, senzuBeans + 1); }
+    public void seedCommandRecoverySupplies() {
+        int foodBase = switch (getRank()) {
+            case ROOKIE -> 1;
+            case TRAINED -> 2;
+            case VETERAN -> 3;
+        };
+        foodSupplies = Math.max(foodSupplies, foodBase);
+        if (getRank() == FighterRank.VETERAN && getRandom().nextFloat() < 0.35F) {
+            senzuBeans = Math.max(senzuBeans, 1);
+        }
+    }
     public void setFlightUnlockedForDebug(boolean unlocked) { entityData.set(FLIGHT_UNLOCKED, unlocked); setCanFly(unlocked && !isNonCombatant()); }
     public boolean hasParty() { return partyId != null; }
     public boolean isPartyCaptain() { return partyCaptain; }
@@ -3050,7 +3132,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     }
 
     private void tickFactionSupplies() {
-        if (!isFactionMember() || supplyCooldown > 0 || isDefeated() || isCaptive() || isAwakening()) return;
+        if (supplyCooldown > 0 || isDefeated() || isCaptive() || isAwakening()) return;
         LivingEntity target = getTarget();
         float hp = getHealth() / Math.max(1.0F, getMaxHealth());
 
@@ -3926,6 +4008,11 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     public int getActiveRacialFormLevel() { return entityData.get(ACTIVE_RACIAL_FORM_LEVEL); }
     public boolean isRacialFormActive() { return getActiveRacialFormLevel() > 0; }
     public RacialFormProfile getActiveRacialForm() { return isRacialFormActive() ? RacialFormProfile.forSkill(getRace(), getActiveRacialFormLevel()) : null; }
+    public boolean isFrostDemonPrimitive() {
+        if (getRace() != FighterRace.FROST_DEMON) return false;
+        RacialFormProfile form = getActiveRacialForm();
+        return form == null || "second".equals(form.id());
+    }
     public String getRacialFormName() { RacialFormProfile form = getActiveRacialForm(); return form == null ? "" : form.displayName(); }
     public boolean isKaiokenAuraPulse() { return isKaiokenActive() && (kaiokenTicks > 0) && (kaiokenTicks % 100 > 92); }
 
@@ -4988,6 +5075,22 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             entityData.set(EYE2_COLOR, redEye);
             if (isFemale()) entityData.set(HAIR_COLOR, getBodyColor());
         }
+        // Migrate Frost Demons saved by older builds without replacing already-authored colours
+        // on every load. Missing channels receive broader native-channel variants.
+        if (getRace() == FighterRace.FROST_DEMON) {
+            RandomSource frostAppearance = RandomSource.create(getUUID().getMostSignificantBits()
+                    ^ Long.rotateLeft(getUUID().getLeastSignificantBits(), 23));
+            entityData.set(BODY_TYPE, Math.floorMod(getUUID().hashCode(), 3));
+            entityData.set(EYES_TYPE, Math.floorMod(getEyesType(), 6));
+            entityData.set(NOSE_TYPE, Math.floorMod(getNoseType(), 2));
+            entityData.set(MOUTH_TYPE, Math.floorMod(getMouthType(), 2));
+            entityData.set(HEAD_BONE, Math.floorMod(getHeadBone(), 5));
+            applyFrostDemonColors(frostAppearance,
+                    !tag.contains("LWBodyColor"), !tag.contains("LWBodyColor2"), !tag.contains("LWBodyColor3"),
+                    !tag.contains("LWHairColor"), !tag.contains("LWEye1Color") && !tag.contains("LWEye2Color"));
+            entityData.set(DISPLAY_SCALE, 0.7375F);
+            setScaleVal(0.7375F);
+        }
         if (tag.contains("LWEye1Color")) entityData.set(EYE1_COLOR, tag.getString("LWEye1Color"));
         if (tag.contains("LWEye2Color")) entityData.set(EYE2_COLOR, tag.getString("LWEye2Color"));
         // The generic appearance NBT above contains the *currently rendered* form hair/eyes.
@@ -5004,6 +5107,10 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             String redEye = MAJIN_EYE_RED[Math.floorMod(getUUID().hashCode() / 11, MAJIN_EYE_RED.length)];
             entityData.set(EYE1_COLOR, redEye);
             entityData.set(EYE2_COLOR, redEye);
+        }
+        if (getRace() == FighterRace.FROST_DEMON) {
+            entityData.set(DISPLAY_SCALE, 0.7375F);
+            setScaleVal(0.7375F);
         }
         entityData.set(SPEECH, "");
         speechTicks = 0;

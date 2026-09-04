@@ -4,6 +4,7 @@ import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.RedRibbonExperimentManager;
 import com.dragonminez.client.util.ColorUtils;
+import com.dragonminez.client.render.util.ModRenderTypes;
 import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -185,6 +186,10 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
 
     private void renderFrost(PoseStack pose, AmbientFighterEntity e, BakedGeoModel model,
                              MultiBufferSource buffers, float pt, int light, int overlay) {
+        // GeckoLib's baked models are mutable and shared. Resolve the exact current Frost geo at
+        // this render boundary; the argument can still refer to the preceding actor/form.
+        BakedGeoModel frostModel = getGeoModel().getBakedModel(getGeoModel().getModelResource(e));
+        if (frostModel == null) return;
         String root = "textures/entity/races/frostdemon/";
         int bodyType = Math.floorMod(e.getBodyType(), 3);
         var activeForm = e.getActiveRacialForm();
@@ -205,38 +210,38 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         if (!finalFamily) {
             String prefix = third ? "thirdform_bodytype_" : "bodytype_";
             String base = root + prefix + bodyType + "_layer";
-            layer(model, pose, buffers, e, dmz(base + "1.png"), body1, pt, light, overlay);
-            layer(model, pose, buffers, e, dmz(base + "2.png"), body2, pt, light, overlay);
-            layer(model, pose, buffers, e, dmz(base + "3.png"), body3, pt, light, overlay);
-            layer(model, pose, buffers, e, dmz(base + "4.png"), hair, pt, light, overlay);
+            layer(frostModel, pose, buffers, e, dmz(base + "1.png"), body1, pt, light, overlay);
+            layer(frostModel, pose, buffers, e, dmz(base + "2.png"), body2, pt, light, overlay);
+            layer(frostModel, pose, buffers, e, dmz(base + "3.png"), body3, pt, light, overlay);
+            layer(frostModel, pose, buffers, e, dmz(base + "4.png"), hair, pt, light, overlay);
             if (bodyType == 0)
-                layer(model, pose, buffers, e, dmz(base + "5.png"), new float[]{1.0F, 0.6471F, 0.0F}, pt, light, overlay);
+                layer(frostModel, pose, buffers, e, dmz(base + "5.png"), rgb("#E67D40"), pt, light, overlay);
         } else {
             String prefix = fifth ? "fifth_bodytype_" : "finalform_bodytype_";
             String base = root + prefix + bodyType + "_layer";
-            layer(model, pose, buffers, e, dmz(base + "1.png"), body1, pt, light, overlay);
-            layer(model, pose, buffers, e, dmz(base + "2.png"), bodyType == 1 ? body2 : hair, pt, light, overlay);
+            layer(frostModel, pose, buffers, e, dmz(base + "1.png"), body1, pt, light, overlay);
+            layer(frostModel, pose, buffers, e, dmz(base + "2.png"), bodyType == 1 ? body2 : hair, pt, light, overlay);
             if (bodyType == 1) {
-                layer(model, pose, buffers, e, dmz(base + "3.png"), body3, pt, light, overlay);
-                layer(model, pose, buffers, e, dmz(base + "4.png"), hair, pt, light, overlay);
+                layer(frostModel, pose, buffers, e, dmz(base + "3.png"), body3, pt, light, overlay);
+                layer(frostModel, pose, buffers, e, dmz(base + "4.png"), hair, pt, light, overlay);
             } else if (bodyType == 2) {
-                layer(model, pose, buffers, e, dmz(base + "3.png"), hair, pt, light, overlay);
+                layer(frostModel, pose, buffers, e, dmz(base + "3.png"), hair, pt, light, overlay);
                 // DMZ deliberately emits layer 2 again with bodyColor2 for body type 2.
-                layer(model, pose, buffers, e, dmz(base + "2.png"), body2, pt, light, overlay);
+                layer(frostModel, pose, buffers, e, dmz(base + "2.png"), body2, pt, light, overlay);
             }
         }
         String face = root + "faces/";
         int eyeType = Math.floorMod(e.getEyesType(), 6);
         String eye = face + "frostdemon_eye_" + eyeType + "_";
-        layer(model, pose, buffers, e, dmz(eye + "0.png"), fifth ? new float[]{0.8196F, 0.102F, 0.0667F} : new float[]{0.949F, 0.949F, 0.949F}, pt, light, overlay);
-        layer(model, pose, buffers, e, dmz(eye + "1.png"), rgb(e.getEye1Color()), pt, light, overlay);
-        layer(model, pose, buffers, e, dmz(eye + "2.png"), rgb(e.getEye2Color()), pt, light, overlay);
+        layer(frostModel, pose, buffers, e, dmz(eye + "0.png"), fifth ? rgb("#D11A11") : rgb("#F2F2F2"), pt, light, overlay);
+        layer(frostModel, pose, buffers, e, dmz(eye + "1.png"), rgb(e.getEye1Color()), pt, light, overlay);
+        layer(frostModel, pose, buffers, e, dmz(eye + "2.png"), rgb(e.getEye2Color()), pt, light, overlay);
         if (fifth) {
-            layer(model, pose, buffers, e, dmz(face + "frostdemon_fifth_mouth.png"), body1, pt, light, overlay);
+            layer(frostModel, pose, buffers, e, dmz(face + "frostdemon_fifth_mouth.png"), body1, pt, light, overlay);
         } else {
-            float[] detail = (!finalFamily || bodyType == 1) ? body2 : body1;
-            layer(model, pose, buffers, e, dmz(face + "frostdemon_nose_" + Math.floorMod(e.getNoseType(), 2) + ".png"), detail, pt, light, overlay);
-            layer(model, pose, buffers, e, dmz(face + "frostdemon_mouth_" + Math.floorMod(e.getMouthType(), 2) + ".png"), detail, pt, light, overlay);
+            float[] detail = (e.isFrostDemonPrimitive() || bodyType == 1) ? body2 : body1;
+            layer(frostModel, pose, buffers, e, dmz(face + "frostdemon_nose_" + Math.floorMod(e.getNoseType(), 2) + ".png"), detail, pt, light, overlay);
+            layer(frostModel, pose, buffers, e, dmz(face + "frostdemon_mouth_" + Math.floorMod(e.getMouthType(), 2) + ".png"), detail, pt, light, overlay);
         }
     }
 
@@ -289,7 +294,7 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
                        AmbientFighterEntity entity, ResourceLocation texture, float[] rgb,
                        float partialTick, int packedLight, int packedOverlay) {
         if (!faceTextureAllowed(entity, texture)) return;
-        RenderType type = RenderType.entityCutoutNoCull(texture);
+        RenderType type = ModRenderTypes.skinOverlayCutout(texture);
         VertexConsumer consumer = buffers.getBuffer(type);
         getRenderer().reRender(model, pose, buffers, entity, type, consumer,
                 partialTick, packedLight, packedOverlay, rgb[0], rgb[1], rgb[2], 1.0F);

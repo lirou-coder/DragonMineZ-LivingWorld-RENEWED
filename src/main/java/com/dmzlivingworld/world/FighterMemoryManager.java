@@ -106,6 +106,7 @@ public final class FighterMemoryManager {
     /** Called by natural population before creating a fresh stranger. */
     public static boolean trySpawnRecurring(ServerPlayer player, boolean force) {
         if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) return false;
+        discardLoadedDuplicateRecords(player.getServer());
         CompoundTag root = getRoot(player);
         ListTag list = root.getList(RIVALS_KEY, Tag.TAG_COMPOUND);
         if (list.isEmpty()) return false;
@@ -790,6 +791,19 @@ public final class FighterMemoryManager {
             }
         }
         return false;
+    }
+
+    private static void discardLoadedDuplicateRecords(net.minecraft.server.MinecraftServer server) {
+        if (server == null) return;
+        java.util.Set<UUID> seen = new java.util.HashSet<>();
+        for (ServerLevel loadedLevel : server.getAllLevels()) {
+            for (var entity : loadedLevel.getAllEntities()) {
+                if (!(entity instanceof AmbientFighterEntity fighter) || !fighter.isAlive()) continue;
+                UUID recordId = fighter.getMemoryRecordId();
+                if (recordId == null) continue;
+                if (!seen.add(recordId)) fighter.discard();
+            }
+        }
     }
 
     /**

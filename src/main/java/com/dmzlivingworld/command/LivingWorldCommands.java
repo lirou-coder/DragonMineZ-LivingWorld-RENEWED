@@ -1517,6 +1517,7 @@ public final class LivingWorldCommands {
         AmbientFighterEntity fighter = AmbientFighterSpawner.spawnAt(level, pos, FighterAlignment.NEUTRAL,
                 FighterRank.TRAINED, FighterPersonality.CALM, race, style, player.getRandom());
         if (fighter == null) return 0;
+        fighter.seedCommandRecoverySupplies();
         player.displayClientMessage(Component.literal("[Living World] Spawned test fighter: ").withStyle(ChatFormatting.GOLD)
                 .append(Component.literal(fighter.getFighterName()).withStyle(ChatFormatting.WHITE))
                 .append(Component.literal(" • " + race.displayName()
@@ -1576,6 +1577,7 @@ public final class LivingWorldCommands {
         AmbientFighterEntity fighter = AmbientFighterSpawner.spawnAt(level, pos, alignment, rank,
                 personality, race, archetype, player.getRandom());
         if (fighter == null) return 0;
+        fighter.seedCommandRecoverySupplies();
         if (customName != null && !customName.isBlank()) fighter.setFighterName(customName.trim());
 
         player.displayClientMessage(Component.literal("[Living World] Summoned ").withStyle(ChatFormatting.GOLD)

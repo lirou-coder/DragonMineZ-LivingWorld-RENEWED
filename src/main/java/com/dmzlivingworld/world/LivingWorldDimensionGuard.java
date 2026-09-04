@@ -13,7 +13,8 @@ public final class LivingWorldDimensionGuard {
 
     @SubscribeEvent
     public static void onEntityTravel(EntityTravelToDimensionEvent event) {
-        if (!(event.getEntity() instanceof AmbientFighterEntity)) return;
+        if (!(event.getEntity() instanceof AmbientFighterEntity fighter)) return;
+        if (FighterAfterlifeManager.canUseNetherHell(fighter, event.getDimension())) return;
         if (!LivingWorldDimensions.isSupported(event.getDimension())) event.setCanceled(true);
     }
 }

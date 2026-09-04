@@ -2,8 +2,11 @@ package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -41,7 +44,6 @@ public final class FighterLegacyManager {
             if (victim.getPersistentData().contains("DMZLWNpcFusionTemp", Tag.TAG_COMPOUND)
                     && victim.getPersistentData().getCompound("DMZLWNpcFusionTemp").getBoolean("Active")) return;
             String killerName = attacker == null ? "" : attacker.getName().getString();
-            AmbientFighterEntity heir = FighterArsenalManager.inheritFromFallen(victim);
             int killerPower = 0;
             boolean killerIsPlayer = false;
             if (attacker instanceof AmbientFighterEntity other) {
@@ -56,13 +58,17 @@ public final class FighterLegacyManager {
                 FighterAftermathManager.beginLethalScene(victim, player);
             }
             victim.recordLegacyBattle(killerName.isBlank() ? "Unknown" : killerName, killerPower, false, true, killerIsPlayer);
+            if (!isPermanentDeath(victim, attacker)) {
+                notifyTemporaryDefeat(victim);
+                return;
+            }
+            FighterArsenalManager.inheritFromFallen(victim);
             FighterLegacyWorldData legacyWorld = FighterLegacyWorldData.get(level);
-            // A dead fighter must always leave a tombstone even if an older/unremembered instance
-            // died before a People record id had been attached. Archive() uses the same fallback.
             java.util.UUID deadRecordId = victim.getMemoryRecordId() != null ? victim.getMemoryRecordId() : victim.getUUID();
             legacyWorld.markDeadRecord(deadRecordId);
             if (!deadRecordId.equals(victim.getUUID())) legacyWorld.markDeadRecord(victim.getUUID());
             victim.getPersistentData().putBoolean("LWDeathArchived", true);
+            discardLiveCopies(level.getServer(), deadRecordId, victim);
             FighterNpcSocialManager.cancelFor(victim);
             FighterAmbientActivityManager.cancelFor(victim);
             victim.setAmbientPose(0);
@@ -75,6 +81,33 @@ public final class FighterLegacyManager {
         if (event.getEntity() instanceof ServerPlayer player && attacker instanceof AmbientFighterEntity fighter) {
             int playerPower = (int)Math.min(Integer.MAX_VALUE - 1L, Math.round(PlayerWorldManager.playerBattlePower(player)));
             fighter.recordLegacyBattle(player.getGameProfile().getName(), playerPower, true, false, true);
+        }
+    }
+
+    public static boolean isPermanentDeath(AmbientFighterEntity victim, Entity attacker) {
+        if (attacker instanceof AmbientFighterEntity killer && WorldMenaceManager.isWorldMenace(killer)) return true;
+        if (attacker instanceof ServerPlayer player && FactionRequestManager.causesPermanentDeathNotice(player, victim)) return true;
+        return false;
+    }
+
+    private static void notifyTemporaryDefeat(AmbientFighterEntity victim) {
+        if (!(victim.level() instanceof ServerLevel level)) return;
+        Component message = Component.literal("[LIVING WORLD] " + victim.getFighterName()
+                + " was heavily damaged, but will return soon").withStyle(ChatFormatting.YELLOW);
+        for (ServerPlayer player : level.players()) {
+            if (!player.isSpectator() && player.distanceToSqr(victim) <= 20.0D * 20.0D)
+                player.displayClientMessage(message, false);
+        }
+    }
+
+    private static void discardLiveCopies(MinecraftServer server, java.util.UUID recordId, AmbientFighterEntity original) {
+        if (server == null || recordId == null) return;
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getAllEntities()) {
+                if (!(entity instanceof AmbientFighterEntity fighter) || fighter == original || fighter.isDeadSoul()) continue;
+                java.util.UUID otherId = fighter.getMemoryRecordId() != null ? fighter.getMemoryRecordId() : fighter.getUUID();
+                if (recordId.equals(otherId)) fighter.discard();
+            }
         }
     }
 

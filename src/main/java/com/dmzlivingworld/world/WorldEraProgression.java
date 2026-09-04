@@ -15,6 +15,8 @@ import net.minecraftforge.fml.common.Mod;
 
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /** Dynamic, completion-only world progression over every configured non-Movies saga. */
@@ -32,10 +34,9 @@ public final class WorldEraProgression {
 
         // Starting a saga, or completing any intermediate quest, never changes world progression.
         Quest last = saga.getQuests().get(saga.getQuests().size() - 1);
-        if (last.getId() != quest.getId()) return;
-        int number = configuredEraNumber(saga.getId());
-        if (number > 0) WorldEraData.get(level).advanceTo(number, saga.getId(), saga.getName(),
-                WorldPowerScaler.lastKillReference(saga), level.getGameTime());
+        if (!java.util.Objects.equals(last.getId(), quest.getId())) return;
+        redefineFromCurrentPlayers(level.getServer().getPlayerList().getPlayers(), WorldEraData.get(level),
+            saga, event.getPlayer());
     }
 
     /** Recovers the furthest fully completed configured saga, including custom sagas. */
@@ -43,8 +44,7 @@ public final class WorldEraProgression {
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)
                 || !(player.level() instanceof ServerLevel level)) return;
-        player.getCapability(StatsCapability.INSTANCE).ifPresent(stats ->
-                recoverFromPlayer(WorldEraData.get(level), stats.getPlayerQuestData(), level.getGameTime()));
+        redefineFromCurrentPlayers(level.getServer().getPlayerList().getPlayers(), WorldEraData.get(level));
     }
 
     /**
@@ -75,29 +75,47 @@ public final class WorldEraProgression {
 
     private static void redefineFromCurrentPlayers(java.util.List<net.minecraft.server.level.ServerPlayer> players,
                                                    WorldEraData data) {
-        int bestNumber = 0;
-        Saga bestSaga = null;
-        int number = 0;
-        for (Saga saga : QuestRegistry.getAllSagas().values()) {
-            if (isMovies(saga)) continue;
-            number++;
-            boolean completed = players.stream().anyMatch(player -> player.getCapability(StatsCapability.INSTANCE)
-                    .map(stats -> isSagaCompleted(stats.getPlayerQuestData(), saga)).orElse(false));
-            if (completed && number > bestNumber) { bestNumber = number; bestSaga = saga; }
-        }
-        data.redefine(bestNumber, bestSaga == null ? "" : bestSaga.getId(),
-                bestSaga == null ? 0.0D : WorldPowerScaler.lastKillReference(bestSaga));
+        redefineFromCurrentPlayers(players, data, null, null);
     }
 
-    private static void recoverFromPlayer(WorldEraData data, PlayerQuestData quests, long now) {
-        if (quests == null) return;
-        int number = 0;
+    private static void redefineFromCurrentPlayers(java.util.List<net.minecraft.server.level.ServerPlayer> players,
+                                                   WorldEraData data, Saga completingSaga,
+                                                   net.minecraft.server.level.ServerPlayer completingPlayer) {
+        double bestReference = -1.0D;
+        int bestDepth = 0;
+        Saga bestSaga = null;
         for (Saga saga : QuestRegistry.getAllSagas().values()) {
             if (isMovies(saga)) continue;
-            number++;
-            if (isSagaCompleted(quests, saga)) data.advanceTo(number, saga.getId(), saga.getName(),
-                    WorldPowerScaler.lastKillReference(saga), now);
+            boolean completed = saga == completingSaga && completingPlayer != null
+                    || players.stream().anyMatch(player -> player.getCapability(StatsCapability.INSTANCE)
+                    .map(stats -> isSagaCompleted(stats.getPlayerQuestData(), saga)).orElse(false));
+            if (!completed) continue;
+
+            double reference = WorldPowerScaler.lastKillReference(saga);
+            if (!Double.isFinite(reference) || reference <= 0.0D) continue;
+            int depth = sagaDepth(saga);
+            if (reference > bestReference || (Double.compare(reference, bestReference) == 0 && depth > bestDepth)) {
+                bestReference = reference;
+                bestDepth = depth;
+                bestSaga = saga;
+            }
         }
+        data.redefine(bestDepth, bestSaga == null ? "" : bestSaga.getId(), bestReference);
+    }
+
+    private static int sagaDepth(Saga saga) {
+        int depth = 1;
+        Set<String> visited = new HashSet<>();
+        Saga current = saga;
+        while (current != null && current.getRequirements() != null) {
+            String previousId = current.getRequirements().previousSagaId();
+            if (previousId == null || previousId.isBlank() || !visited.add(previousId)) break;
+            Saga previous = QuestRegistry.getSaga(previousId);
+            if (previous == null || isMovies(previous)) break;
+            depth++;
+            current = previous;
+        }
+        return depth;
     }
 
     private static boolean isSagaCompleted(PlayerQuestData quests, Saga saga) {

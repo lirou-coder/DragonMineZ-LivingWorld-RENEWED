@@ -2555,6 +2555,31 @@ public final class FactionRequestManager {
                 || FactionRequestMissionManager.rosterContains(req, "PatrolContact", fighter.getUUID());
     }
 
+    public static boolean causesPermanentDeathNotice(ServerPlayer player, AmbientFighterEntity victim) {
+        if (player == null || victim == null || !victim.isFactionMember()) return false;
+        CompoundTag req = request(player);
+        String activeType = req.getString("Type");
+        if ("MERCENARY_INTEL".equals(activeType)) {
+            return victim.getFactionId().equals(req.getString("Target"))
+                    && FactionRequestMissionManager.rosterContains(req, "IntelObservers", victim.getUUID());
+        }
+        if ("RECON".equals(activeType)) {
+            return victim.getFactionId().equals(req.getString("Target"))
+                    && FactionRequestMissionManager.rosterContains(req, "ReconObservers", victim.getUUID());
+        }
+        if ("WAR_READINESS".equals(activeType) && Math.max(1, req.getInt("SeriesStage")) == 2) {
+            return victim.getFactionId().equals(req.getString("Target"))
+                    && FactionRequestMissionManager.rosterContains(req, "ReadinessObservers", victim.getUUID());
+        }
+        if ("MERCENARY_SABOTAGE".equals(activeType)) {
+            return victim.getFactionId().equals(req.getString("Target"))
+                    && FactionRequestMissionManager.rosterContains(req, "SabotageSecurity", victim.getUUID());
+        }
+        return "MERCENARY_HUNT".equals(activeType) && req.hasUUID("TargetEntity")
+                && victim.getUUID().equals(req.getUUID("TargetEntity"))
+                && victim.getFactionId().equals(req.getString("Target"));
+    }
+
     public static boolean isCaptureTarget(ServerPlayer player, AmbientFighterEntity fighter) {
         return false;
     }

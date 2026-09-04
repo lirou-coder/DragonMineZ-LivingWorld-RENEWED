@@ -268,6 +268,7 @@ public final class FighterLifeJoinManager {
         if (player == null || fighter == null) return;
         FighterMemoryManager.strengthenRelationship(player, fighter, 2,
                 FighterRelationshipManager.BondEvent.TRAVEL, outcome);
+        PlayerAlignmentManager.rewardGoodAct(player);
         fighter.recordLegacyEvent(outcome + " with " + player.getGameProfile().getName());
         FighterMemoryManager.refreshLoadedProfile(fighter);
         message(player, "You stayed with " + fighter.getFighterName() + " and saw it through.", ChatFormatting.GOLD);

@@ -225,6 +225,7 @@ public final class AmbientFighterSpawner {
         // Dead-record tombstones are authoritative across every materialization path, including
         // debug recurrence and companion recovery. A historical person must never be recreated.
         if (recordId != null && FighterLegacyWorldData.get(level).isDeadRecord(recordId)) return null;
+        if (recordId != null && isMemoryRecordLoaded(player, recordId)) return null;
         int min = closeForDebug ? 8 : 0;
         int max = closeForDebug ? 14 : 18;
         BlockPos center = closeForDebug || preferred == null ? player.blockPosition() : preferred;
@@ -263,6 +264,7 @@ public final class AmbientFighterSpawner {
         if (player == null || life == null || !(player.level() instanceof ServerLevel level)
                 || !LivingWorldDimensions.isSupported(level)) return null;
         if (recordId != null && FighterLegacyWorldData.get(level).isDeadRecord(recordId)) return null;
+        if (recordId != null && isMemoryRecordLoaded(player, recordId)) return null;
         // Instant Transmission is an intentional lock-on, so synchronously load only the destination
         // chunk required for that action. Ambient simulation still never force-loads remote chunks.
         level.getChunkAt(life);
@@ -374,5 +376,16 @@ public final class AmbientFighterSpawner {
         if (GravityChamberSafety.isInsideActiveChamber(level, pos)) return false;
         if (!level.getFluidState(pos).isEmpty() || !level.getFluidState(pos.above()).isEmpty()) return false;
         return level.getBlockState(pos).isAir() && level.getBlockState(pos.above()).isAir();
+    }
+
+    private static boolean isMemoryRecordLoaded(ServerPlayer player, UUID recordId) {
+        if (player == null || recordId == null || player.getServer() == null) return false;
+        for (ServerLevel level : player.getServer().getAllLevels()) {
+            for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
+                if (entity instanceof AmbientFighterEntity fighter && fighter.isAlive()
+                        && recordId.equals(fighter.getMemoryRecordId())) return true;
+            }
+        }
+        return false;
     }
 }

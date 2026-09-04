@@ -252,6 +252,7 @@ public final class FactionManager {
     public static void onDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof AmbientFighterEntity fighter) || !fighter.isFactionMember()) return;
         if (!(fighter.level() instanceof ServerLevel level)) return;
+        if (!FighterLegacyManager.isPermanentDeath(fighter, event.getSource().getEntity())) return;
         FactionWorldData data = FactionWorldData.get(level);
         WorldFaction faction = byId(level, fighter.getFactionId());
         if (faction == null) return;

@@ -180,7 +180,7 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
         // DMZ names these configured Frost Demon options horns1..horns5. Every Frost model,
         // including transformed models, carries the same selectable top-level horn set.
         for (int i = 1; i <= 5; i++)
-            setHiddenIfPresent("horns" + i, entity.getRace() != FighterRace.FROST_DEMON || i != entity.getHeadBone() + 1);
+            setHiddenIfPresent("horns" + i, !entity.isFrostDemonPrimitive() || i != entity.getHeadBone() + 1);
 
         resetDancePoseAfterExit(entity);
         resetHornPoseAfterExit(entity);

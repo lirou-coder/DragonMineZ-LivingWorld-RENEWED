@@ -256,10 +256,18 @@ public final class LWFusionManager {
         session.putString("PartnerName", partnerName);
         session.putString("FusionName", fusionName);
         session.putString("Type", TYPE_METAMORU);
-        session.putBoolean("PartnerInvisible", partner.isInvisible());
-        session.putBoolean("PartnerInvulnerable", partner.isInvulnerable());
-        session.putBoolean("PartnerSilent", partner.isSilent());
-        if (partner instanceof Mob mob) session.putBoolean("PartnerNoAI", mob.isNoAi());
+        CompoundTag partnerBackup = partner.getPersistentData().contains(PARTNER_ROOT)
+                ? partner.getPersistentData().getCompound(PARTNER_ROOT) : null;
+        session.putBoolean("PartnerInvisible", partnerBackup != null
+                ? partnerBackup.getBoolean("PartnerInvisible") : partner.isInvisible());
+        session.putBoolean("PartnerInvulnerable", partnerBackup != null
+                ? partnerBackup.getBoolean("PartnerInvulnerable") : partner.isInvulnerable());
+        session.putBoolean("PartnerSilent", partnerBackup != null
+                ? partnerBackup.getBoolean("PartnerSilent") : partner.isSilent());
+        if (partner instanceof Mob mob) {
+            session.putBoolean("PartnerNoAI", partnerBackup != null
+                    ? partnerBackup.getBoolean("PartnerNoAI") : mob.isNoAi());
+        }
         player.getPersistentData().put(ROOT, session);
 
         hidePartner(player, partner);
@@ -502,7 +510,12 @@ public final class LWFusionManager {
     public static void forceEnd(ServerPlayer player, StatsData stats) {
         if (player == null) return;
         if (isDancePending(player)) cancelPlayerDance(player);
-        if (!isActive(player) || stats == null) return;
+        if (!isActive(player)) return;
+        if (stats == null) {
+            restorePartner(player, session(player), true);
+            clearSession(player);
+            return;
+        }
         finish(player, stats, session(player), true);
     }
 
@@ -606,16 +619,16 @@ public final class LWFusionManager {
     private static void restorePartnerState(LivingEntity partner, CompoundTag backup) {
         if (partner == null || backup == null) return;
         partner.stopRiding();
-        partner.setInvisible(backup.getBoolean("PartnerInvisible"));
-        partner.setInvulnerable(backup.getBoolean("PartnerInvulnerable"));
-        partner.setSilent(backup.getBoolean("PartnerSilent"));
+        partner.setInvisible(backup.contains("PartnerInvisible") && backup.getBoolean("PartnerInvisible"));
+        partner.setInvulnerable(backup.contains("PartnerInvulnerable") && backup.getBoolean("PartnerInvulnerable"));
+        partner.setSilent(backup.contains("PartnerSilent") && backup.getBoolean("PartnerSilent"));
         if (backup.contains("PartnerFighterName") && LivingWorldCompat.isLivingWorldFighter(partner)) {
             LivingWorldCompat.setFighterName(partner, backup.getString("PartnerFighterName"));
         }
         partner.getPersistentData().remove("DMZLWFusionHost");
         partner.getPersistentData().remove(PARTNER_ROOT);
         if (partner instanceof Mob mob) {
-            mob.setNoAi(backup.getBoolean("PartnerNoAI"));
+            mob.setNoAi(backup.contains("PartnerNoAI") && backup.getBoolean("PartnerNoAI"));
             mob.setTarget(null);
             mob.getNavigation().stop();
         }

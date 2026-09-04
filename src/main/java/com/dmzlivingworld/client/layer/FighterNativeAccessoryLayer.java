@@ -52,8 +52,7 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
             renderMajinHeadParts(poseStack, fighter, buffers, partialTick, packedLight);
             buffers.getBuffer(renderType);
         }
-        if ("head".equals(playerBone.getName())
-                && fighter.getRace() == com.dmzlivingworld.entity.FighterRace.FROST_DEMON) {
+        if ("head".equals(playerBone.getName()) && fighter.isFrostDemonPrimitive()) {
             renderFrostDemonHorns(poseStack, fighter, buffers, partialTick, packedLight);
             buffers.getBuffer(renderType);
         }
@@ -162,8 +161,10 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
                                     MultiBufferSource buffers, float partialTick, int packedLight,
                                     float[] color) {
         parts.getBone(boneName).ifPresent(part -> {
+            part.setHidden(false);
+            part.setChildrenHidden(false);
             syncTargetBoneAndParents(part, body);
-            RenderType type = RenderType.entityCutoutNoCull(RACE_PARTS_TEXTURE);
+            RenderType type = RenderType.entityTranslucent(RACE_PARTS_TEXTURE);
             VertexConsumer consumer = buffers.getBuffer(type);
             getRenderer().renderRecursively(poseStack, fighter, part, type, buffers, consumer, true,
                     partialTick, packedLight, OverlayTexture.NO_OVERLAY,

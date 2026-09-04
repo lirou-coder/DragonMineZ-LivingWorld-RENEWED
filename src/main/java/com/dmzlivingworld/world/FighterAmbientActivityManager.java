@@ -119,6 +119,7 @@ public final class FighterAmbientActivityManager {
         boolean actualStarted;
         long actualStartedAt;
         boolean lying;
+        float sleepingYaw;
         long nextBeat;
         // Empty-hand training deliberately crosses a real STOP -> START boundary between
         // native DMZ combo animations. Restarting BASIC in the same tick as interruptCombo()
@@ -180,6 +181,7 @@ public final class FighterAmbientActivityManager {
             this.stand = stand == null ? fighter.blockPosition() : stand.immutable();
             this.focus = focus == null ? this.stand : focus.immutable();
             this.started = now;
+            this.sleepingYaw = fighter.getYRot();
             // Ordinary-life activities should read as actual activities rather than brief emotes.
             // Keep short observational interactions short, while training/rest/scouting can occupy
             // a believable stretch of an NPC's day. Mood still multiplies these established ranges.
@@ -434,10 +436,7 @@ public final class FighterAmbientActivityManager {
                     finish(fighter);
                     return;
                 }
-                fighter.setAmbientPose(22);
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
-                fighter.setSprinting(false);
-                fighter.setDeltaMovement(0.0D, 0.0D, 0.0D);
+                holdSleepingPose(fighter, session);
             }
             case TREE -> {
                 fighter.setPose(Pose.STANDING);
@@ -529,8 +528,11 @@ public final class FighterAmbientActivityManager {
                 session.lying = ReactiveWorldManager.mood(fighter) != ReactiveWorldManager.Mood.SOMBER
                         && ReactiveWorldManager.mood(fighter) != ReactiveWorldManager.Mood.WEARY
                         && fighter.getRandom().nextFloat() < 0.62F && fighter.onGround();
-                fighter.setPose(Pose.STANDING);
-                fighter.setAmbientPose(session.lying ? 2 : 1);
+                if (session.lying) holdSleepingPose(fighter, session);
+                else {
+                    fighter.setPose(Pose.STANDING);
+                    fighter.setAmbientPose(1);
+                }
                 fighter.setDeltaMovement(0.0D, 0.0D, 0.0D);
                 fighter.setXRot(session.lying ? 0.0F : 85.0F);
                 fighter.xRotO = fighter.getXRot();
@@ -587,9 +589,7 @@ public final class FighterAmbientActivityManager {
                 }
             }
             case NAP -> {
-                fighter.setAmbientPose(22);
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
-                fighter.setSprinting(false);
+                holdSleepingPose(fighter, session);
                 // Anchor the settled nap exactly where it began. Native mob movement/collision
                 // can otherwise advance a lying fighter a few pixels per tick even with navigation stopped.
                 if (Math.abs(fighter.getX() - session.settledAnchorX) > 0.003D
@@ -771,8 +771,11 @@ public final class FighterAmbientActivityManager {
                 }
             }
             case STARGAZING -> {
-                fighter.setPose(Pose.STANDING);
-                fighter.setAmbientPose(session.lying ? 2 : 1);
+                if (session.lying) holdSleepingPose(fighter, session);
+                else {
+                    fighter.setPose(Pose.STANDING);
+                    fighter.setAmbientPose(1);
+                }
                 fighter.setDeltaMovement(0.0D, 0.0D, 0.0D);
                 // Do not hand the head back to LookControl here. The renderer/model own a fixed skyward
                 // stargazing pose, which avoids the previous left/right pitch wobble.
@@ -2433,8 +2436,28 @@ public final class FighterAmbientActivityManager {
 
     private static void finishIfPresent(AmbientFighterEntity fighter) { if (fighter != null && SESSIONS.containsKey(fighter.getUUID())) finish(fighter); }
 
+    /** Uses vanilla's real sleeping pose and freezes every look axis for its whole lifetime. */
+    private static void holdSleepingPose(AmbientFighterEntity fighter, Session session) {
+        fighter.setLivingWorldSleepingPoseLock(true, session.sleepingYaw);
+        fighter.getNavigation().stop();
+        fighter.setPose(Pose.SLEEPING);
+        fighter.setAmbientPose(0);
+        fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+        fighter.setSprinting(false);
+        fighter.setXRot(0.0F);
+        fighter.xRotO = 0.0F;
+        fighter.setYRot(session.sleepingYaw);
+        fighter.yRotO = session.sleepingYaw;
+        fighter.yBodyRot = session.sleepingYaw;
+        fighter.yBodyRotO = session.sleepingYaw;
+        fighter.setYHeadRot(session.sleepingYaw);
+        fighter.yHeadRotO = session.sleepingYaw;
+        fighter.setDeltaMovement(0.0D, 0.0D, 0.0D);
+    }
+
     private static void finish(AmbientFighterEntity fighter) {
         Session session = SESSIONS.remove(fighter.getUUID());
+        fighter.setLivingWorldSleepingPoseLock(false, fighter.getYRot());
         if (session != null) {
             removeFishingHook(fighter);
             if (session.actualStarted) {
