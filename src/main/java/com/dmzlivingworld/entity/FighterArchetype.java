@@ -48,4 +48,8 @@ public enum FighterArchetype {
         if (value < 81) return SPEEDSTER;
         return GUARDIAN;
     }
+
+    public static boolean isPhysical(FighterArchetype type) {
+        return type != KI_SPECIALIST;
+    }
 }

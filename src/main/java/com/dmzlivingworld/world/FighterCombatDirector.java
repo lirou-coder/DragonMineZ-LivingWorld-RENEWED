@@ -149,7 +149,7 @@ public final class FighterCombatDirector {
             }
         }
 
-        if (LivingWorldConfig.npcKiMode() != 2) {
+        if (LivingWorldConfig.npcKiMode() != 2 && fighter.getRace() != com.dmzlivingworld.entity.FighterRace.ZAARAKIN) {
             configureKiIdentity(fighter, rank, style, variant);
             FighterTechniqueManager.applyLearnedTechniques(fighter);
         }
@@ -291,6 +291,11 @@ public final class FighterCombatDirector {
                 case 1 -> DBSagasEntity.KiSkillType.KAMEHAMEHA;
                 default -> DBSagasEntity.KiSkillType.MASENKO;
             };
+            case ZAARAKIN, ANTORANIAN -> switch (variant % 3) {
+                case 0 -> DBSagasEntity.KiSkillType.KAMEHAMEHA;
+                case 1 -> DBSagasEntity.KiSkillType.MASENKO;
+                default -> DBSagasEntity.KiSkillType.GENERIC_KI_WAVE;
+            };
         };
     }
 
@@ -302,6 +307,7 @@ public final class FighterCombatDirector {
             case MAJIN -> (variant & 1) == 0 ? DBSagasEntity.KiSkillType.KI_EXPLOSION : DBSagasEntity.KiSkillType.KAMEHAMEHA;
             case FROST_DEMON -> DBSagasEntity.KiSkillType.DEATH_BALL;
             case BIO_ANDROID -> DBSagasEntity.KiSkillType.TRIPLE_LASER;
+            case ZAARAKIN, ANTORANIAN -> DBSagasEntity.KiSkillType.KI_SMALL;
         };
     }
 

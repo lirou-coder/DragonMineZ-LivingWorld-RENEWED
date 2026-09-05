@@ -689,6 +689,8 @@ public final class FighterNpcSocialManager {
                 case MAJIN -> 0.22F;
                 case FROST_DEMON -> 0.25F;
                 case BIO_ANDROID -> 0.24F;
+                case ZAARAKIN -> 0.28F;
+                case ANTORANIAN -> 0.22F;
             };
             if (!hasRaceKinshipSeen(a, b)) raceChance += 0.18F;
             if (a.getRandom().nextFloat() < raceChance) return Topic.RACE_KINSHIP;
@@ -822,6 +824,14 @@ public final class FighterNpcSocialManager {
                         beats.add(new Beat(a.getUUID(), "Your energy pattern is like mine. Another Bio-Android.", Tone.NEUTRAL));
                         beats.add(new Beat(b.getUUID(), "I noticed. Similar origin doesn't mean identical purpose, though.", Tone.NEUTRAL));
                         beats.add(new Beat(a.getUUID(), "No. But it gives us something real to compare.", Tone.WARM));
+                    }
+                    case ZAARAKIN -> {
+                        beats.add(new Beat(a.getUUID(), "You're Zaarakin too. Your fighting spirit is hard to miss.", Tone.NEUTRAL));
+                        beats.add(new Beat(b.getUUID(), "Then you know why I prefer a close fight.", Tone.WARM));
+                    }
+                    case ANTORANIAN -> {
+                        beats.add(new Beat(a.getUUID(), "Another Antoranian. Your presence feels familiar.", Tone.NEUTRAL));
+                        beats.add(new Beat(b.getUUID(), "Familiarity is a good reason to talk.", Tone.WARM));
                     }
                     case HUMAN -> {
                         beats.add(new Beat(a.getUUID(), "Funny. With everyone around here, it's nice meeting another ordinary Human fighter.", Tone.WARM));

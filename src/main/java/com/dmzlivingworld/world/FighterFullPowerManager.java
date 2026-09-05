@@ -53,6 +53,7 @@ public final class FighterFullPowerManager {
         fighter.getPersistentData().putLong(UNTIL, now + DURATION);
         fighter.getPersistentData().putBoolean(FORM_REQUESTED, false);
         fighter.getPersistentData().putBoolean(AmbientFighterEntity.TEMPORARY_AWAKENING, true);
+        fighter.beginAwakening();
         fighter.setKiCharge(true);
         fighter.flareAura((int) DURATION);
         player.displayClientMessage(Component.literal("[Living World] " + fighter.getFighterName() + " begins bringing out their full power."), false);
@@ -85,8 +86,6 @@ public final class FighterFullPowerManager {
             return false;
         }
 
-        long started = data.getLong(START);
-        long elapsed = Math.max(0L, now - started);
         fighter.getNavigation().stop();
         fighter.setTarget(null);
         fighter.setAggressive(false);
@@ -95,16 +94,6 @@ public final class FighterFullPowerManager {
         fighter.setPose(Pose.STANDING);
         fighter.setAmbientPose(0);
         fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
-
-        // The first few seconds visibly charge. After that the form/aura itself carries the scene.
-        if (elapsed < 70L && !fighter.isRacialFormActive()) fighter.setKiCharge(true);
-        else fighter.setKiCharge(false);
-
-        if (elapsed >= 45L && fighter.getRacialSkillLevel() > 0
-                && !data.getBoolean(FORM_REQUESTED) && !fighter.isAwakening() && !fighter.isRacialFormActive()) {
-            data.putBoolean(FORM_REQUESTED, true);
-            fighter.beginAwakening();
-        }
 
         return true;
     }

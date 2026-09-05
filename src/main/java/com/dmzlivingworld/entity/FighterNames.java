@@ -42,6 +42,7 @@ public final class FighterNames {
             case MAJIN -> female ? MAJIN_FEMALE : MAJIN_MALE;
             case FROST_DEMON -> FROST;
             case BIO_ANDROID -> BIO;
+            case ZAARAKIN, ANTORANIAN -> female ? HUMAN_FEMALE : HUMAN_MALE;
         };
         return pool[random.nextInt(pool.length)];
     }

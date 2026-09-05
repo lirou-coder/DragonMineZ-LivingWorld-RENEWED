@@ -3,6 +3,8 @@ package com.dmzlivingworld.client;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterRace;
 import com.dmzlivingworld.world.WorldMenaceManager;
+import com.dmzlivingworld.world.SairensRaceCompat;
+import com.dragonminez.common.config.ConfigManager;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
 import software.bernie.geckolib.constant.DataTickets;
@@ -101,12 +103,20 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
             // player form renderer. Living World keeps native base geometry rather than
             // inventing a replacement model for those aliases.
         }
+        if (entity.getRace() == FighterRace.BIO_ANDROID && SairensRaceCompat.isBioAndroidHumanModel()) {
+            return entity.isFemale() ? MAJIN_SLIM : HUMAN;
+        }
+        if (SairensRaceCompat.isLoaded() && entity.getRace().isSairensRace()) {
+            return entity.isFemale() ? dmz("geo/entity/races/majin_slim_notail.geo.json")
+                    : dmz("geo/entity/races/human_notail.geo.json");
+        }
         return switch (entity.getRace()) {
-            case HUMAN, SAIYAN -> entity.isFemale() ? HUMAN_FEMALE : HUMAN;
+            case HUMAN, SAIYAN -> entity.isFemale() ? MAJIN_SLIM : HUMAN;
             case NAMEKIAN -> HUMAN;
             case MAJIN -> entity.isFemale() ? MAJIN_SLIM : MAJIN;
             case FROST_DEMON -> FROST;
             case BIO_ANDROID -> BIO;
+            case ZAARAKIN, ANTORANIAN -> HUMAN;
         };
     }
 

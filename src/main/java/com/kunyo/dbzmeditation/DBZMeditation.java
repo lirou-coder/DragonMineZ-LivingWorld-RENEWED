@@ -39,6 +39,7 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
@@ -183,9 +184,11 @@ public final class DBZMeditation {
         ModLoadingContext.get().registerConfig(
             ModConfig.Type.CLIENT, MeditationConfig.CLIENT_SPEC, "dmzlivingworld-meditation-client.toml"
         );
-        MeditationNetwork.register();
-        MinecraftForge.EVENT_BUS.register(new DBZMeditation());
         PARTICLE_TYPES.register(modEventBus);
+        modEventBus.addListener((FMLCommonSetupEvent event) -> event.enqueueWork(() -> {
+            MeditationNetwork.register();
+            MinecraftForge.EVENT_BUS.register(new DBZMeditation());
+        }));
     }
 
     private DBZMeditation() {}

@@ -24,7 +24,7 @@ public final class FighterTechniqueManager {
     private FighterTechniqueManager() {}
 
     public static void applyLearnedTechniques(AmbientFighterEntity fighter) {
-        if (fighter == null) return;
+        if (fighter == null || fighter.getRace() == com.dmzlivingworld.entity.FighterRace.ZAARAKIN) return;
         ListTag list = cleanList(fighter.getLegacyData());
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);
@@ -41,7 +41,8 @@ public final class FighterTechniqueManager {
 
     /** Learn one real technique that another fighter currently knows. This is generic observation/copying, not mentorship. */
     public static boolean tryLearnFrom(AmbientFighterEntity learner, AmbientFighterEntity source, String reason) {
-        if (learner == null || source == null || learner == source || learner.level().isClientSide) return false;
+        if (learner == null || source == null || learner == source || learner.level().isClientSide
+            || learner.getRace() == com.dmzlivingworld.entity.FighterRace.ZAARAKIN) return false;
         ListTag known = cleanList(learner.getLegacyData());
         if (known.size() >= MAX_LEARNED) return false;
 
@@ -81,7 +82,8 @@ public final class FighterTechniqueManager {
     }
 
     public static int learnedCount(AmbientFighterEntity fighter) {
-        return fighter == null ? 0 : cleanList(fighter.getLegacyData()).size();
+        return fighter == null || fighter.getRace() == com.dmzlivingworld.entity.FighterRace.ZAARAKIN
+            ? 0 : cleanList(fighter.getLegacyData()).size();
     }
 
     public static String summary(AmbientFighterEntity fighter) {

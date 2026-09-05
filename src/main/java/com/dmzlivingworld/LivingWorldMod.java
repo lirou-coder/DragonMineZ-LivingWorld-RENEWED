@@ -14,6 +14,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 
 /**
  * DragonMine Z: Living World — roaming encounter branch.
@@ -32,10 +33,16 @@ public final class LivingWorldMod {
         LWKiTrainingParticles.TYPES.register(modBus);
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, LivingWorldConfig.SPEC, MOD_ID + "-server.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, LivingWorldClientConfig.SPEC, MOD_ID + "-client.toml");
-        LWNetwork.register();
-        FusionAnimationNetwork.register();
         DBZMeditation.init(modBus);
+        modBus.addListener(this::commonSetup);
         modBus.addListener(this::registerAttributes);
+    }
+
+    private void commonSetup(FMLCommonSetupEvent event) {
+        event.enqueueWork(() -> {
+            LWNetwork.register();
+            FusionAnimationNetwork.register();
+        });
     }
 
     private void registerAttributes(EntityAttributeCreationEvent event) {

@@ -173,7 +173,8 @@ public final class FighterGoalManager {
         List<Option> options = new ArrayList<>();
 
         if (!fighter.getRivalName().isBlank()) options.add(new Option("DEFEAT_RIVAL", 24, fighter.getRivalName()));
-        if (FighterTechniqueManager.learnedCount(fighter) < 4) {
+        if (fighter.getRace() != com.dmzlivingworld.entity.FighterRace.ZAARAKIN
+            && FighterTechniqueManager.learnedCount(fighter) < 4) {
             options.add(new Option("LEARN_TECHNIQUE", 9, ""));
         }
         boolean lacksWeapon = !FighterArsenalManager.hasPreferredWeapon(fighter);
@@ -182,7 +183,7 @@ public final class FighterGoalManager {
         }
         if (!fighter.hasFlightUnlocked() && fighter.getRank() != FighterRank.ROOKIE) options.add(new Option("LEARN_FLIGHT", 13, ""));
         if (fighter.getRank() != FighterRank.ROOKIE
-                && fighter.getRacialSkillLevel() < RacialFormProfile.maxSkillLevel(fighter.getRace())) {
+                && fighter.getRacialSkillLevel() < NpcFormConfigBridge.maxSkillLevel(fighter.getRace())) {
             options.add(new Option("ADVANCE_RACIAL", 13, ""));
         }
         options.add(new Option("WIN_FIGHTS", fighter.getRank() == FighterRank.VETERAN ? 18 : 13, ""));

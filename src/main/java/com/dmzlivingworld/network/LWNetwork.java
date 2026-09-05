@@ -11,7 +11,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 
 /** Tiny S2C channel used only for presentation snapshots. Simulation remains server authoritative. */
 public final class LWNetwork {
-    private static final String PROTOCOL = "38.4";
+        private static final String PROTOCOL = "38.5";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(LivingWorldMod.MOD_ID, "main"),
             () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);

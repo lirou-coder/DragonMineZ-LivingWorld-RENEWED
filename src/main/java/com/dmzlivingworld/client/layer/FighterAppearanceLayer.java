@@ -3,7 +3,9 @@ package com.dmzlivingworld.client.layer;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.RedRibbonExperimentManager;
+import com.dmzlivingworld.world.SairensRaceCompat;
 import com.dragonminez.client.util.ColorUtils;
+import com.dragonminez.common.config.ConfigManager;
 import com.dragonminez.client.render.util.ModRenderTypes;
 import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;
@@ -70,7 +72,13 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
             case NAMEKIAN -> renderNamekian(poseStack, entity, bakedModel, bufferSource, partialTick, packedLight, packedOverlay);
             case MAJIN -> renderMajin(poseStack, entity, bakedModel, bufferSource, partialTick, packedLight, packedOverlay);
             case FROST_DEMON -> renderFrost(poseStack, entity, bakedModel, bufferSource, partialTick, packedLight, packedOverlay);
-            case BIO_ANDROID -> renderBio(poseStack, entity, bakedModel, bufferSource, partialTick, packedLight, packedOverlay);
+            case BIO_ANDROID -> {
+                if (SairensRaceCompat.isBioAndroidHumanModel())
+                    renderHumanSaiyan(poseStack, entity, bakedModel, bufferSource, partialTick, packedLight, packedOverlay);
+                else renderBio(poseStack, entity, bakedModel, bufferSource, partialTick, packedLight, packedOverlay);
+            }
+            case ZAARAKIN -> renderSairensHumanRace(poseStack, entity, bakedModel, bufferSource, "zaarakin", 13, partialTick, packedLight, packedOverlay);
+            case ANTORANIAN -> renderSairensHumanRace(poseStack, entity, bakedModel, bufferSource, "antoranian", 8, partialTick, packedLight, packedOverlay);
         }
     }
 
@@ -78,7 +86,9 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
                                    MultiBufferSource buffers, float pt, int light, int overlay) {
         // Never let a stale/incorrect dispatch paint a Human face over another race.
         if (e.getRace() != com.dmzlivingworld.entity.FighterRace.HUMAN
-                && e.getRace() != com.dmzlivingworld.entity.FighterRace.SAIYAN) return;
+            && e.getRace() != com.dmzlivingworld.entity.FighterRace.SAIYAN
+            && !(e.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID
+            && SairensRaceCompat.isBioAndroidHumanModel())) return;
         float[] body = rgb(e.getBodyColor());
         float[] hair = rgb(e.getHairColor());
         float[] eye1 = rgb(e.getEye1Color());
@@ -88,6 +98,9 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         layer(model, pose, buffers, e,
                 dmz("textures/entity/races/humansaiyan/bodytype_" + gender + "_" + e.getBodyType() + ".png"),
                 body, pt, light, overlay);
+        if (e.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID && SairensRaceCompat.isBioAndroidHumanModel()) {
+            layer(model, pose, buffers, e, dmz("textures/entity/races/" + gender + "_android.png"), WHITE, pt, light, overlay);
+        }
 
         // DMZ's player skin layer paints this scalp texture independently from the
         // strand geometry. Preset id 5 is the native bald option and deliberately
@@ -273,6 +286,35 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         layer(bioModel, pose, buffers, e, dmz(root + "faces/" + phase + "_eye_layer1.png"), rgb(e.getEye1Color()), pt, light, overlay);
     }
 
+    private void renderSairensHumanRace(PoseStack pose, AmbientFighterEntity e, BakedGeoModel model,
+                                        MultiBufferSource buffers, String raceRoot, int eyeCount,
+                                        float pt, int light, int overlay) {
+        if (!SairensRaceCompat.isLoaded()) return;
+        String gender = e.isFemale() ? "female" : "male";
+        int bodyType = Math.max(1, Math.min(2, e.getBodyType()));
+        float[] body = rgb(e.getBodyColor());
+        float[] body2 = rgb(e.getBodyColor2());
+        float[] body3 = rgb(e.getBodyColor3());
+        layer(model, pose, buffers, e, dmz("textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_" + bodyType + ".png"), body, pt, light, overlay);
+        if (shouldRenderHumanSaiyanHairBase(e)) {
+            layer(model, pose, buffers, e, dmz("textures/entity/races/hair_base.png"), rgb(e.getHairColor()), pt, light, overlay);
+        }
+        layer(model, pose, buffers, e, dmz("textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_" + bodyType + "_layer2.png"), body2, pt, light, overlay);
+        if ("zaarakin".equals(raceRoot)) {
+            layer(model, pose, buffers, e, dmz("textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_" + bodyType + "_layer3.png"), body3, pt, light, overlay);
+        }
+        String face = "textures/entity/races/" + raceRoot + "/faces/" + raceRoot + "_eye_" + Math.floorMod(e.getEyesType(), eyeCount) + "_";
+        layer(model, pose, buffers, e, dmz(face + "0.png"), WHITE, pt, light, overlay);
+        layer(model, pose, buffers, e, dmz(face + "1.png"), rgb(e.getEye1Color()), pt, light, overlay);
+        layer(model, pose, buffers, e, dmz(face + "2.png"), rgb(e.getEye2Color()), pt, light, overlay);
+        layer(model, pose, buffers, e, dmz(face + "3.png"), rgb(e.getHairColor()), pt, light, overlay);
+        layer(model, pose, buffers, e, dmz("textures/entity/races/" + raceRoot + "/faces/" + raceRoot + "_nose_" + Math.floorMod(e.getNoseType(), 6) + ".png"), body, pt, light, overlay);
+        layer(model, pose, buffers, e, dmz("textures/entity/races/" + raceRoot + "/faces/" + raceRoot + "_mouth_" + Math.floorMod(e.getMouthType(), 9) + ".png"), body, pt, light, overlay);
+        if (!hasReplacementArmor(e) && e.getOutfit() >= 0) {
+            renderOutfit(model, pose, buffers, e, HUMAN_OUTFITS[Math.floorMod(e.getOutfit(), HUMAN_OUTFITS.length)], pt, light, overlay);
+        }
+    }
+
     /**
      * LW's procedural outfit is the fighter's default clothing. A genuine equipped chest/leg
      * armor set is a replacement visual rendered by DMZ's native DMZSagaArmorLayer, not a second
@@ -286,9 +328,14 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
 
     private static boolean shouldRenderHumanSaiyanHairBase(AmbientFighterEntity e) {
         if (e == null || (e.getRace() != com.dmzlivingworld.entity.FighterRace.HUMAN
-                && e.getRace() != com.dmzlivingworld.entity.FighterRace.SAIYAN)) return false;
+                && e.getRace() != com.dmzlivingworld.entity.FighterRace.SAIYAN
+                && !(e.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID
+                && SairensRaceCompat.isBioAndroidHumanModel())
+                && !e.getRace().isSairensRace())) return false;
         if (e.getHairId() == 5) return false;
-        CustomHair hair = HairManager.getPresetHair(e.getHairId(), e.getRace().dmzId());
+        String raceId = e.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID || e.getRace().isSairensRace()
+            ? "human" : e.getRace().dmzId();
+        CustomHair hair = HairManager.getPresetHair(e.getHairId(), raceId);
         if (hair == null || hair.isEmpty()) hair = HairManager.getPresetHair(e.getHairId(), "human");
         return hair != null && hair.getVisibleStrandCount() > 0;
     }

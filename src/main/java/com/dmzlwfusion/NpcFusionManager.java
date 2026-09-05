@@ -387,6 +387,7 @@ public final class NpcFusionManager {
         String eye1 = LWFusionManager.mixHex(LivingWorldCompat.eye1Color(first), LivingWorldCompat.eye1Color(second));
         String eye2 = LWFusionManager.mixHex(LivingWorldCompat.eye2Color(first), LivingWorldCompat.eye2Color(second));
         int aura = parseHex(LWFusionManager.mixHex(LivingWorldCompat.auraColor(first), LivingWorldCompat.auraColor(second)), 0xFFFFFF);
+        int averagedRelationship = initiator == null ? 0 : averageRelationship(initiator, first, second);
 
         try {
             CompoundTag template = new CompoundTag();
@@ -440,6 +441,9 @@ public final class NpcFusionManager {
                     && second instanceof AmbientFighterEntity secondFighter) {
                 fusedFighter.debugSetRacialSkill(Math.max(firstFighter.getRacialSkillLevel(), secondFighter.getRacialSkillLevel()));
                 fusedFighter.setKaiokenPotential(firstFighter.hasKaiokenPotential() || secondFighter.hasKaiokenPotential());
+                if (initiator != null && (firstFighter.isRememberedFor(initiator) || secondFighter.isRememberedFor(initiator))) {
+                    fusedFighter.bindMemory(initiator.getUUID(), UUID.randomUUID(), 1, averagedRelationship, false);
+                }
             }
         } catch (RuntimeException ex) {
             restorePair(first, second, x, y, z, yaw);
@@ -509,6 +513,14 @@ public final class NpcFusionManager {
             second.getPersistentData().remove("LWAutonomousFusionTarget");
         }
     }
+
+        private static int averageRelationship(ServerPlayer player, LivingEntity first, LivingEntity second) {
+        int firstValue = first instanceof AmbientFighterEntity fighter && fighter.isRememberedFor(player)
+            ? fighter.getMemoryRelationship() : 0;
+        int secondValue = second instanceof AmbientFighterEntity fighter && fighter.isRememberedFor(player)
+            ? fighter.getMemoryRelationship() : 0;
+        return Math.max(-100, Math.min(100, Math.round((firstValue + secondValue) / 2.0F)));
+        }
 
     private static boolean eligiblePair(ServerPlayer initiator, LivingEntity first, LivingEntity second,
                                         boolean debugForce, double maxRange) {
@@ -716,6 +728,7 @@ public final class NpcFusionManager {
         backup.putBoolean("PartnerSilent", fighter.isSilent());
         if (LivingWorldCompat.isLivingWorldFighter(fighter)) {
             backup.putString("PartnerFighterName", LivingWorldCompat.fighterName(fighter));
+            backup.put("PartnerFusionState", ((AmbientFighterEntity) fighter).captureFusionState());
         }
         if (fighter instanceof Mob mob) backup.putBoolean("PartnerNoAI", mob.isNoAi());
         fighter.getPersistentData().put(PARTNER_ROOT, backup);

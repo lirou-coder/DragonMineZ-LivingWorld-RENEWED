@@ -50,6 +50,8 @@ import com.dmzlivingworld.world.BattlePowerFormula;
 import com.dmzlivingworld.world.NpcDefenseCalculator;
 import com.dmzlivingworld.world.NpcDefensePenetrationManager;
 import com.dmzlivingworld.world.NpcFormConfigBridge;
+import com.dmzlivingworld.world.SairensBioAndroidCompat;
+import com.dmzlivingworld.world.SairensRaceCompat;
 import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.ReactiveWorldEventManager;
 import com.dmzlivingworld.world.ReactiveWorldManager;
@@ -138,6 +140,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
      */
     private static final String PERMANENT_BATTLE_POWER = "LWPermanentBattlePower";
     public static final String TEMPORARY_AWAKENING = "LWTemporaryAwakening";
+    private static final String TEMPORARY_AWAKENING_BASE = "LWTemporaryAwakeningBase";
     /** Highest real BP reached through a permanent organic gain; faction maintenance respects it. */
     private static final String EARNED_BATTLE_POWER_FLOOR = "LWEarnedBattlePowerFloor";
     private static final String POWER_COMPARE_RESTORE_BP = "LWPowerCompareRestoreBP";
@@ -366,12 +369,16 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     private double racialBaseSpeed;
     private double racialBaseAttackSpeed;
     private float racialBaseKiDamage;
+    private String racialBaseBodyColor = "";
+    private String racialBaseBodyColor2 = "";
+    private String racialBaseBodyColor3 = "";
     private float racialBaseScale = 1.0F;
     private String racialBaseHairColor = "";
     private String racialBaseEye1Color = "";
     private String racialBaseEye2Color = "";
     private String racialBaseAuraType = "";
     private int racialBaseAuraColor = 0xFFFFFF;
+    private int racialBaseLightningColor = 0xFFFFFF;
     private boolean racialBaseLightning;
     // 0.8.0: persistent, event-derived character history and real DMZ equipment state.
     private CompoundTag legacyData = new CompoundTag();
@@ -606,6 +613,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     public void initializeAs(FighterAlignment alignment, FighterRank rank, FighterPersonality personality,
                              FighterRace race, FighterArchetype archetype) {
         RandomSource random = getRandom();
+        if (race == FighterRace.ZAARAKIN && archetype == FighterArchetype.KI_SPECIALIST) {
+            archetype = FighterArchetype.BRAWLER;
+        }
         entityData.set(ALIGNMENT, alignment.id());
         entityData.set(RANK, rank.id());
         entityData.set(PERSONALITY, personality.id());
@@ -657,7 +667,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         entityData.set(MEDITATING, false);
         entityData.set(KAIOKEN_LEVEL, 0);
         entityData.set(STORY_ROLE, STORY_NONE);
-        entityData.set(FLIGHT_UNLOCKED, rollInitialFlight(random, rank));
+        entityData.set(FLIGHT_UNLOCKED, race == FighterRace.ANTORANIAN || rollInitialFlight(random, rank));
         entityData.set(RACIAL_SKILL_LEVEL, rollInitialRacialSkill(random, rank, race));
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, 0);
         entityData.set(AMBIENT_POSE, 0);
@@ -2558,7 +2568,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         FighterRace race = getRace();
         // Keep applicable races visibly mixed rather than letting a small test sample
         // accidentally look single-gender. 46% female is close to even while still random.
-        entityData.set(GENDER, race.gendered() && random.nextFloat() < 0.46F ? 1 : 0);
+        boolean humanAppearanceBio = race == FighterRace.BIO_ANDROID && SairensRaceCompat.isBioAndroidHumanModel();
+        entityData.set(GENDER, (race.gendered() || humanAppearanceBio) && random.nextFloat() < 0.46F ? 1 : 0);
         float scale = rollNaturalScale(random, race, isFemale());
         entityData.set(DISPLAY_SCALE, scale);
         setScaleVal(scale);
@@ -2635,6 +2646,19 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 applyFrostDemonColors(random, true, true, true, true, true);
             }
             case BIO_ANDROID -> {
+                if (humanAppearanceBio) {
+                    entityData.set(BODY_TYPE, 1 + random.nextInt(2));
+                    entityData.set(EYES_TYPE, random.nextInt(13));
+                    entityData.set(NOSE_TYPE, random.nextInt(6));
+                    entityData.set(MOUTH_TYPE, random.nextInt(9));
+                    entityData.set(HAIR_ID, 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())));
+                    entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains("human") ? random.nextInt(22) : 0);
+                    String skin = pick(random, SKIN_COLORS);
+                    entityData.set(BODY_COLOR, skin);
+                    entityData.set(BODY_COLOR2, skin);
+                    entityData.set(BODY_COLOR3, skin);
+                    break;
+                }
                 entityData.set(BODY_TYPE, random.nextInt(3));
                 entityData.set(EYES_TYPE, 0);
                 entityData.set(NOSE_TYPE, 0);
@@ -2642,6 +2666,32 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 entityData.set(HAIR_ID, 0);
                 entityData.set(OUTFIT, 0);
                 applyBioAndroidColors(random);
+            }
+            case ZAARAKIN -> {
+                entityData.set(BODY_TYPE, 1 + random.nextInt(2));
+                entityData.set(EYES_TYPE, random.nextInt(13));
+                entityData.set(NOSE_TYPE, random.nextInt(6));
+                entityData.set(MOUTH_TYPE, random.nextInt(9));
+                entityData.set(HAIR_ID, 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())));
+                entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains("human") ? random.nextInt(22) : 0);
+                entityData.set(BODY_COLOR, "#FFD3C9");
+                entityData.set(BODY_COLOR2, randomColor(random));
+                entityData.set(BODY_COLOR3, randomColor(random));
+                entityData.set(HAIR_COLOR, randomColor(random));
+            }
+            case ANTORANIAN -> {
+                entityData.set(BODY_TYPE, 1 + random.nextInt(2));
+                entityData.set(EYES_TYPE, random.nextInt(8));
+                entityData.set(NOSE_TYPE, random.nextInt(6));
+                entityData.set(MOUTH_TYPE, random.nextInt(9));
+                entityData.set(HAIR_ID, 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())));
+                entityData.set(OUTFIT, random.nextBoolean() && LivingWorldConfig.canUseClothes().contains("human")
+                    ? random.nextInt(22) : -1);
+                String antoranianBody = randomColor(random);
+                entityData.set(BODY_COLOR, antoranianBody);
+                entityData.set(BODY_COLOR2, contrastingColor(random, antoranianBody));
+                entityData.set(BODY_COLOR3, randomColor(random));
+                entityData.set(HAIR_COLOR, randomColor(random));
             }
         }
     }
@@ -2680,6 +2730,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             case MAJIN -> female ? 0.70F : 0.74F;
             case FROST_DEMON -> 0.73F;
             case BIO_ANDROID -> 0.76F;
+            case ZAARAKIN, ANTORANIAN -> 0.74F;
         };
         float max = switch (race) {
             case HUMAN, SAIYAN -> female ? 1.24F : 1.34F;
@@ -2687,6 +2738,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             case MAJIN -> female ? 1.27F : 1.38F;
             case FROST_DEMON -> 1.31F;
             case BIO_ANDROID -> 1.39F;
+            case ZAARAKIN, ANTORANIAN -> 1.34F;
         };
         // Triangular distribution: extremes exist, but most people stay around average.
         float t = (random.nextFloat() + random.nextFloat()) * 0.5F;
@@ -2700,6 +2752,18 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     private static String randomColor(RandomSource random) {
         return String.format(java.util.Locale.ROOT, "#%02X%02X%02X",
                 random.nextInt(256), random.nextInt(256), random.nextInt(256));
+    }
+
+    private static String contrastingColor(RandomSource random, String source) {
+        int color = parseHex(source, 0x00008B);
+        int red = (color >> 16) & 255;
+        int green = (color >> 8) & 255;
+        int blue = color & 255;
+        int variation = random.nextInt(25) - 12;
+        return String.format(java.util.Locale.ROOT, "#%02X%02X%02X",
+                Math.max(0, Math.min(255, 255 - red + variation)),
+                Math.max(0, Math.min(255, 255 - green + variation)),
+                Math.max(0, Math.min(255, 255 - blue + variation)));
     }
 
     private static String colorVariant(RandomSource random, int rgb, int variation) {
@@ -3258,7 +3322,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             }
             case NAMEKIAN -> Math.floorMod(theme + variant + role.id(), 2);
             case MAJIN -> Math.floorMod(theme + variant + role.id(), 6);
-            case FROST_DEMON, BIO_ANDROID -> 0;
+            case FROST_DEMON, BIO_ANDROID, ZAARAKIN, ANTORANIAN -> 0;
         };
         entityData.set(OUTFIT, outfit);
 
@@ -3575,11 +3639,26 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (level().isClientSide || isAwakening() || isRacialFormActive() || isKaiokenActive()
                 || getRank() == FighterRank.ROOKIE) return false;
         if (isAwakened() && getRacialSkillLevel() <= 0) return false;
-        racialTransformPending = getRacialSkillLevel() > 0;
+        int skillLevel = getRacialSkillLevel();
+        if (skillLevel <= 0 && getPersistentData().getBoolean("LWTemporaryAwakening")
+            && getRace() == FighterRace.BIO_ANDROID) skillLevel = 1;
+        if (getPersistentData().getBoolean(TEMPORARY_AWAKENING)
+                && !getPersistentData().contains(TEMPORARY_AWAKENING_BASE, Tag.TAG_COMPOUND)) {
+            CompoundTag base = new CompoundTag();
+            base.putString("Hair", getHairColor());
+            base.putString("Eye1", getEye1Color());
+            base.putString("Eye2", getEye2Color());
+            base.putString("AuraType", getAuraType() == null ? "" : getAuraType());
+            base.putInt("AuraColor", getAuraColor());
+            base.putInt("LightningColor", getLightningColor());
+            base.putBoolean("Lightning", isLightning());
+            getPersistentData().put(TEMPORARY_AWAKENING_BASE, base);
+        }
+        racialTransformPending = skillLevel > 0;
         awakeningTicks = getRank() == FighterRank.VETERAN ? 76 : 64;
         setTransforming(true);
         setKiCharge(true);
-        RacialFormProfile next = racialTransformPending ? RacialFormProfile.forSkill(getRace(), getRacialSkillLevel()) : null;
+        RacialFormProfile next = racialTransformPending ? NpcFormConfigBridge.profile(getRace(), skillLevel) : null;
         setLightning(next != null ? next.lightning() : (getRank() == FighterRank.VETERAN || getRandom().nextBoolean()));
         if (next != null && next.auraColor() != 0xFFFFFF) {
             setAuraType("kakarot");
@@ -3589,7 +3668,6 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         stopCasting();
         setAttacking(false);
         getNavigation().stop();
-        level().playSound(null, blockPosition(), MainSounds.TRANSFORM_ON.get(), SoundSource.HOSTILE, 1.35F, 0.92F + getRandom().nextFloat() * 0.12F);
         return true;
     }
 
@@ -3630,7 +3708,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         }
         setLightning(true);
         if (getRandom().nextFloat() < 0.72F) flareAura(140 + getRandom().nextInt(121));
-        level().playSound(null, blockPosition(), MainSounds.TRANSFORM_OFF.get(), SoundSource.HOSTILE, 1.25F, 1.0F);
+        level().playSound(null, blockPosition(), MainSounds.TRANSFORM_ON.get(), SoundSource.HOSTILE, 1.25F, 1.0F);
         speak(getPersonality() == FighterPersonality.PROUD ? "Now we can begin." : "My power just changed.", 52);
     }
 
@@ -3641,8 +3719,11 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     }
 
     private void activateRacialForm() {
-        NpcFormConfigBridge.Form configured = NpcFormConfigBridge.form(getRace(), getRacialSkillLevel());
-        RacialFormProfile form = RacialFormProfile.forSkill(getRace(), getRacialSkillLevel());
+        int skillLevel = getRacialSkillLevel();
+        if (skillLevel <= 0 && getPersistentData().getBoolean(TEMPORARY_AWAKENING)
+            && getRace() == FighterRace.BIO_ANDROID) skillLevel = 1;
+        NpcFormConfigBridge.Form configured = NpcFormConfigBridge.form(getRace(), skillLevel);
+        RacialFormProfile form = NpcFormConfigBridge.profile(getRace(), skillLevel);
         if (configured == null || isRacialFormActive()) return;
         racialBasePower = getPermanentBattlePower();
         var attack = getAttribute(Attributes.ATTACK_DAMAGE);
@@ -3651,12 +3732,16 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         racialBaseSpeed = speed == null ? getRank().speed() : speed.getBaseValue();
         racialBaseAttackSpeed = getDefaultAttackSpeed();
         racialBaseKiDamage = getKiBlastDamage();
+        racialBaseBodyColor = getBodyColor();
+        racialBaseBodyColor2 = getBodyColor2();
+        racialBaseBodyColor3 = getBodyColor3();
         racialBaseScale = getDisplayScale();
         racialBaseHairColor = getHairColor();
         racialBaseEye1Color = getEye1Color();
         racialBaseEye2Color = getEye2Color();
         racialBaseAuraType = getAuraType() == null ? "" : getAuraType();
         racialBaseAuraColor = getAuraColor();
+        racialBaseLightningColor = getLightningColor();
         racialBaseLightning = isLightning();
 
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, configured.skillLevel());
@@ -3664,6 +3749,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (speed != null) speed.setBaseValue(racialBaseSpeed * configured.speed());
         setDefaultAttackSpeed(racialBaseAttackSpeed * configured.attackSpeed());
         setKiBlastDamage((float)(racialBaseKiDamage * configured.ki()));
+        if (!configured.bodyColor1().isBlank()) entityData.set(BODY_COLOR, configured.bodyColor1());
+        if (!configured.bodyColor2().isBlank()) entityData.set(BODY_COLOR2, configured.bodyColor2());
+        if (!configured.bodyColor3().isBlank()) entityData.set(BODY_COLOR3, configured.bodyColor3());
         float oldMax = Math.max(1.0F, getMaxHealth());
         float healthRatio = getHealth() / oldMax;
         var health = getAttribute(Attributes.MAX_HEALTH);
@@ -3673,13 +3761,17 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         entityData.set(DISPLAY_SCALE, racialBaseScale * configured.scale());
         setScaleVal(getDisplayScale());
         if (!configured.hairColor().isBlank()) entityData.set(HAIR_COLOR, configured.hairColor());
-        if (!configured.eyeColor().isBlank()) { entityData.set(EYE1_COLOR, configured.eyeColor()); entityData.set(EYE2_COLOR, configured.eyeColor()); }
+        if (!configured.eyeColor().isBlank()) entityData.set(EYE1_COLOR, configured.eyeColor());
+        if (!configured.eye2Color().isBlank()) entityData.set(EYE2_COLOR, configured.eye2Color());
         setAuraType("kakarot");
+        if (!configured.auraType().isBlank()) setAuraType(configured.auraType());
         if (configured.auraColor() != 0xFFFFFF) setAuraColor(configured.auraColor());
+        if (!configured.lightningColor().isBlank()) setLightningColor(parseHex(configured.lightningColor(), getAuraColor()));
         setLightning(configured.lightning());
+        SairensBioAndroidCompat.apply(this, configured.id());
         racialCalmTicks = 0;
         flareAura(80);
-        level().playSound(null, blockPosition(), MainSounds.TRANSFORM_OFF.get(), SoundSource.HOSTILE, 1.2F, 1.0F);
+        level().playSound(null, blockPosition(), MainSounds.TRANSFORM_ON.get(), SoundSource.HOSTILE, 1.2F, 1.0F);
         speak((configured.name() == null ? configured.id() : configured.name()) + "!", 64);
     }
 
@@ -3706,9 +3798,17 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (racialBaseHairColor != null && !racialBaseHairColor.isBlank()) entityData.set(HAIR_COLOR, racialBaseHairColor);
         if (racialBaseEye1Color != null && !racialBaseEye1Color.isBlank()) entityData.set(EYE1_COLOR, racialBaseEye1Color);
         if (racialBaseEye2Color != null && !racialBaseEye2Color.isBlank()) entityData.set(EYE2_COLOR, racialBaseEye2Color);
+        if (racialBaseBodyColor != null && !racialBaseBodyColor.isBlank()) entityData.set(BODY_COLOR, racialBaseBodyColor);
+        if (racialBaseBodyColor2 != null && !racialBaseBodyColor2.isBlank()) entityData.set(BODY_COLOR2, racialBaseBodyColor2);
+        if (racialBaseBodyColor3 != null && !racialBaseBodyColor3.isBlank()) entityData.set(BODY_COLOR3, racialBaseBodyColor3);
         setAuraType(racialBaseAuraType == null ? "" : racialBaseAuraType);
         setAuraColor(racialBaseAuraColor);
+        setLightningColor(racialBaseLightningColor);
         setLightning(racialBaseLightning);
+        SairensBioAndroidCompat.clear(this);
+        auraFlareTicks = 0;
+        entityData.set(AURA_FLARED, false);
+        level().playSound(null, blockPosition(), MainSounds.TRANSFORM_OFF.get(), SoundSource.HOSTILE, 1.0F, 0.95F);
         racialCalmTicks = 0;
         // Rebuild from canonical BP now that the temporary form multiplier has ended. This is
         // what makes a training gain earned during the form real in HP, melee and Ki as well.
@@ -3724,6 +3824,19 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             setTransforming(false);
             entityData.set(AWAKENED, false);
             getPersistentData().remove(TEMPORARY_AWAKENING);
+            getPersistentData().remove("LWFullPowerBioSkill");
+            CompoundTag base = getPersistentData().getCompound(TEMPORARY_AWAKENING_BASE);
+            if (base.contains("Hair")) entityData.set(HAIR_COLOR, base.getString("Hair"));
+            if (base.contains("Eye1")) entityData.set(EYE1_COLOR, base.getString("Eye1"));
+            if (base.contains("Eye2")) entityData.set(EYE2_COLOR, base.getString("Eye2"));
+            if (base.contains("AuraType")) setAuraType(base.getString("AuraType"));
+            if (base.contains("AuraColor")) setAuraColor(base.getInt("AuraColor"));
+            if (base.contains("LightningColor")) setLightningColor(base.getInt("LightningColor"));
+            if (base.contains("Lightning")) setLightning(base.getBoolean("Lightning"));
+            getPersistentData().remove(TEMPORARY_AWAKENING_BASE);
+            auraFlareTicks = 0;
+            entityData.set(AURA_FLARED, false);
+            level().playSound(null, blockPosition(), MainSounds.TRANSFORM_OFF.get(), SoundSource.HOSTILE, 1.0F, 0.95F);
             setBattlePower(projectedBattlePower());
             if (entityData.get(READY)) refreshCombatStatsFromPower();
         }
@@ -4049,11 +4162,61 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     public int getRacialSkillLevel() { return entityData.get(RACIAL_SKILL_LEVEL); }
     public int getActiveRacialFormLevel() { return entityData.get(ACTIVE_RACIAL_FORM_LEVEL); }
     public boolean isRacialFormActive() { return getActiveRacialFormLevel() > 0; }
-    public RacialFormProfile getActiveRacialForm() { return isRacialFormActive() ? RacialFormProfile.forSkill(getRace(), getActiveRacialFormLevel()) : null; }
+    public RacialFormProfile getActiveRacialForm() {
+        return isRacialFormActive() ? NpcFormConfigBridge.profile(getRace(), getActiveRacialFormLevel()) : null;
+    }
     public boolean isFrostDemonPrimitive() {
         if (getRace() != FighterRace.FROST_DEMON) return false;
         RacialFormProfile form = getActiveRacialForm();
         return form == null || "second".equals(form.id());
+    }
+
+    public CompoundTag captureFusionState() {
+        CompoundTag state = new CompoundTag();
+        state.putBoolean("AuraFlared", isAuraFlared());
+        state.putInt("AuraFlareTicks", auraFlareTicks);
+        state.putString("AuraType", getAuraType() == null ? "" : getAuraType());
+        state.putInt("AuraColor", getAuraColor());
+        state.putBoolean("Lightning", isLightning());
+        state.putBoolean("Awakened", isAwakened());
+        state.putInt("ActiveRacialForm", getActiveRacialFormLevel());
+        state.putBoolean("KiCharge", isCharge());
+        state.putBoolean("Flying", isFlying());
+        state.putBoolean("NoGravity", isNoGravity());
+        state.putBoolean("AmbientFlight", isAmbientFlightActivity());
+        state.putBoolean("SocialActivity", isSocialLifeActivity());
+        state.putBoolean("Sprinting", isSprinting());
+        state.putString("Locomotion", getLocomotionMode().name());
+        return state;
+    }
+
+    public void restoreFusionState(CompoundTag state) {
+        if (state == null) return;
+        setAuraType(state.getString("AuraType"));
+        setAuraColor(state.getInt("AuraColor"));
+        setLightning(state.getBoolean("Lightning"));
+        entityData.set(AWAKENED, state.getBoolean("Awakened"));
+        entityData.set(ACTIVE_RACIAL_FORM_LEVEL, Math.max(0, state.getInt("ActiveRacialForm")));
+        setKiCharge(state.getBoolean("KiCharge"));
+        if (state.getBoolean("AuraFlared")) {
+            auraFlareTicks = Math.max(1, state.getInt("AuraFlareTicks"));
+            entityData.set(AURA_FLARED, true);
+        } else {
+            auraFlareTicks = 0;
+            entityData.set(AURA_FLARED, false);
+        }
+        setFlying(state.getBoolean("Flying"));
+        setFlyingFast(state.getBoolean("Flying"));
+        setNoGravity(state.getBoolean("NoGravity"));
+        setAmbientFlightActivity(state.getBoolean("AmbientFlight"));
+        setSocialLifeActivity(state.getBoolean("SocialActivity"));
+        setSprinting(state.getBoolean("Sprinting"));
+        try {
+            setLocomotionMode(com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.valueOf(
+                    state.getString("Locomotion")));
+        } catch (IllegalArgumentException ignored) {
+            setLocomotionMode(com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.WALK);
+        }
     }
     public String getRacialFormName() { RacialFormProfile form = getActiveRacialForm(); return form == null ? "" : form.displayName(); }
     public boolean isKaiokenAuraPulse() { return isKaiokenActive() && (kaiokenTicks > 0) && (kaiokenTicks % 100 > 92); }
@@ -4519,7 +4682,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             if (next > getRacialSkillLevel() && racialTrainingProgress >= threshold) {
                 racialTrainingProgress -= threshold;
                 entityData.set(RACIAL_SKILL_LEVEL, next);
-                RacialFormProfile unlocked = RacialFormProfile.forSkill(getRace(), next);
+                RacialFormProfile unlocked = NpcFormConfigBridge.profile(getRace(), next);
                 if (unlocked != null) {
                     recordLegacyEvent("Unlocked " + unlocked.displayName() + " through training");
                     FighterGoalManager.onRacialAdvanced(this);

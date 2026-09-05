@@ -57,7 +57,8 @@ public final class FighterAppearanceEvolutionManager {
     public static boolean change(AmbientFighterEntity fighter, boolean debug) {
         if (fighter == null || !fighter.isAlive() || fighter.level().isClientSide || WorldMenaceManager.isHerobrine(fighter)) return false;
         FighterRace race = fighter.getRace();
-        boolean canHair = race == FighterRace.HUMAN || race == FighterRace.SAIYAN;
+        boolean canHair = race == FighterRace.HUMAN || race == FighterRace.SAIYAN
+            || (race == FighterRace.BIO_ANDROID && SairensRaceCompat.isBioAndroidHumanModel());
         boolean canOutfit = race != FighterRace.FROST_DEMON && race != FighterRace.BIO_ANDROID && !fighter.isFactionMember();
         if (!canHair && !canOutfit) return false;
 

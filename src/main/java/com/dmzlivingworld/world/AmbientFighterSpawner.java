@@ -199,6 +199,7 @@ public final class AmbientFighterSpawner {
         FighterPersonality resolvedPersonality = personality == null
                 ? FighterPersonality.roll(random, alignment) : personality;
         FighterRace resolvedRace = race == null ? rollRaceForLevel(level, random) : race;
+        if (resolvedRace.isSairensRace() && !SairensRaceCompat.isLoaded()) return null;
         FighterArchetype resolvedArchetype = archetype == null ? FighterArchetype.roll(random, rank) : archetype;
         fighter.initializeAs(alignment, rank, resolvedPersonality, resolvedRace, resolvedArchetype);
         if (!level.noCollision(fighter)) return null;
@@ -323,7 +324,10 @@ public final class AmbientFighterSpawner {
             if (roll < 82) return FighterRace.SAIYAN;
             if (roll < 89) return FighterRace.MAJIN;
             if (roll < 95) return FighterRace.FROST_DEMON;
-            return FighterRace.BIO_ANDROID;
+            if (roll < 97) return FighterRace.BIO_ANDROID;
+                return SairensRaceCompat.isLoaded()
+                    ? (random.nextBoolean() ? FighterRace.ZAARAKIN : FighterRace.ANTORANIAN)
+                    : FighterRace.BIO_ANDROID;
         }
         return FighterRace.roll(random);
     }

@@ -2,6 +2,7 @@ package com.dmzlivingworld.client.layer;
 
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.world.WorldMenaceManager;
+import com.dmzlivingworld.world.SairensRaceCompat;
 import com.dragonminez.client.render.hair.HairRenderer;
 import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;
@@ -30,12 +31,14 @@ public final class FighterHairLayer extends GeoRenderLayer<AmbientFighterEntity>
                 || (entity.getRace() == com.dmzlivingworld.entity.FighterRace.MAJIN && !entity.isFemale())) return;
 
         Character character = entity.getDMZCharacter();
+        String hairRace = entity.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID
+                || entity.getRace().isSairensRace() ? "human" : entity.getRace().dmzId();
         String hairType = entity.getActiveRacialForm() == null ? "base" : entity.getActiveRacialForm().hairType();
         CustomHair hair = switch (hairType) {
-            case "ssj" -> HairManager.getPresetHairSSJ(entity.getHairId(), entity.getRace().dmzId());
-            case "ssj2" -> HairManager.getPresetHairSSJ2(entity.getHairId(), entity.getRace().dmzId());
-            case "ssj3" -> HairManager.getPresetHairSSJ3(entity.getHairId(), entity.getRace().dmzId());
-            default -> HairManager.getPresetHair(entity.getHairId(), entity.getRace().dmzId());
+            case "ssj" -> HairManager.getPresetHairSSJ(entity.getHairId(), hairRace);
+            case "ssj2" -> HairManager.getPresetHairSSJ2(entity.getHairId(), hairRace);
+            case "ssj3" -> HairManager.getPresetHairSSJ3(entity.getHairId(), hairRace);
+            default -> HairManager.getPresetHair(entity.getHairId(), hairRace);
         };
         if (hair == null || hair.isEmpty()) {
             hair = switch (hairType) {

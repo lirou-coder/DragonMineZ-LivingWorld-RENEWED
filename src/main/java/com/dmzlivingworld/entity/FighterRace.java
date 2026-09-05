@@ -1,6 +1,7 @@
 package com.dmzlivingworld.entity;
 
 import com.dmzlivingworld.config.LivingWorldConfig;
+import com.dmzlivingworld.world.SairensRaceCompat;
 import net.minecraft.util.RandomSource;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +13,9 @@ public enum FighterRace {
     NAMEKIAN(2, "Namekian", "namekian", false),
     MAJIN(3, "Majin", "majin", true),
     FROST_DEMON(4, "Frost Demon", "frostdemon", false),
-    BIO_ANDROID(5, "Bio-Android", "bioandroid", false);
+    BIO_ANDROID(5, "Bio-Android", "bioandroid", false),
+    ZAARAKIN(6, "Zaarakin", "zaarakins", true),
+    ANTORANIAN(7, "Antoranian", "antoranian", true);
 
     private final int id;
     private final String displayName;
@@ -30,7 +33,10 @@ public enum FighterRace {
     public String displayName() { return displayName; }
     public String dmzId() { return dmzId; }
     public boolean gendered() { return gendered; }
-    public boolean usesHair() { return this == HUMAN || this == SAIYAN || this == MAJIN; }
+            public boolean usesHair() { return this == HUMAN || this == SAIYAN || this == MAJIN
+                || (this == BIO_ANDROID && SairensRaceCompat.isBioAndroidHumanModel()) || isSairensRace(); }
+
+        public boolean isSairensRace() { return this == ZAARAKIN || this == ANTORANIAN; }
 
     public static FighterRace byId(int id) {
         for (FighterRace race : values()) if (race.id == id) return race;
@@ -46,16 +52,24 @@ public enum FighterRace {
             boolean listed = configured.contains(race.dmzId.toLowerCase(java.util.Locale.ROOT));
             if (whitelist == listed) allowed.add(race);
         }
+        if (SairensRaceCompat.isLoaded()) {
+            for (FighterRace race : new FighterRace[]{ZAARAKIN, ANTORANIAN}) {
+                boolean listed = configured.contains(race.dmzId.toLowerCase(java.util.Locale.ROOT));
+                if (whitelist == listed) allowed.add(race);
+            }
+        }
         if (allowed.isEmpty()) return HUMAN;
         // Preserve the established weights when no filter is active; filtered lists are
         // intentionally uniform so a surviving uncommon race is not nearly impossible.
-        if (allowed.size() != values().length) return allowed.get(random.nextInt(allowed.size()));
+        int naturalRaceCount = SairensRaceCompat.isLoaded() ? values().length : 6;
+        if (allowed.size() != naturalRaceCount) return allowed.get(random.nextInt(allowed.size()));
         int value = random.nextInt(100);
         if (value < 43) return HUMAN;
         if (value < 64) return SAIYAN;
         if (value < 78) return NAMEKIAN;
         if (value < 87) return MAJIN;
         if (value < 94) return FROST_DEMON;
-        return BIO_ANDROID;
+        if (value < 97) return BIO_ANDROID;
+        return SairensRaceCompat.isLoaded() ? (random.nextBoolean() ? ZAARAKIN : ANTORANIAN) : BIO_ANDROID;
     }
 }

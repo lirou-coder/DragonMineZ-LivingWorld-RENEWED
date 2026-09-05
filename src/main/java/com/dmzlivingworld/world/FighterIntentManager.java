@@ -44,6 +44,10 @@ public final class FighterIntentManager {
 
     public static void tick(AmbientFighterEntity fighter) {
         if (fighter == null || fighter.level().isClientSide || !(fighter.level() instanceof ServerLevel level)) return;
+        if (com.dmzlwfusion.NpcFusionManager.isTemporaryFused(fighter)) {
+            clear(fighter);
+            return;
+        }
         if (FactionRequestMissionManager.isExclusiveFieldAssignment(fighter)) {
             clear(fighter);
             return;

@@ -62,6 +62,7 @@ import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.RedRibbonExperimentManager;
 import com.dmzlivingworld.world.RedRibbonExperimentData;
 import com.dmzlivingworld.world.NpcPlayerDamageManager;
+import com.dmzlivingworld.world.SairensRaceCompat;
 import com.dmzlivingworld.world.ReactiveWorldManager;
 import com.dmzlivingworld.world.FactionHornManager;
 import com.dmzlivingworld.world.FighterDebugSpectateManager;
@@ -93,6 +94,10 @@ public final class LivingWorldCommands {
                 Commands.literal("lw")
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.literal("guide").executes(ctx -> openGuide(ctx.getSource().getPlayerOrException())))
+                        .then(Commands.literal("kill")
+                                .then(Commands.argument("target", StringArgumentType.greedyString())
+                                        .executes(ctx -> killLoadedNpc(ctx.getSource().getPlayerOrException(),
+                                                StringArgumentType.getString(ctx, "target")))))
                         .then(Commands.literal("menace")
                                 .executes(ctx -> openWorldMenace(ctx.getSource().getPlayerOrException()))
                                 .then(Commands.literal("tp").executes(ctx -> WorldMenaceManager.debugTeleport(ctx.getSource().getPlayerOrException())))
@@ -125,7 +130,9 @@ public final class LivingWorldCommands {
                                                 .then(Commands.literal("namekian").executes(ctx -> spawnCustom(ctx.getSource().getPlayerOrException(), FighterRace.NAMEKIAN, null)))
                                                 .then(Commands.literal("majin").executes(ctx -> spawnCustom(ctx.getSource().getPlayerOrException(), FighterRace.MAJIN, null)))
                                                 .then(Commands.literal("frostdemon").executes(ctx -> spawnCustom(ctx.getSource().getPlayerOrException(), FighterRace.FROST_DEMON, null)))
-                                                .then(Commands.literal("bioandroid").executes(ctx -> spawnCustom(ctx.getSource().getPlayerOrException(), FighterRace.BIO_ANDROID, null))))
+                                                .then(Commands.literal("bioandroid").executes(ctx -> spawnCustom(ctx.getSource().getPlayerOrException(), FighterRace.BIO_ANDROID, null)))
+                                                .then(Commands.literal("zaarakin").executes(ctx -> spawnCustom(ctx.getSource().getPlayerOrException(), FighterRace.ZAARAKIN, null)))
+                                                .then(Commands.literal("antoranian").executes(ctx -> spawnCustom(ctx.getSource().getPlayerOrException(), FighterRace.ANTORANIAN, null))))
                                         .then(Commands.literal("style")
                                                 .then(Commands.literal("brawler").executes(ctx -> spawnCustom(ctx.getSource().getPlayerOrException(), null, FighterArchetype.BRAWLER)))
                                                 .then(Commands.literal("martial").executes(ctx -> spawnCustom(ctx.getSource().getPlayerOrException(), null, FighterArchetype.MARTIAL_ARTIST)))
@@ -361,7 +368,7 @@ public final class LivingWorldCommands {
                                 .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(), null, null, null, null, null, null))
                                 .then(Commands.argument("race", StringArgumentType.word())
                                         .suggests((ctx, builder) -> {
-                                            for (String value : new String[]{"human", "saiyan", "namekian", "frostdemon", "bioandroid", "majin"}) builder.suggest(value);
+                                            for (String value : summonableRaceNames()) builder.suggest(value);
                                             return builder.buildFuture();
                                         })
                                         .executes(ctx -> summonFighter(ctx.getSource().getPlayerOrException(),
@@ -755,12 +762,12 @@ public final class LivingWorldCommands {
 
     public static int openPeople(ServerPlayer player) {
         List<String> lines = new java.util.ArrayList<>();
-        String companion = LivingBondManager.companionName(player);
-        if (!companion.isBlank()) {
-            lines.add("## Current companion");
-            lines.add("+ " + companion + " is travelling with you");
-            lines.add("@travel:recall|Regroup " + companion);
-            lines.add("@travel:end|End travel with " + companion);
+                java.util.List<String> companions = LivingBondManager.companionNames(player);
+                if (!companions.isEmpty()) {
+                        lines.add("## Companions");
+                        for (String companion : companions) lines.add("+ " + companion + " is travelling with you");
+                        lines.add("@travel:recall|Regroup companions");
+                        lines.add("@travel:end|End travel with all companions");
         }
         // Instant Transmission status belongs to the selected remembered fighter, not the
         // directory itself. People remains an index; open a person to see live lock/cooldown state.
@@ -794,15 +801,36 @@ public final class LivingWorldCommands {
         return Command.SINGLE_SUCCESS;
     }
 
+        private static int killLoadedNpc(ServerPlayer player, String rawTarget) {
+                if (player == null || rawTarget == null || rawTarget.isBlank()) return 0;
+                String target = rawTarget.trim();
+                List<AmbientFighterEntity> matches = new java.util.ArrayList<>();
+                for (ServerLevel level : player.getServer().getAllLevels()) {
+                        for (var entity : level.getAllEntities()) {
+                                if (entity instanceof AmbientFighterEntity fighter
+                                                && ("all".equalsIgnoreCase(target) || fighter.getFighterName().equalsIgnoreCase(target))) {
+                                        matches.add(fighter);
+                                }
+                        }
+                }
+                if (matches.isEmpty()) {
+                        player.displayClientMessage(Component.literal("[Living World] No loaded NPC matched '" + target + "'."), false);
+                        return 0;
+                }
+                for (AmbientFighterEntity fighter : matches) fighter.kill();
+                player.displayClientMessage(Component.literal("[Living World] Killed " + matches.size() + " loaded NPC" + (matches.size() == 1 ? "." : "s.")), false);
+                return matches.size();
+        }
+
     public static int openTravel(ServerPlayer player) {
         List<String> lines = new java.util.ArrayList<>();
-        String companion = LivingBondManager.companionName(player);
-        lines.add("## Current companion");
-        if (companion.isBlank() || LivingBondManager.companionId(player) == null) {
+                java.util.List<String> companions = LivingBondManager.companionNames(player);
+                lines.add("## Companions");
+                if (companions.isEmpty()) {
             lines.add(". Nobody is travelling with you right now.");
             lines.add(". A fighter who trusts you can sometimes agree to come along from their profile.");
         } else {
-            lines.add("+ " + companion + " is travelling with you");
+                        for (String companion : companions) lines.add("+ " + companion + " is travelling with you");
             lines.add(". If they fall behind, change dimensions, or their chunk unloads, Living World now attempts to regroup them automatically.");
             lines.add("@travel:recall|Regroup companion");
             lines.add("@travel:end|End travel");
@@ -1539,10 +1567,15 @@ public final class LivingWorldCommands {
         FighterPersonality personality = personalityName == null ? null : parsePersonality(personalityName);
         FighterAlignment alignment = alignmentName == null ? null : parseAlignment(alignmentName);
         if (race == null) {
-            player.displayClientMessage(Component.literal("[Living World] Races: human, saiyan, namekian, frostdemon, bioandroid, majin")
+                        player.displayClientMessage(Component.literal("[Living World] Races: " + String.join(", ", summonableRaceNames()))
                     .withStyle(ChatFormatting.RED), false);
             return 0;
         }
+                if (race.isSairensRace() && !SairensRaceCompat.isLoaded()) {
+                        player.displayClientMessage(Component.literal("Cannot summon that race: Sairens RPG World mod is not installed")
+                                        .withStyle(ChatFormatting.RED), false);
+                        return 0;
+                }
         if (rank == null) {
             player.displayClientMessage(Component.literal("[Living World] Training levels: rokie, trained, veteran")
                     .withStyle(ChatFormatting.RED), false);
@@ -2293,9 +2326,17 @@ public final class LivingWorldCommands {
             case "frostdemon", "frost_demon" -> FighterRace.FROST_DEMON;
             case "bioandroid", "bio_android" -> FighterRace.BIO_ANDROID;
             case "majin" -> FighterRace.MAJIN;
+            case "zaarakin", "zaarakins" -> FighterRace.ZAARAKIN;
+            case "antoranian" -> FighterRace.ANTORANIAN;
             default -> null;
         };
     }
+
+        private static String[] summonableRaceNames() {
+                return SairensRaceCompat.isLoaded()
+                                ? new String[]{"human", "saiyan", "namekian", "frostdemon", "bioandroid", "majin", "zaarakin", "antoranian"}
+                                : new String[]{"human", "saiyan", "namekian", "frostdemon", "bioandroid", "majin"};
+        }
 
     private static FighterRank parseRank(String value) {
         return switch (value.toLowerCase(java.util.Locale.ROOT)) {

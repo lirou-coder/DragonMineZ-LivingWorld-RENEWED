@@ -91,7 +91,7 @@ public record FighterProfilePacket(
         techniques = safe(techniques);
         activeForm = safe(activeForm);
         supplyRequestLine = safe(supplyRequestLine);
-        appearanceSnapshot = appearanceSnapshot == null ? new CompoundTag() : appearanceSnapshot.copy();
+        appearanceSnapshot = compactAppearance(appearanceSnapshot);
         equipment = equipment == null ? List.of() : List.copyOf(equipment);
         overviewLines = overviewLines == null ? List.of() : List.copyOf(overviewLines);
         storyLines = storyLines == null ? List.of() : List.copyOf(storyLines);
@@ -101,6 +101,17 @@ public record FighterProfilePacket(
     }
 
     private static String safe(String value) { return value == null ? "" : value; }
+
+    private static CompoundTag compactAppearance(CompoundTag source) {
+        CompoundTag result = new CompoundTag();
+        if (source == null) return result;
+        String[] strings = {"Name", "Race", "BodyColor", "BodyColor2", "BodyColor3", "HairColor", "Eye1Color", "Eye2Color"};
+        for (String key : strings) if (source.contains(key)) result.putString(key, source.getString(key).substring(0, Math.min(96, source.getString(key).length())));
+        String[] ints = {"Gender", "BodyType", "EyesType", "NoseType", "MouthType", "HeadBone", "HairId", "Outfit", "Race"};
+        for (String key : ints) if (source.contains(key)) result.putInt(key, source.getInt(key));
+        if (source.contains("DisplayScale")) result.putFloat("DisplayScale", source.getFloat("DisplayScale"));
+        return result;
+    }
 
     public static void encode(FighterProfilePacket msg, FriendlyByteBuf buf) {
         buf.writeVarInt(Math.max(0, msg.entityId));

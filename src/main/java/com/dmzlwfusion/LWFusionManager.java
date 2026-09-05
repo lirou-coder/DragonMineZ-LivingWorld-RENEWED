@@ -611,6 +611,7 @@ public final class LWFusionManager {
         backup.putBoolean("PartnerSilent", partner.isSilent());
         if (LivingWorldCompat.isLivingWorldFighter(partner)) {
             backup.putString("PartnerFighterName", LivingWorldCompat.fighterName(partner));
+            backup.put("PartnerFusionState", ((AmbientFighterEntity) partner).captureFusionState());
         }
         if (partner instanceof Mob mob) backup.putBoolean("PartnerNoAI", mob.isNoAi());
         partner.getPersistentData().put(PARTNER_ROOT, backup);
@@ -625,6 +626,9 @@ public final class LWFusionManager {
         if (backup.contains("PartnerFighterName") && LivingWorldCompat.isLivingWorldFighter(partner)) {
             LivingWorldCompat.setFighterName(partner, backup.getString("PartnerFighterName"));
         }
+        boolean hasFusionState = partner instanceof AmbientFighterEntity
+            && backup.contains("PartnerFusionState", net.minecraft.nbt.Tag.TAG_COMPOUND);
+        if (hasFusionState) ((AmbientFighterEntity) partner).restoreFusionState(backup.getCompound("PartnerFusionState"));
         partner.getPersistentData().remove("DMZLWFusionHost");
         partner.getPersistentData().remove(PARTNER_ROOT);
         if (partner instanceof Mob mob) {
@@ -636,13 +640,16 @@ public final class LWFusionManager {
         // their old no-gravity/flight flags alive, so merely restoring NoAI leaves them hanging
         // motionless until a later watchdog happens to reclaim locomotion. Hand control back to
         // the fighter immediately; learned flight remains available, but no flight mode owns it.
-        if (partner instanceof AmbientFighterEntity fighter && !fighter.isCaptive()) {
+        if (partner instanceof AmbientFighterEntity fighter && !fighter.isCaptive() && !hasFusionState) {
             fighter.setFlying(false);
             fighter.setFlyingFast(false);
             fighter.setNoGravity(false);
             fighter.setCanFly(fighter.hasFlightUnlocked() && !fighter.isNonCombatant());
             fighter.setAmbientFlightActivity(false);
             fighter.setSocialLifeActivity(false);
+            fighter.setLocomotionMode(com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.WALK);
+            fighter.setPose(net.minecraft.world.entity.Pose.STANDING);
+            fighter.setSprinting(false);
             fighter.getPersistentData().remove("LWIdleFlightTravel");
             fighter.getPersistentData().remove("LWTravelFlightHolding");
             fighter.getPersistentData().remove("LWCompanionComfortZone");

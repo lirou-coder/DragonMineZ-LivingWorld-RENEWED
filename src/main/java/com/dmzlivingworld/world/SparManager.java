@@ -250,6 +250,7 @@ public final class SparManager {
         if (playerWon) fighter.concedeSanctionedMatch();
         end(player.getServer(), session, player, fighter, playerWon, true,
                 (playerWon ? player.getGameProfile().getName() : fighter.getFighterName()) + " won the spar");
+            LivingBondManager.clearPostSparFlight(fighter);
     }
 
     public static void concedePlayer(ServerPlayer player, AmbientFighterEntity fighter) {
@@ -374,6 +375,7 @@ public final class SparManager {
         if (fighter != null) {
             fighter.clearFire();
             fighter.endSanctionedMatch();
+            LivingBondManager.clearPostSparFlight(fighter);
             fighter.restoreSanctionedLivingState(true);
             if (player != null) SanctionedMatchGuard.beginPostSparPeace(fighter, player);
         }
@@ -396,6 +398,7 @@ public final class SparManager {
         if (fighter != null) {
             fighter.clearFire();
             fighter.endSanctionedMatch();
+            LivingBondManager.clearPostSparFlight(fighter);
             if (player != null) {
                 SanctionedMatchGuard.beginPostSparPeace(fighter, player);
                 fighter.getLegacyData().putLong("LWSparCooldown_" + player.getUUID(), server.overworld().getGameTime() + SPAR_COOLDOWN_TICKS);

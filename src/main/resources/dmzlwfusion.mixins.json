@@ -16,6 +16,7 @@
     ,"NamekianRevampTargetMixin"
     ,"MajinRevampFriendlyFistMixin"
     ,"SanctionedMatchDamageMixin"
+    ,"PlayerRestMonsterMixin"
     ,"WishTypeAdapterMixin"
     ,"TargetHelperCompanionMixin"
   ],

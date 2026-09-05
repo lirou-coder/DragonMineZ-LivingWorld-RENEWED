@@ -1313,6 +1313,8 @@ public final class FactionWorldData extends SavedData {
             if (roll < 87) return FighterRace.SAIYAN;
             if (roll < 92) return FighterRace.MAJIN;
             if (roll < 96) return FighterRace.FROST_DEMON;
+            if (SairensRaceCompat.isLoaded() && roll < 98) return FighterRace.ZAARAKIN;
+            if (SairensRaceCompat.isLoaded()) return FighterRace.ANTORANIAN;
             return FighterRace.BIO_ANDROID;
         }
         if (roll < 38) return FighterRace.HUMAN;
@@ -1320,6 +1322,8 @@ public final class FactionWorldData extends SavedData {
         if (roll < 76) return FighterRace.NAMEKIAN;
         if (roll < 88) return FighterRace.MAJIN;
         if (roll < 95) return FighterRace.FROST_DEMON;
+        if (SairensRaceCompat.isLoaded() && roll < 98) return FighterRace.ZAARAKIN;
+        if (SairensRaceCompat.isLoaded()) return FighterRace.ANTORANIAN;
         return FighterRace.BIO_ANDROID;
     }
 

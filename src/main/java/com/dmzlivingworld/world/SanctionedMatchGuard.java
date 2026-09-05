@@ -118,6 +118,22 @@ public final class SanctionedMatchGuard {
         return false;
     }
 
+    /** Same shared post-spar window used by damage protection, exposed to companion targeting. */
+    public static boolean isPostSparProtected(ServerPlayer player, LivingEntity opponent) {
+        if (player == null || opponent == null || player.level().isClientSide
+                || player.level() != opponent.level()) return false;
+        long now = player.level().getGameTime();
+        Long playerUntil = POST_SPAR_INVULNERABLE.get(player.getUUID());
+        Long opponentUntil = POST_SPAR_INVULNERABLE.get(opponent.getUUID());
+        boolean protectedPair = playerUntil != null && opponentUntil != null
+                && playerUntil > now && opponentUntil > now;
+        if (!protectedPair) {
+            if (playerUntil != null && playerUntil <= now) POST_SPAR_INVULNERABLE.remove(player.getUUID());
+            if (opponentUntil != null && opponentUntil <= now) POST_SPAR_INVULNERABLE.remove(opponent.getUUID());
+        }
+        return protectedPair;
+    }
+
     public static void clearRuntime(UUID playerId) {
         if (playerId == null) return;
         TRACE_PLAYERS.remove(playerId);

@@ -993,7 +993,7 @@ public final class FighterMemoryManager {
                 + 0.00135D * blocks * relevance * offscreenParity * LivingWorldConfig.npcGrowthScale()));
         profile.put("Legacy", legacy);
         int racialSkill = Math.max(0, profile.getInt("RacialSkillLevel"));
-        if (rank != FighterRank.ROOKIE && racialSkill < RacialFormProfile.maxSkillLevel(com.dmzlivingworld.entity.FighterRace.byId(profile.getInt("Race")))) {
+        if (rank != FighterRank.ROOKIE && racialSkill < NpcFormConfigBridge.maxSkillLevel(com.dmzlivingworld.entity.FighterRace.byId(profile.getInt("Race")))) {
             int racialEffort = Math.max(1, (int)Math.floor(7.0D * blocks * LivingWorldConfig.npcGrowthScale()));
             int progress = Math.max(0, profile.getInt("RacialTrainingProgress")) + racialEffort;
             var race = com.dmzlivingworld.entity.FighterRace.byId(profile.getInt("Race"));
@@ -1003,7 +1003,7 @@ public final class FighterMemoryManager {
             if (next > racialSkill && progress >= threshold) {
                 progress -= threshold;
                 profile.putInt("RacialSkillLevel", next);
-                RacialFormProfile unlocked = RacialFormProfile.forSkill(race, next);
+                RacialFormProfile unlocked = NpcFormConfigBridge.profile(race, next);
                 if (unlocked != null) {
                     event = "Unlocked " + unlocked.displayName() + " through off-screen training";
                     appendProfileEvent(profile, event, tick);

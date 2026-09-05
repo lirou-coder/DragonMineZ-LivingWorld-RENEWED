@@ -1501,6 +1501,7 @@ public final class FighterAmbientActivityManager {
     }
 
     public static boolean start(AmbientFighterEntity fighter, Type type, long now, boolean forced) {
+        if (fighter != null && com.dmzlwfusion.NpcFusionManager.isTemporaryFused(fighter)) return false;
         if (FactionRequestMissionManager.isAssigned(fighter)) return false;
         if (fighter == null || type == null || !(fighter.level() instanceof ServerLevel level)) return false;
         if (type == Type.STRENGTH_TRAINING) type = Type.TRAINING; // migrate old/debug callers
