@@ -9,9 +9,7 @@ import net.minecraft.world.entity.Pose;
 /**
  * Friend-requested cinematic full-power display.
  *
- * This never invents a transformation or temporary BP multiplier. A fighter with a learned
- * racial form uses AmbientFighterEntity's existing real transformation path; a fighter without
- * one simply demonstrates their real base power/aura. The voluntary display lasts 20 seconds.
+ * This is a temporary full-power display. Its transformation or awakening stats never become permanent.
  */
 public final class FighterFullPowerManager {
     private static final String START = "LWFullPowerStart";
@@ -54,6 +52,7 @@ public final class FighterFullPowerManager {
         fighter.getPersistentData().putLong(START, now);
         fighter.getPersistentData().putLong(UNTIL, now + DURATION);
         fighter.getPersistentData().putBoolean(FORM_REQUESTED, false);
+        fighter.getPersistentData().putBoolean(AmbientFighterEntity.TEMPORARY_AWAKENING, true);
         fighter.setKiCharge(true);
         fighter.flareAura((int) DURATION);
         player.displayClientMessage(Component.literal("[Living World] " + fighter.getFighterName() + " begins bringing out their full power."), false);
@@ -77,7 +76,6 @@ public final class FighterFullPowerManager {
         }
 
         if (now >= until) {
-            if (fighter.isRacialFormActive()) fighter.stopRacialForm();
             fighter.setKiCharge(false);
             fighter.suppressActivityAura();
             fighter.setAmbientPose(0);
@@ -102,13 +100,12 @@ public final class FighterFullPowerManager {
         if (elapsed < 70L && !fighter.isRacialFormActive()) fighter.setKiCharge(true);
         else fighter.setKiCharge(false);
 
-        // Highest learned racial skill is exactly the form AmbientFighterEntity's established
-        // combat transformation path resolves. No skill means no fabricated transformation.
         if (elapsed >= 45L && fighter.getRacialSkillLevel() > 0
                 && !data.getBoolean(FORM_REQUESTED) && !fighter.isAwakening() && !fighter.isRacialFormActive()) {
             data.putBoolean(FORM_REQUESTED, true);
             fighter.beginAwakening();
         }
+
         return true;
     }
 
@@ -116,5 +113,6 @@ public final class FighterFullPowerManager {
         fighter.getPersistentData().remove(START);
         fighter.getPersistentData().remove(UNTIL);
         fighter.getPersistentData().remove(FORM_REQUESTED);
+        fighter.finishFullPowerState();
     }
 }

@@ -137,6 +137,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
      * value, so forms, fruit and social flares must never become the source of permanent growth.
      */
     private static final String PERMANENT_BATTLE_POWER = "LWPermanentBattlePower";
+    public static final String TEMPORARY_AWAKENING = "LWTemporaryAwakening";
     /** Highest real BP reached through a permanent organic gain; faction maintenance respects it. */
     private static final String EARNED_BATTLE_POWER_FLOOR = "LWEarnedBattlePowerFloor";
     private static final String POWER_COMPARE_RESTORE_BP = "LWPowerCompareRestoreBP";
@@ -279,6 +280,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     private static final String[] BIO_MAIN = {"#187600", "#247E16", "#326B24", "#0D6446"};
     private static final String[] BIO_SECOND = {"#9FE321", "#7FCF27", "#B1D54E", "#5EBF69"};
     private static final String[] BIO_ACCENT = {"#FF7600", "#E84C20", "#E9BD25", "#C84639"};
+    private static final String[] BIO_EYES = {"#2B211B", "#503522", "#6B4A2B", "#3E5F43", "#355C7D", "#566B85", "#6B456E"};
     private static final String[] FROST_BODY_MAIN = {"#FFFFFF", "#F6FBFF", "#EAF2FF", "#FFF7FF"};
     private static final String[] FROST_BODY_SECOND = {"#E8A2FF", "#C98DFF", "#B976EA", "#F0B7FF"};
     private static final String[] FROST_BODY_ACCENT = {"#FF39A9", "#D936C6", "#C449FF", "#FF5A75"};
@@ -1532,9 +1534,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     public long getPermanentBattlePowerLong() {
         double effective = legacyData.getDouble(FighterPowerStatScaler.EFFECTIVE_STATS);
         if (effective > 0.0D && Double.isFinite(effective)) {
-            double totalStats = entityData.get(READY) && getAttribute(Attributes.ATTACK_DAMAGE) != null
-                    ? FighterPowerStatScaler.currentTotalStats(this) : effective;
-            double calculated = FighterPowerStatScaler.battlePowerForStats(this, totalStats);
+            double calculated = FighterPowerStatScaler.battlePowerForEffectiveBudget(this, effective);
             return calculated >= Long.MAX_VALUE ? Long.MAX_VALUE : Math.max(1L, Math.round(calculated));
         }
         long stored = legacyData.getLong(PERMANENT_BATTLE_POWER);
@@ -1694,17 +1694,24 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                     kaioken.melee(), kaioken.defense(), kaioken.vitality(), kaioken.ki());
             else projected *= kaiokenMultiplier(getKaiokenLevel());
         }
+        if (isAwakened() && !isRacialFormActive() && !isKaiokenActive()) {
+            double melee = getRank() == FighterRank.VETERAN ? 1.32D : 1.20D;
+            double ki = getRank() == FighterRank.VETERAN ? 1.34D : 1.20D;
+            projected = FighterPowerStatScaler.transformedBattlePower(this, melee, melee, 1.0D, ki);
+        }
         return (int)Math.min(Integer.MAX_VALUE - 1L, Math.max(1L, Math.round(projected)));
     }
 
     private boolean hasTemporaryPowerLayer() {
         return isRacialFormActive() || isKaiokenActive() || isTransforming() || socialPowerDisplay
+                || getPersistentData().getBoolean(TEMPORARY_AWAKENING)
                 || FighterSpecialItemManager.hasActiveMightFruit(this);
     }
 
     /** Fruit is a real one-minute combat boost and may refresh stats; forms/social displays are not. */
     private boolean blocksPowerProfileRefresh() {
-        return isRacialFormActive() || isKaiokenActive() || isTransforming() || socialPowerDisplay;
+        return isRacialFormActive() || isKaiokenActive() || isTransforming() || socialPowerDisplay
+            || getPersistentData().getBoolean(TEMPORARY_AWAKENING);
     }
 
     private void applyPowerScaledCoreAttributes() {
@@ -1729,6 +1736,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         NpcFormConfigBridge.Form kaioken = isKaiokenActive()
                 ? NpcFormConfigBridge.kaioken(getKaiokenLevel()) : null;
         if (kaioken != null) defense *= kaioken.defense();
+        if (isAwakened()) defense *= getRank() == FighterRank.VETERAN ? 1.32D : 1.20D;
         return defense;
     }
 
@@ -2001,7 +2009,6 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (!level().isClientSide && sanctionedMatchParticipant) {
             if (!isSanctionedOpponent(attackerEntity)) return false;
             if (isDefeated() || recoveryGraceTicks > 0) return false;
-            if (SanctionedMatchGuard.interceptFinalNpcSparDamage(this, source, amount)) return true;
             // Legitimate non-finishing spar damage uses DMZ's real damage path, but bypasses
             // crime/faction-war logic and ordinary NPC concession/death handling below.
             return super.hurt(source, amount);
@@ -2634,17 +2641,37 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 entityData.set(MOUTH_TYPE, 0);
                 entityData.set(HAIR_ID, 0);
                 entityData.set(OUTFIT, 0);
-                entityData.set(BODY_COLOR, pick(random, BIO_MAIN));
-                entityData.set(BODY_COLOR2, pick(random, BIO_SECOND));
-                entityData.set(BODY_COLOR3, pick(random, BIO_ACCENT));
+                applyBioAndroidColors(random);
             }
         }
+    }
+
+    private void applyBioAndroidColors(RandomSource random) {
+        boolean standardVariant = random.nextBoolean();
+        entityData.set(BODY_COLOR, standardVariant
+                ? colorVariant(random, parseHex(pick(random, BIO_MAIN), 0x187600), 24) : randomColor(random));
+        entityData.set(BODY_COLOR2, standardVariant
+                ? colorVariant(random, parseHex(pick(random, BIO_SECOND), 0x9FE321), 24) : randomColor(random));
+        entityData.set(BODY_COLOR3, standardVariant
+                ? colorVariant(random, parseHex(pick(random, BIO_ACCENT), 0xFF7600), 24) : randomColor(random));
+
+        String primary = standardVariant
+                ? colorVariant(random, parseHex(pick(random, BIO_EYES), 0x355C7D), 18) : randomColor(random);
+        String secondary = primary;
+        if (random.nextFloat() >= 0.04F) {
+            for (int tries = 0; tries < 8 && secondary.equals(primary); tries++) {
+                secondary = standardVariant
+                        ? colorVariant(random, parseHex(pick(random, BIO_EYES), 0x355C7D), 18) : randomColor(random);
+            }
+        }
+        entityData.set(EYE1_COLOR, primary);
+        entityData.set(EYE2_COLOR, secondary);
     }
 
     private static float rollNaturalScale(RandomSource random, FighterRace race, boolean female) {
         // This race's player model is authored around DMZ's exact 0.7375 default scaling.
         // Applying the generic NPC height roll distorted every Frost geo and its external horns.
-        if (race == FighterRace.FROST_DEMON) return 0.7375F;
+        if (race == FighterRace.FROST_DEMON) return 0.7375F * (1.0F + random.nextFloat() * 0.30F);
         // Wider natural range than the old near-uniform silhouettes. Extremes are intentionally
         // uncommon because the triangular roll below still clusters most fighters near average.
         float min = switch (race) {
@@ -3589,10 +3616,12 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
         entityData.set(AWAKENED, true);
         double multiplier = getRank() == FighterRank.VETERAN ? 1.72D : 1.42D;
-        setEarnedBattlePowerAndRefresh((int)Math.min(Integer.MAX_VALUE - 1L,
-                Math.round(Math.max(1, getPermanentBattlePower()) * multiplier)));
+        boolean temporary = getPersistentData().getBoolean(TEMPORARY_AWAKENING);
+        if (!temporary) setEarnedBattlePowerAndRefresh((int)Math.min(Integer.MAX_VALUE - 1L,
+            Math.round(Math.max(1, getPermanentBattlePower()) * multiplier)));
         applyAwakenedCombatBoost();
-        setHealth(Math.min(getMaxHealth(), getHealth() + getMaxHealth() * (getRank() == FighterRank.VETERAN ? 0.26F : 0.18F)));
+        setBattlePower(projectedBattlePower());
+        if (!temporary) setHealth(Math.min(getMaxHealth(), getHealth() + getMaxHealth() * (getRank() == FighterRank.VETERAN ? 0.26F : 0.18F)));
 
         if (getRace() == FighterRace.SAIYAN) {
             entityData.set(HAIR_COLOR, "#F2D35A");
@@ -3631,7 +3660,6 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         racialBaseLightning = isLightning();
 
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, configured.skillLevel());
-        refreshTemporaryPowerProjection();
         if (attack != null) attack.setBaseValue(racialBaseAttack * configured.melee());
         if (speed != null) speed.setBaseValue(racialBaseSpeed * configured.speed());
         setDefaultAttackSpeed(racialBaseAttackSpeed * configured.attackSpeed());
@@ -3641,6 +3669,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         var health = getAttribute(Attributes.MAX_HEALTH);
         if (health != null) health.setBaseValue(health.getBaseValue() * configured.vitality());
         setHealth(Math.max(1.0F, getMaxHealth() * healthRatio));
+        setBattlePower(projectedBattlePower());
         entityData.set(DISPLAY_SCALE, racialBaseScale * configured.scale());
         setScaleVal(getDisplayScale());
         if (!configured.hairColor().isBlank()) entityData.set(HAIR_COLOR, configured.hairColor());
@@ -3665,7 +3694,6 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     public void stopRacialForm() {
         if (!isRacialFormActive()) return;
-        FighterPowerStatScaler.preserveCurrentMaxHealth(this);
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, 0);
         refreshTemporaryPowerProjection();
         var attack = getAttribute(Attributes.ATTACK_DAMAGE);
@@ -3685,6 +3713,20 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         // Rebuild from canonical BP now that the temporary form multiplier has ended. This is
         // what makes a training gain earned during the form real in HP, melee and Ki as well.
         if (!isKaiokenActive()) refreshCombatStatsFromPower();
+    }
+
+    public void finishFullPowerState() {
+        boolean temporaryAwakening = getPersistentData().getBoolean(TEMPORARY_AWAKENING);
+        if (isRacialFormActive()) stopRacialForm();
+        if (temporaryAwakening) {
+            awakeningTicks = 0;
+            racialTransformPending = false;
+            setTransforming(false);
+            entityData.set(AWAKENED, false);
+            getPersistentData().remove(TEMPORARY_AWAKENING);
+            setBattlePower(projectedBattlePower());
+            if (entityData.get(READY)) refreshCombatStatsFromPower();
+        }
     }
 
     public void debugUnlockFlight() {
@@ -5088,8 +5130,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             applyFrostDemonColors(frostAppearance,
                     !tag.contains("LWBodyColor"), !tag.contains("LWBodyColor2"), !tag.contains("LWBodyColor3"),
                     !tag.contains("LWHairColor"), !tag.contains("LWEye1Color") && !tag.contains("LWEye2Color"));
-            entityData.set(DISPLAY_SCALE, 0.7375F);
-            setScaleVal(0.7375F);
+            float frostScale = 0.7375F * (1.0F + (Math.floorMod(getUUID().hashCode(), 31) / 30.0F) * 0.30F);
+            entityData.set(DISPLAY_SCALE, frostScale);
+            setScaleVal(frostScale);
         }
         if (tag.contains("LWEye1Color")) entityData.set(EYE1_COLOR, tag.getString("LWEye1Color"));
         if (tag.contains("LWEye2Color")) entityData.set(EYE2_COLOR, tag.getString("LWEye2Color"));
@@ -5109,8 +5152,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             entityData.set(EYE2_COLOR, redEye);
         }
         if (getRace() == FighterRace.FROST_DEMON) {
-            entityData.set(DISPLAY_SCALE, 0.7375F);
-            setScaleVal(0.7375F);
+            float frostScale = 0.7375F * (1.0F + (Math.floorMod(getUUID().hashCode(), 31) / 30.0F) * 0.30F);
+            entityData.set(DISPLAY_SCALE, frostScale);
+            setScaleVal(frostScale);
         }
         entityData.set(SPEECH, "");
         speechTicks = 0;

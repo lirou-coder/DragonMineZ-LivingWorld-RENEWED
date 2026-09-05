@@ -15,6 +15,7 @@
     ,"NamekianRevampRacialSkillMixin"
     ,"NamekianRevampTargetMixin"
     ,"MajinRevampFriendlyFistMixin"
+    ,"SanctionedMatchDamageMixin"
     ,"WishTypeAdapterMixin"
     ,"TargetHelperCompanionMixin"
   ],

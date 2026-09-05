@@ -159,8 +159,9 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         float[] eye1 = rgb(e.getEye1Color());
         String gender = e.isFemale() ? "female" : "male";
         String root = "textures/entity/races/majin/";
-        layer(majinModel, pose, buffers, e, dmz(root + "bodytype_" + gender + "_" + e.getBodyType() + "_layer1.png"), body, pt, light, overlay);
-        if (e.getBodyType() == 1) {
+        int bodyType = Math.floorMod(e.getBodyType(), 3);
+        layer(majinModel, pose, buffers, e, dmz(root + "bodytype_" + gender + "_" + bodyType + "_layer1.png"), body, pt, light, overlay);
+        if (bodyType == 1) {
             layer(majinModel, pose, buffers, e, dmz(root + "bodytype_" + gender + "_1_layer2.png"), rgb(e.getBodyColor2()), pt, light, overlay);
         }
         int eyeType = Math.floorMod(e.getEyesType(), MAJIN_EYES.length);
@@ -175,7 +176,7 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         layer(majinModel, pose, buffers, e, eye[0], eyeBackground, pt, light, overlay);
         layer(majinModel, pose, buffers, e, eye[1], eyeInner, pt, light, overlay);
         if (eye.length > 2) layer(majinModel, pose, buffers, e, eye[2], body, pt, light, overlay);
-        float[] faceColor = e.getBodyType() == 1 ? rgb(e.getBodyColor2()) : body;
+        float[] faceColor = bodyType == 1 ? rgb(e.getBodyColor2()) : body;
         layer(majinModel, pose, buffers, e, MAJIN_NOSES[Math.floorMod(e.getNoseType(), MAJIN_NOSES.length)],
                 faceColor, pt, light, overlay);
         layer(majinModel, pose, buffers, e, MAJIN_MOUTHS[Math.floorMod(e.getMouthType(), MAJIN_MOUTHS.length)],
@@ -247,21 +248,29 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
 
     private void renderBio(PoseStack pose, AmbientFighterEntity e, BakedGeoModel model,
                            MultiBufferSource buffers, float pt, int light, int overlay) {
+        if (e.getRace() != com.dmzlivingworld.entity.FighterRace.BIO_ANDROID) return;
+        BakedGeoModel bioModel = getGeoModel().getBakedModel(getGeoModel().getModelResource(e));
+        if (bioModel == null) return;
         String root = "textures/entity/races/bioandroid/";
         float[] main = rgb(e.getBodyColor());
         float[] second = rgb(e.getBodyColor2());
         float[] accent = rgb(e.getBodyColor3());
-        float[][] tints = {main, second, accent, WHITE, WHITE};
-        for (int i = 1; i <= 5; i++) {
-            layer(model, pose, buffers, e, dmz(root + "base_" + e.getBodyType() + "_layer" + i + ".png"), tints[i - 1], pt, light, overlay);
+        float[] hair = rgb(e.getHairColor());
+        int bodyType = Math.floorMod(e.getBodyType(), 3);
+        var activeForm = e.getActiveRacialForm();
+        String formId = activeForm == null ? "" : activeForm.id();
+        String modelKey = activeForm == null ? "" : activeForm.modelKey();
+        String phase = "base";
+        if ("semiperfect".equals(formId) || "bioandroid_semi".equals(modelKey)) phase = "semiperfect";
+        else if (activeForm != null) phase = "perfect";
+        float[][] tints = {main, second, accent, hair};
+        for (int i = 1; i <= 4; i++) {
+            layer(bioModel, pose, buffers, e, dmz(root + phase + "_" + bodyType + "_layer" + i + ".png"), tints[i - 1], pt, light, overlay);
         }
-        String form = switch (e.getBodyType()) {
-            case 1 -> "semiperfect";
-            case 2 -> "perfect";
-            default -> "base";
-        };
-        layer(model, pose, buffers, e, dmz(root + "faces/" + form + "_eye_layer0.png"), WHITE, pt, light, overlay);
-        layer(model, pose, buffers, e, dmz(root + "faces/" + form + "_eye_layer1.png"), rgb(e.getEye1Color()), pt, light, overlay);
+        if (!"xenomax".equals(formId) && !"xenofp".equals(formId))
+            layer(bioModel, pose, buffers, e, dmz(root + phase + "_" + bodyType + "_layer5.png"), rgb("#D9B28D"), pt, light, overlay);
+        layer(bioModel, pose, buffers, e, dmz(root + "faces/" + phase + "_eye_layer0.png"), WHITE, pt, light, overlay);
+        layer(bioModel, pose, buffers, e, dmz(root + "faces/" + phase + "_eye_layer1.png"), rgb(e.getEye1Color()), pt, light, overlay);
     }
 
     /**

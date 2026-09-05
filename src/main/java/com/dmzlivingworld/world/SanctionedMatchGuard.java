@@ -13,7 +13,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -198,20 +197,6 @@ public final class SanctionedMatchGuard {
         return null;
     }
 
-    /** Called only after AmbientFighterEntity has applied its real DMZ melee and Defense mitigation. */
-    public static boolean interceptFinalNpcSparDamage(AmbientFighterEntity fighter, DamageSource source, float finalDamage) {
-        if (fighter == null || fighter.level().isClientSide || !fighter.isSanctionedMatchParticipant()) return false;
-        LivingEntity attacker = responsibleAttacker(source);
-        if (!(attacker instanceof ServerPlayer player) || !fighter.isSanctionedOpponent(player)) return false;
-        float floor = Math.max(1.0F, fighter.getMaxHealth() * 0.30F);
-        if (fighter.getHealth() - Math.max(0.0F, finalDamage) > floor) return false;
-        fighter.setHealth(floor);
-        fighter.restoreSanctionedLivingState(false);
-        fighter.concedeSanctionedMatch();
-        SparManager.finishFromFinalDamage(player, fighter, true);
-        return true;
-    }
-
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingHurt(LivingHurtEvent event) {
         if (event.getAmount() <= 0.0F) return;
@@ -253,39 +238,34 @@ public final class SanctionedMatchGuard {
         }
     }
 
-    /**
-     * Preventive player-side floor. LOWEST is intentional: DMZ and compatibility handlers have
-     * already converted the original hit into the mitigated amount by this point.
-     */
-    /** The 30% decision uses the final damage after DMZ defense and every other modifier. */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(LivingDamageEvent event) {
-        if (event.getAmount() <= 0.0F) return;
-        LivingEntity responsible = responsibleAttacker(event.getSource());
-        if (event.getEntity() instanceof AmbientFighterEntity fighter && fighter.isSanctionedMatchParticipant()) {
-            if (!(responsible instanceof ServerPlayer player) || !fighter.isSanctionedOpponent(player)) return;
+    /** Receives the exact damage after actuallyHurt has completed all mitigation. */
+    public static boolean handleFinalSparDamage(LivingEntity target, DamageSource source, float finalDamage) {
+        if (target == null || target.level().isClientSide || finalDamage <= 0.0F) return false;
+        float safeDamage = Float.isFinite(finalDamage) ? Math.max(0.0F, finalDamage) : Float.POSITIVE_INFINITY;
+        LivingEntity responsible = responsibleAttacker(source);
+        if (target instanceof AmbientFighterEntity fighter && fighter.isSanctionedMatchParticipant()) {
+            if (!(responsible instanceof ServerPlayer player) || !fighter.isSanctionedOpponent(player)) return false;
             float floor = Math.max(1.0F, fighter.getMaxHealth() * 0.30F);
-            if (fighter.getHealth() - event.getAmount() <= floor) {
-                // LivingDamageEvent already contains the post-mitigation amount. Cancel its
-                // application entirely and place the target exactly on the sanctioned floor.
-                event.setCanceled(true);
+            if (fighter.getHealth() - safeDamage <= floor) {
                 fighter.setHealth(floor);
                 fighter.restoreSanctionedLivingState(false);
                 SparManager.finishFromFinalDamage(player, fighter, true);
+                return true;
             }
-            return;
+            return false;
         }
-        if (event.getEntity() instanceof ServerPlayer player && SparManager.isPlayerInSpar(player)
+        if (target instanceof ServerPlayer player && SparManager.isPlayerInSpar(player)
                 && responsible instanceof AmbientFighterEntity fighter
                 && SparManager.isSanctionedPlayerOpponent(player, fighter)) {
             float floor = Math.max(1.0F, player.getMaxHealth() * 0.30F);
-            if (player.getHealth() - event.getAmount() <= floor) {
-                event.setCanceled(true);
+            if (player.getHealth() - safeDamage <= floor) {
                 player.setHealth(floor);
                 player.setPose(Pose.STANDING);
                 SparManager.finishFromFinalDamage(player, fighter, false);
+                return true;
             }
         }
+        return false;
     }
 
     @SubscribeEvent
