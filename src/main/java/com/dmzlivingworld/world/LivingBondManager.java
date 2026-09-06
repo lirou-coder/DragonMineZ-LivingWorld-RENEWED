@@ -602,26 +602,15 @@ public final class LivingBondManager {
         double vertical = player.getY() - companion.getY();
         boolean playerAirborne = isActuallyFlying(player);
 
-        // If the owner gets five blocks above an earthbound companion, capture that exact point.
-        // The rescue flight deliberately does not chase the owner's later positions: it reaches
-        // the captured ledge first, then returns to ordinary pet-style following.
-        boolean rescueFlight = travelData.getBoolean("LWCompanionRescueFlight");
-        if (!rescueFlight && vertical >= 5.0D && companion.hasFlightUnlocked() && !companion.isNonCombatant()) {
-            rescueFlight = true;
-            travelData.putBoolean("LWCompanionRescueFlight", true);
-            travelData.putDouble("LWCompanionRescueX", player.getX());
-            travelData.putDouble("LWCompanionRescueY", player.getY() + 0.5D);
-            travelData.putDouble("LWCompanionRescueZ", player.getZ());
-        }
-        Vec3 flightTarget = rescueFlight
-                ? new Vec3(travelData.getDouble("LWCompanionRescueX"), travelData.getDouble("LWCompanionRescueY"),
-                        travelData.getDouble("LWCompanionRescueZ"))
-                : player.position().add(0.0D, 1.0D, 0.0D);
+        // The companion always flies toward the owner's live position, never a captured
+        // snapshot, so it keeps tracking them if they keep moving after triggering flight.
+        boolean rescueFlight = vertical >= 5.0D && companion.hasFlightUnlocked() && !companion.isNonCombatant();
+        travelData.remove("LWCompanionRescueFlight");
+        travelData.remove("LWCompanionRescueX");
+        travelData.remove("LWCompanionRescueY");
+        travelData.remove("LWCompanionRescueZ");
+        Vec3 flightTarget = player.position().add(0.0D, 1.0D, 0.0D);
         double flightDistanceSq = companion.position().distanceToSqr(flightTarget);
-        if (rescueFlight && flightDistanceSq <= 2.25D) {
-            rescueFlight = false;
-            travelData.remove("LWCompanionRescueFlight");
-        }
 
         // Keep an already airborne companion under direct flight control while descending. This
         // mirrors DBSagasEntity instead of handing a flying entity to ground navigation, which was

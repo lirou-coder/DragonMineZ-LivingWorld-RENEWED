@@ -1992,8 +1992,6 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         Entity attackerEntity = source.getEntity();
-        if (!level().isClientSide && attackerEntity instanceof ServerPlayer player && amount > 0.0F)
-            PlayerSpawnCombatSafety.notePlayerAttack(this, player);
         if (!level().isClientSide && SanctionedMatchGuard.isPostSparInvulnerable(this)) return false;
         if (!level().isClientSide && attackerEntity instanceof ServerPlayer player
                 && PlayerCreationSafety.isCreating(player)) return false;

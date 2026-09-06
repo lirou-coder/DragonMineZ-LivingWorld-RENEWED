@@ -7,31 +7,17 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
-import java.util.UUID;
-
-/** Prevents unsolicited Living World combat in the four-chunk area around a player's spawn. */
+/** Prevents unsolicited Living World combat in the five-chunk radius around a player's spawnpoint. */
 public final class PlayerSpawnCombatSafety {
-    private static final String ATTACKER = "LWSpawnSafetyPlayerAttacker";
-    private static final String ATTACK_UNTIL = "LWSpawnSafetyPlayerAttackUntil";
-    private static final double RADIUS = 4.0D * 16.0D;
+    private static final double RADIUS = 5.0D * 16.0D;
+    private static final double RADIUS_SQ = RADIUS * RADIUS;
 
     private PlayerSpawnCombatSafety() {}
 
-    public static void notePlayerAttack(AmbientFighterEntity fighter, ServerPlayer player) {
-        if (fighter == null || player == null) return;
-        fighter.getPersistentData().putUUID(ATTACKER, player.getUUID());
-        fighter.getPersistentData().putLong(ATTACK_UNTIL,
-                player.serverLevel().getServer().overworld().getGameTime() + 1200L);
-    }
-
+    /** Starting a Spar with the target is the only way to bypass this protection; self-defence never does. */
     public static boolean blocksTarget(AmbientFighterEntity fighter, ServerPlayer player) {
-        if (fighter == null || player == null || !(fighter.level() instanceof ServerLevel level)) return false;
+        if (fighter == null || player == null) return false;
         if (fighter.isSanctionedMatchParticipant() && fighter.isSanctionedOpponent(player)) return false;
-        long now = level.getServer().overworld().getGameTime();
-        if (fighter.getPersistentData().hasUUID(ATTACKER)
-                && fighter.getPersistentData().getUUID(ATTACKER).equals(player.getUUID())
-                && fighter.getPersistentData().getLong(ATTACK_UNTIL) >= now) return false;
-
         return isInsideProtectedArea(player);
     }
 
@@ -48,6 +34,6 @@ public final class PlayerSpawnCombatSafety {
         if (!level.dimension().equals(spawnDimension)) return false;
         double dx = player.getX() - (spawn.getX() + 0.5D);
         double dz = player.getZ() - (spawn.getZ() + 0.5D);
-        return Math.abs(dx) <= RADIUS && Math.abs(dz) <= RADIUS;
+        return dx * dx + dz * dz <= RADIUS_SQ;
     }
 }

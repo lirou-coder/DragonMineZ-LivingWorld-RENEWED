@@ -365,33 +365,14 @@ public final class FighterLifeJoinManager {
     }
 
     private static String opening(AmbientFighterEntity fighter, ServerPlayer player, Opportunity opportunity, Entity target) {
-        String objective = switch (opportunity.kind()) {
-            case RIVAL -> "I found " + ((AmbientFighterEntity) target).getFighterName() + ". I'm settling this now.";
-            case EQUIPMENT -> "There's something nearby I can actually use. I'm going for it.";
-            case THREAT -> "There's trouble nearby. I'm not ignoring it.";
-            case FRIEND -> "I haven't checked in with " + ((AmbientFighterEntity) target).getFighterName() + " in a while. Come on.";
-            case FACTION -> "I'm checking in with " + ((AmbientFighterEntity) target).getFighterName() + " before I move on. Come if you want.";
+        String action = switch (opportunity.kind()) {
+            case RIVAL -> "settle things with " + ((AmbientFighterEntity) target).getFighterName();
+            case EQUIPMENT -> "grab some gear nearby";
+            case THREAT -> "deal with some trouble nearby";
+            case FRIEND -> "check in with " + ((AmbientFighterEntity) target).getFighterName();
+            case FACTION -> "check in with " + ((AmbientFighterEntity) target).getFighterName();
         };
-        int relationship = fighter.isRememberedFor(player) ? fighter.getMemoryRelationship() : 0;
-        String address = relationship >= 35 ? "I trust you, so come with me. "
-                : relationship >= 15 ? "You can come if you keep up. " : "Stay out of my way. ";
-        String mood = switch (ReactiveWorldManager.mood(fighter)) {
-            case UPBEAT -> "This should be a good change of pace. ";
-            case IRRITATED -> "I don't want to waste time. ";
-            case SOMBER -> "I need to do this, even if I'm not feeling talkative. ";
-            case WARY -> "Keep your eyes open. ";
-            case WEARY -> "I'm tired, but this still needs doing. ";
-            case FOCUSED -> "I've made up my mind. ";
-            case CONTENT -> "Now is as good a time as any. ";
-        };
-        String personality = switch (fighter.getPersonality()) {
-            case HEROIC -> "Let's handle it properly. ";
-            case CALM -> "No need to rush blindly. ";
-            case CAUTIOUS -> "We'll take the safe route. ";
-            case PROUD -> "Don't slow me down. ";
-            case AGGRESSIVE -> "If it turns into a fight, even better. ";
-        };
-        return address + mood + personality + objective;
+        return "I'm going to " + action + ". Stay close.";
     }
 
     private static void moveTowardOpportunity(AmbientFighterEntity fighter, Entity target, boolean refreshGroundPath) {
