@@ -1,0 +1,32 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.dmzlwfusion.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "FusionModeHandlerMixin",
+    "FusionStatusHandlerMixin",
+    "SagaFusionAnimationMixin",
+    "KiProjectileProtectionMixin",
+    "KiLaserExplosionMixin",
+    "LivingWorldOwnedMonsterPersistenceMixin",
+    "LivingWorldOwnedHostilePersistenceMixin"
+    ,"RacialSkillLogicMixin"
+    ,"NamekianRevampRacialSkillMixin"
+    ,"NamekianRevampTargetMixin"
+    ,"MajinRevampFriendlyFistMixin"
+    ,"SanctionedMatchDamageMixin"
+    ,"PlayerRestMonsterMixin"
+    ,"WishTypeAdapterMixin"
+    ,"TargetHelperCompanionMixin"
+  ],
+  "client": [
+    "FighterModelAnimationMixin",
+    "GeoItemRendererAccessor",
+    "KiSenseVisualBattlePowerMixin",
+    "ScouterVisualBattlePowerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

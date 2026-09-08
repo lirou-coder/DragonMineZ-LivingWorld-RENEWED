@@ -1,0 +1,70 @@
+# DragonMine Z TP bridge
+#
+# dmzpoints remains inside Minecraft server-function context.
+# 1..20 are kept for upgrade compatibility; larger rewards use unique binary tags.
+
+execute as @a[tag=dbzm_tp_reward_1] run dmzpoints add 1 @s
+execute as @a[tag=dbzm_tp_reward_2] run dmzpoints add 2 @s
+execute as @a[tag=dbzm_tp_reward_3] run dmzpoints add 3 @s
+execute as @a[tag=dbzm_tp_reward_4] run dmzpoints add 4 @s
+execute as @a[tag=dbzm_tp_reward_5] run dmzpoints add 5 @s
+execute as @a[tag=dbzm_tp_reward_6] run dmzpoints add 6 @s
+execute as @a[tag=dbzm_tp_reward_7] run dmzpoints add 7 @s
+execute as @a[tag=dbzm_tp_reward_8] run dmzpoints add 8 @s
+execute as @a[tag=dbzm_tp_reward_9] run dmzpoints add 9 @s
+execute as @a[tag=dbzm_tp_reward_10] run dmzpoints add 10 @s
+execute as @a[tag=dbzm_tp_reward_11] run dmzpoints add 11 @s
+execute as @a[tag=dbzm_tp_reward_12] run dmzpoints add 12 @s
+execute as @a[tag=dbzm_tp_reward_13] run dmzpoints add 13 @s
+execute as @a[tag=dbzm_tp_reward_14] run dmzpoints add 14 @s
+execute as @a[tag=dbzm_tp_reward_15] run dmzpoints add 15 @s
+execute as @a[tag=dbzm_tp_reward_16] run dmzpoints add 16 @s
+execute as @a[tag=dbzm_tp_reward_17] run dmzpoints add 17 @s
+execute as @a[tag=dbzm_tp_reward_18] run dmzpoints add 18 @s
+execute as @a[tag=dbzm_tp_reward_19] run dmzpoints add 19 @s
+execute as @a[tag=dbzm_tp_reward_20] run dmzpoints add 20 @s
+execute as @a[tag=dbzm_tp_reward_32] run dmzpoints add 32 @s
+execute as @a[tag=dbzm_tp_reward_64] run dmzpoints add 64 @s
+execute as @a[tag=dbzm_tp_reward_128] run dmzpoints add 128 @s
+execute as @a[tag=dbzm_tp_reward_256] run dmzpoints add 256 @s
+execute as @a[tag=dbzm_tp_reward_512] run dmzpoints add 512 @s
+execute as @a[tag=dbzm_tp_reward_1024] run dmzpoints add 1024 @s
+execute as @a[tag=dbzm_tp_reward_2048] run dmzpoints add 2048 @s
+execute as @a[tag=dbzm_tp_reward_4096] run dmzpoints add 4096 @s
+execute as @a[tag=dbzm_tp_reward_8192] run dmzpoints add 8192 @s
+execute as @a[tag=dbzm_tp_reward_16384] run dmzpoints add 16384 @s
+execute as @a[tag=dbzm_tp_reward_32768] run dmzpoints add 32768 @s
+execute as @a[tag=dbzm_tp_reward_65536] run dmzpoints add 65536 @s
+
+tag @a[tag=dbzm_tp_reward_1] remove dbzm_tp_reward_1
+tag @a[tag=dbzm_tp_reward_2] remove dbzm_tp_reward_2
+tag @a[tag=dbzm_tp_reward_3] remove dbzm_tp_reward_3
+tag @a[tag=dbzm_tp_reward_4] remove dbzm_tp_reward_4
+tag @a[tag=dbzm_tp_reward_5] remove dbzm_tp_reward_5
+tag @a[tag=dbzm_tp_reward_6] remove dbzm_tp_reward_6
+tag @a[tag=dbzm_tp_reward_7] remove dbzm_tp_reward_7
+tag @a[tag=dbzm_tp_reward_8] remove dbzm_tp_reward_8
+tag @a[tag=dbzm_tp_reward_9] remove dbzm_tp_reward_9
+tag @a[tag=dbzm_tp_reward_10] remove dbzm_tp_reward_10
+tag @a[tag=dbzm_tp_reward_11] remove dbzm_tp_reward_11
+tag @a[tag=dbzm_tp_reward_12] remove dbzm_tp_reward_12
+tag @a[tag=dbzm_tp_reward_13] remove dbzm_tp_reward_13
+tag @a[tag=dbzm_tp_reward_14] remove dbzm_tp_reward_14
+tag @a[tag=dbzm_tp_reward_15] remove dbzm_tp_reward_15
+tag @a[tag=dbzm_tp_reward_16] remove dbzm_tp_reward_16
+tag @a[tag=dbzm_tp_reward_17] remove dbzm_tp_reward_17
+tag @a[tag=dbzm_tp_reward_18] remove dbzm_tp_reward_18
+tag @a[tag=dbzm_tp_reward_19] remove dbzm_tp_reward_19
+tag @a[tag=dbzm_tp_reward_20] remove dbzm_tp_reward_20
+tag @a[tag=dbzm_tp_reward_32] remove dbzm_tp_reward_32
+tag @a[tag=dbzm_tp_reward_64] remove dbzm_tp_reward_64
+tag @a[tag=dbzm_tp_reward_128] remove dbzm_tp_reward_128
+tag @a[tag=dbzm_tp_reward_256] remove dbzm_tp_reward_256
+tag @a[tag=dbzm_tp_reward_512] remove dbzm_tp_reward_512
+tag @a[tag=dbzm_tp_reward_1024] remove dbzm_tp_reward_1024
+tag @a[tag=dbzm_tp_reward_2048] remove dbzm_tp_reward_2048
+tag @a[tag=dbzm_tp_reward_4096] remove dbzm_tp_reward_4096
+tag @a[tag=dbzm_tp_reward_8192] remove dbzm_tp_reward_8192
+tag @a[tag=dbzm_tp_reward_16384] remove dbzm_tp_reward_16384
+tag @a[tag=dbzm_tp_reward_32768] remove dbzm_tp_reward_32768
+tag @a[tag=dbzm_tp_reward_65536] remove dbzm_tp_reward_65536

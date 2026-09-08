@@ -75,7 +75,7 @@ public final class WorldPowerScaler {
                     double hp = Math.max(0.0D, kill.getHealth());
                     double melee = Math.max(0.0D, kill.getMeleeDamage());
                     double ki = Math.max(0.0D, kill.getKiDamage());
-                    double reference = (hp + melee + ki) / 2.0D;
+                    double reference = ((hp/2.0D) + melee + ki) / 2.0D;
                     if (Double.isFinite(reference) && reference > 0.0D) return reference;
                 }
             }
