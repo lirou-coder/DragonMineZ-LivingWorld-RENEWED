@@ -69,6 +69,17 @@ public final class FactionWorldData extends SavedData {
         );
     }
 
+    /** Recreate the procedural faction map and erase every saved war/request state. */
+    public void resetData(ServerLevel level) {
+        factions.clear();
+        new HashSet<>(factionStates.getAllKeys()).forEach(factionStates::remove);
+        factions.addAll(ensureAnchorFactions(level, generateFactions(level, List.of(), targetFactionCount(level.getSeed()))));
+        lastOrganizationTick = 0L;
+        lastSocietyDay = -1L;
+        lastFactionFormationTick = level.getGameTime();
+        setDirty();
+    }
+
     private static FactionWorldData create(ServerLevel level) {
         long worldSeed = level.getSeed();
         int count = targetFactionCount(worldSeed);

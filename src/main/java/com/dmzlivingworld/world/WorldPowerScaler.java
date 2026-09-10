@@ -47,7 +47,8 @@ public final class WorldPowerScaler {
 
     /** Canonical totalStats budget. Every era is anchored to configured QUEST enemy stats. */
     public static double rollEffectiveStats(ServerLevel level, FighterRank rank, RandomSource random) {
-        double reference = sagaKillReference(level) * LivingWorldConfig.npcStrengthScale();
+        double reference = sagaKillReference(level) * LivingWorldConfig.npcStrengthScale()
+                * LivingWorldConfig.npcPowerMultiplier();
         return Math.max(1.0D, reference * rollReferenceFactor(rank, random));
     }
 
@@ -181,7 +182,8 @@ public final class WorldPowerScaler {
         double days = level.getServer().overworld().getGameTime() / 24000.0D;
         double ageFactor = 1.0D + Math.min(0.35D, Math.max(0.0D, days) / 900.0D);
         double difficulty = LivingWorldConfig.npcStrengthScale();
-        double effectiveReference = sagaKillReference(level) * ageFactor * difficulty;
+        double effectiveReference = sagaKillReference(level) * ageFactor * difficulty
+                * LivingWorldConfig.npcPowerMultiplier();
         return Math.max(90.0D, BattlePowerFormula.battlePower(Math.max(1.0D, effectiveReference)));
     }
 

@@ -16,6 +16,8 @@ public final class LivingWorldClientConfig {
     public static final ForgeConfigSpec.IntValue DIALOGUE_DISTANCE;
     public static final ForgeConfigSpec.BooleanValue SPEECH_TO_CHAT;
     public static final ForgeConfigSpec.IntValue SPEECH_CHAT_RADIUS;
+    public static final ForgeConfigSpec.DoubleValue HUD_SCALE;
+    public static final ForgeConfigSpec.DoubleValue FACTION_QUEST_HUD_SCALE;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -43,9 +45,13 @@ public final class LivingWorldClientConfig {
         DIALOGUE_DISTANCE = builder.comment("Maximum distance in blocks for floating dialogue.")
                 .defineInRange("dialogueDistance", 42, 8, 4096);
         SPEECH_TO_CHAT = builder.comment("Also mirror nearby Living World NPC speech into normal chat. Floating dialogue remains available independently.")
-                .define("speechToChat", false);
+                .define("speechToChat", true);
         SPEECH_CHAT_RADIUS = builder.comment("Maximum distance in blocks for NPC speech mirrored into chat.")
                 .defineInRange("speechChatRadius", 42, 8, 4096);
+        HUD_SCALE = builder.comment("Scale for Living World HUDs. 1.0 = base size.")
+                .defineInRange("hudScale", 1.0D, 0.5D, 3.0D);
+        FACTION_QUEST_HUD_SCALE = builder.comment("Additional scale used only by the faction quest HUD.")
+                .defineInRange("factionQuestHudScale", 0.85D, 0.5D, 3.0D);
 
         builder.pop();
         SPEC = builder.build();
@@ -64,11 +70,13 @@ public final class LivingWorldClientConfig {
     public static int dialogueDistance() { return DIALOGUE_DISTANCE.get(); }
     public static boolean speechToChat() { return SPEECH_TO_CHAT.get(); }
     public static int speechChatRadius() { return Math.min(70, SPEECH_CHAT_RADIUS.get()); }
+    public static float hudScale() { return HUD_SCALE.get().floatValue(); }
+    public static float factionQuestHudScale() { return FACTION_QUEST_HUD_SCALE.get().floatValue(); }
 
     public static Snapshot snapshot() {
         return new Snapshot(NAMEPLATE_SCALE.get(), DIALOGUE_SCALE.get(), NAMEPLATE_VERTICAL_OFFSET.get(),
                 SHOW_DISPOSITION_ICON.get(), SHOW_FACTION_LABEL.get(), SHOW_DIALOGUE.get(),
-                NAMEPLATE_DISTANCE.get(), FACTION_LABEL_DISTANCE.get(), DIALOGUE_DISTANCE.get(), SPEECH_TO_CHAT.get(), speechChatRadius());
+                NAMEPLATE_DISTANCE.get(), FACTION_LABEL_DISTANCE.get(), DIALOGUE_DISTANCE.get(), SPEECH_TO_CHAT.get(), speechChatRadius(), HUD_SCALE.get(), FACTION_QUEST_HUD_SCALE.get());
     }
 
     public static void apply(Snapshot v) {
@@ -84,14 +92,16 @@ public final class LivingWorldClientConfig {
         DIALOGUE_DISTANCE.set(Math.max(8, Math.min(4096, v.dialogueDistance())));
         SPEECH_TO_CHAT.set(v.speechToChat());
         SPEECH_CHAT_RADIUS.set(Math.max(8, Math.min(70, v.speechChatRadius())));
+        HUD_SCALE.set(clamp(v.hudScale(), .5D, 3D));
+        FACTION_QUEST_HUD_SCALE.set(clamp(v.factionQuestHudScale(), .5D, 3D));
         NAMEPLATE_SCALE.save();
     }
 
-    public static Snapshot defaults() { return new Snapshot(1.18D, 1.12D, 0.34D, true, true, true, 48, 30, 42, false, 42); }
+    public static Snapshot defaults() { return new Snapshot(1.18D, 1.12D, 0.34D, true, true, true, 48, 30, 42, true, 42, 1D, .85D); }
     private static double clamp(double v, double min, double max) { return Math.max(min, Math.min(max, v)); }
 
     public record Snapshot(double nameplateScale, double dialogueScale, double verticalOffset,
                            boolean showDispositionIcon, boolean showFactionLabel, boolean showDialogue,
                            int nameplateDistance, int factionLabelDistance, int dialogueDistance,
-                           boolean speechToChat, int speechChatRadius) {}
+                           boolean speechToChat, int speechChatRadius, double hudScale, double factionQuestHudScale) {}
 }

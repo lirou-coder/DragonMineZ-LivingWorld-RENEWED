@@ -2,6 +2,8 @@ package com.dmzlivingworld.client.screen;
 
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.network.FactionRequestTrackerPacket;
+import com.dmzlivingworld.client.ClientModEvents;
+import com.dmzlivingworld.config.LivingWorldClientConfig;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -21,16 +23,25 @@ public final class FactionRequestTrackerOverlay {
     private static volatile FactionRequestTrackerPacket current = FactionRequestTrackerPacket.clear();
     private static volatile String cachedLiveProgress = "";
     private static long cachedLiveProgressTick = Long.MIN_VALUE;
+    private static volatile boolean hiddenByPlayer;
     private FactionRequestTrackerOverlay() { }
 
     public static void update(FactionRequestTrackerPacket packet) {
         current = packet == null ? FactionRequestTrackerPacket.clear() : packet;
         refreshLiveProgress(true);
     }
+    public static void toggleVisibility() {
+        if (current != null && current.active()) hiddenByPlayer = !hiddenByPlayer;
+    }
+    /** World Settings is modal: keep quest state, but never render it under another LW menu. */
+    public static void suspendForWorldMenu() { hiddenByPlayer = true; }
+    public static void resumeAfterWorldMenu() { if (current != null && current.active()) hiddenByPlayer = false; }
+    public static boolean hasActiveRequest() { return current != null && current.active(); }
     public static void clear() {
         current = FactionRequestTrackerPacket.clear();
         cachedLiveProgress = "";
         cachedLiveProgressTick = Long.MIN_VALUE;
+        hiddenByPlayer = false;
     }
 
     private static void refreshLiveProgress(boolean force) {
@@ -61,6 +72,22 @@ public final class FactionRequestTrackerOverlay {
         GuiGraphics g = event.getGuiGraphics();
         int screenW = mc.getWindow().getGuiScaledWidth();
         int screenH = mc.getWindow().getGuiScaledHeight();
+        float scale = LivingWorldClientConfig.hudScale() * LivingWorldClientConfig.factionQuestHudScale();
+        g.pose().pushPose();
+        g.pose().translate(screenW, screenH, 0.0F);
+        g.pose().scale(scale, scale, 1.0F);
+        g.pose().translate(-screenW, -screenH, 0.0F);
+        String key = ClientModEvents.TOGGLE_FACTION_QUEST.getTranslatedKeyMessage().getString();
+        if (hiddenByPlayer) {
+            String prompt = "Press " + key + " to open faction quest";
+            int w = mc.font.width(prompt) + 20, h = 30, x = screenW - w - 10, y = Math.max(8, screenH - h - 10);
+            g.fill(x - 1, y - 1, x + w + 1, y + h + 1, LivingWorldGuiStyle.GOLD_DARK);
+            g.fill(x, y, x + w, y + h, 0xE80A1018);
+            g.fill(x, y, x + 4, y + h, LivingWorldGuiStyle.GOLD);
+            g.drawString(mc.font, prompt, x + 10, y + 10, LivingWorldGuiStyle.TEXT, false);
+            g.pose().popPose();
+            return;
+        }
         int w = 390, h = 120, x = screenW - w - 10;
         int totalH = h + (data.stepTotal() > 0 ? 70 : 0);
         // R38: active quest HUD lives in the bottom-right, above the screen edge as one compact block.
@@ -72,6 +99,8 @@ public final class FactionRequestTrackerOverlay {
         g.fill(x, y, x + 4, y + h, LivingWorldGuiStyle.GOLD);
 
         g.drawString(mc.font, "FACTION REQUEST", x + 10, y + 7, LivingWorldGuiStyle.GOLD, false);
+        String close = "Press " + key + " To Close";
+        g.drawString(mc.font, close, x + w - 10 - mc.font.width(close), y + 7, LivingWorldGuiStyle.MUTED, false);
         drawWrappedLimited(g, mc, data.title(), x + 10, y + 19, textWidth, LivingWorldGuiStyle.TEXT, 2);
 
         g.drawString(mc.font, "CURRENT OBJECTIVE", x + 10, y + 43, LivingWorldGuiStyle.BLUE, false);
@@ -103,6 +132,7 @@ public final class FactionRequestTrackerOverlay {
 
         drawCompass(g, mc, x + w - 35, y + 53, dx, dz, liveDistance, radius);
         if (data.stepTotal() > 0) drawMissionSteps(g, mc, data, x, y + h, w);
+        g.pose().popPose();
     }
 
     private static void drawMissionSteps(GuiGraphics g, Minecraft mc, FactionRequestTrackerPacket data, int x, int y, int w) {

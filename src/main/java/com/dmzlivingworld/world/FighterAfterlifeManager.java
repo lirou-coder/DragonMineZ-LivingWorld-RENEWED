@@ -319,6 +319,20 @@ public final class FighterAfterlifeManager {
         }
     }
 
+    /** Administrative world reset hook: no dead/assimilated identity may survive a fresh start. */
+    public static void resetData(MinecraftServer server) {
+        if (server == null) return;
+        Data data = Data.get(server.overworld());
+        data.dead.clear();
+        data.assimilated.clear();
+        data.setDirty();
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getAllEntities()) {
+                if (entity instanceof AmbientFighterEntity fighter && fighter.isDeadSoul()) fighter.discard();
+            }
+        }
+    }
+
     private static boolean isWorldMenaceRecord(CompoundTag entry) {
         return entry != null && WorldMenaceManager.isWorldMenaceProfile(entry.getCompound("Profile"));
     }

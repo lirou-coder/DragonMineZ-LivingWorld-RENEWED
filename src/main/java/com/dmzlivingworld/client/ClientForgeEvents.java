@@ -4,9 +4,11 @@ import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.network.LWNetwork;
 import com.dmzlivingworld.config.LivingWorldClientConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
+import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dragonminez.client.systems.kisense.KiSenseScan;
 import com.dragonminez.common.init.entities.sagas.SagaSaibamanEntity;
 import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -74,10 +76,14 @@ public final class ClientForgeEvents {
             lastLevel = minecraft.level;
         }
         while (ClientModEvents.OPEN_LIVING_WORLD.consumeClick()) {
+            FactionRequestTrackerOverlay.suspendForWorldMenu();
             LWNetwork.requestMenu("world", 0);
         }
         while (ClientModEvents.TRACK_LAST_WORLD_EVENT.consumeClick()) {
             if (minecraft.player.connection != null) minecraft.player.connection.sendCommand("lwtrack last");
+        }
+        while (ClientModEvents.TOGGLE_FACTION_QUEST.consumeClick()) {
+            FactionRequestTrackerOverlay.toggleVisibility();
         }
         mirrorNearbySpeechToChat(minecraft);
         refreshKiSenseWhenSaibamanPowerChanges(minecraft);
@@ -124,7 +130,10 @@ public final class ClientForgeEvents {
             }
             String previous = LAST_MIRRORED_SPEECH.put(id, speech);
             if (!speech.equals(previous)) {
-                minecraft.gui.getChat().addMessage(Component.literal("[Living World] " + fighter.getFighterName() + ": " + speech));
+                ChatFormatting nameColor = WorldMenaceManager.isHerobrine(fighter)
+                        ? ChatFormatting.RED : ChatFormatting.AQUA;
+                minecraft.gui.getChat().addMessage(Component.literal(fighter.getFighterName()).withStyle(nameColor)
+                        .append(Component.literal(": " + speech).withStyle(ChatFormatting.WHITE)));
             }
         }
         LAST_MIRRORED_SPEECH.keySet().removeIf(id -> !nearby.contains(id));

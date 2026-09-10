@@ -61,6 +61,15 @@ public final class WorldEraData extends SavedData {
         setDirty();
     }
 
+    public void resetData() {
+        eraNumber = 0;
+        anchorSagaId = "";
+        anchorReference = 0.0D;
+        lastAdvanceTick = Long.MIN_VALUE;
+        milestones.clear();
+        setDirty();
+    }
+
     private void addMilestone(String entry) {
         if (entry == null || entry.isBlank()) return;
         if (milestones.size() >= 64) milestones.remove(0);

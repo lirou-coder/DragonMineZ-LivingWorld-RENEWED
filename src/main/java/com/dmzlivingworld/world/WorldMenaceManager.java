@@ -8,6 +8,7 @@ import com.dmzlivingworld.entity.FighterPersonality;
 import com.dmzlivingworld.entity.FighterRace;
 import com.dmzlivingworld.entity.FighterRank;
 import com.dmzlivingworld.entity.LWEntities;
+import com.dmzlivingworld.config.LivingWorldConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -87,6 +88,8 @@ public final class WorldMenaceManager {
         return fighter != null && (fighter.getPersistentData().getBoolean(HEROBRINE_TAG)
                 || "Herobrine".equals(fighter.getFighterName()));
     }
+
+    public static boolean enabled() { return LivingWorldConfig.worldMenacesEnabled(); }
 
     /** Shared social/People/IT gate for every unique recurring World Menace. */
     public static boolean isWorldMenace(AmbientFighterEntity fighter) {
@@ -302,6 +305,16 @@ public final class WorldMenaceManager {
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         MinecraftServer server = event.getServer();
+        if (!enabled()) {
+            java.util.List<AmbientFighterEntity> remove = new java.util.ArrayList<>();
+            for (ServerLevel level : server.getAllLevels()) for (var entity : level.getAllEntities())
+                if (entity instanceof AmbientFighterEntity fighter && isWorldMenace(fighter)) remove.add(fighter);
+            // Do not mutate PersistentEntitySectionManager while traversing it: some large packs
+            // tick its removal queues concurrently and fastutil's iterator then crashes.
+            for (AmbientFighterEntity fighter : remove) fighter.discard();
+            WATCHES.clear();
+            return;
+        }
         long now = server.overworld().getGameTime();
         if (now % 200L != 0L) return;
         ServerLevel level = server.overworld();

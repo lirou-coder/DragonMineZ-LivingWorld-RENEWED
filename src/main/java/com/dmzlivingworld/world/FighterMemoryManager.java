@@ -43,6 +43,16 @@ public final class FighterMemoryManager {
 
     private FighterMemoryManager() {}
 
+    /** Clears the exact persistent directory used by the Remembered People screen. */
+    public static void resetRememberedPeople(ServerPlayer player) {
+        if (player == null) return;
+        CompoundTag root = getRoot(player);
+        root.put(RIVALS_KEY, new ListTag());
+        root.remove(PEOPLE_SORT_KEY);
+        saveRoot(player, root);
+        detachLoaded(player, null);
+    }
+
     public static void rememberEscape(ServerPlayer player, AmbientFighterEntity fighter) {
         if (player == null || fighter == null || !fighter.isAlive() || fighter.isFactionLeader()) return;
         if (!fighter.isRemembered()) {

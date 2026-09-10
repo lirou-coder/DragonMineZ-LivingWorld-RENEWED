@@ -18,6 +18,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.client.event.RegisterParticleProvidersEvent;
 import net.minecraftforge.client.event.RenderGuiEvent;
+import com.dmzlivingworld.config.LivingWorldClientConfig;
 import net.minecraftforge.client.event.RenderHandEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -677,12 +678,15 @@ public final class ClientMeditation {
                     .focusHud
                     .get()
                 && hudPresence > 0.01F) {
-
+                float hudScale = LivingWorldClientConfig.hudScale();
+                graphics.pose().pushPose();
+                graphics.pose().scale(hudScale, hudScale, 1.0F);
                 renderUnifiedFocusHud(
                     mc,
                     graphics,
                     width
                 );
+                graphics.pose().popPose();
             }
 
             if (!mc.options.hideGui

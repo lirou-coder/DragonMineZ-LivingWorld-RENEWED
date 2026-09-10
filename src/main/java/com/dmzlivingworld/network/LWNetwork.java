@@ -91,6 +91,8 @@ public final class LWNetwork {
                 FighterInteractPacket::encode,
                 FighterInteractPacket::decode,
                 FighterInteractPacket::handle);
+        CHANNEL.registerMessage(nextId++, ResetNpcDataPacket.class,
+                ResetNpcDataPacket::encode, ResetNpcDataPacket::decode, ResetNpcDataPacket::handle);
     }
 
     public static void sendFactionDossier(ServerPlayer player, FactionDossierPacket packet) {
@@ -162,4 +164,5 @@ public final class LWNetwork {
                                            MeditationConfig.ServerSnapshot meditation) {
         CHANNEL.sendToServer(new WorldSettingsUpdatePacket(world, meditation));
     }
+    public static void resetNpcData() { CHANNEL.sendToServer(new ResetNpcDataPacket()); }
 }

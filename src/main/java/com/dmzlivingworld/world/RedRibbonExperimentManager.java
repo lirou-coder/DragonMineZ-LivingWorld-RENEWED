@@ -447,6 +447,7 @@ public final class RedRibbonExperimentManager {
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
+        if (!WorldMenaceManager.enabled()) return;
         MinecraftServer server = event.getServer(); ServerLevel level = server.overworld(); long now = level.getGameTime();
         if (now % 80L != 0L) return;
         RedRibbonExperimentData data = RedRibbonExperimentData.get(level);

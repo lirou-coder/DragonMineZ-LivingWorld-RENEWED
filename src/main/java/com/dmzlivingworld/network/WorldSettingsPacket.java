@@ -43,11 +43,11 @@ public record WorldSettingsPacket(LivingWorldConfig.Snapshot world,
         b.writeVarInt(v.talkRelationshipCap()); b.writeVarInt(v.talkCooldownMinSeconds()); b.writeVarInt(v.talkCooldownMaxSeconds());
         b.writeBoolean(v.npcSocializing()); b.writeVarInt(v.npcChaosPercent()); b.writeBoolean(v.companionSagaHelp()); b.writeVarInt(v.npcKiMode()); b.writeVarInt(v.npcStrengthPercent()); b.writeVarInt(v.npcGrowthPercent()); b.writeBoolean(v.attackMinecraftMobs()); b.writeVarInt(v.npcChatFrequencyPercent()); b.writeVarInt(v.earthGuardianResponsePercent());
         b.writeVarInt(v.maxRememberedDeadFighters()); b.writeVarInt(v.npcDespawnProtectionRadius());
-        b.writeDouble(v.levelMultiplierPerSaga()); b.writeDouble(v.maxDefenseMitigation()); b.writeDouble(v.bpVisualMultiplier());
+        b.writeDouble(v.levelMultiplierPerSaga()); b.writeDouble(v.maxDefenseMitigation()); b.writeDouble(v.bpVisualMultiplier()); b.writeDouble(v.npcPowerMultiplier());
         b.writeBoolean(v.canMeditationProcSkillProgression()); writeStrings(b, v.npcRaceBlacklist());
         b.writeBoolean(v.treatRaceBlacklistAsWhitelist()); writeStrings(b, v.canUseClothes()); writeStrings(b, v.dimensionWhitelist());
         b.writeBoolean(v.treatDimensionWhitelistAsBlacklist()); writeStrings(b, v.companionDimensionBlacklist()); b.writeVarInt(v.archetypeShares().size());
-        for (double share : v.archetypeShares()) b.writeDouble(share);
+        for (double share : v.archetypeShares()) b.writeDouble(share); b.writeBoolean(v.worldMenacesEnabled());
     }
 
     static LivingWorldConfig.Snapshot readWorld(FriendlyByteBuf b) {
@@ -55,7 +55,7 @@ public record WorldSettingsPacket(LivingWorldConfig.Snapshot world,
                 b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readVarInt(),
                 b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readVarInt(), b.readBoolean(), b.readVarInt(),
                 b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readVarInt(),
-                b.readVarInt(), b.readVarInt(), b.readDouble(), b.readDouble(), b.readDouble(), b.readBoolean(), readStrings(b), b.readBoolean(), readStrings(b), readStrings(b), b.readBoolean(), readStrings(b), readDoubles(b));
+                b.readVarInt(), b.readVarInt(), b.readDouble(), b.readDouble(), b.readDouble(), b.readDouble(), b.readBoolean(), readStrings(b), b.readBoolean(), readStrings(b), readStrings(b), b.readBoolean(), readStrings(b), readDoubles(b), b.readBoolean());
     }
 
     private static void writeStrings(FriendlyByteBuf b, java.util.List<String> values) {

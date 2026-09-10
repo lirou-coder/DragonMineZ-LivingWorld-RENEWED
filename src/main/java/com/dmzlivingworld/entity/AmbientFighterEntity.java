@@ -4837,16 +4837,6 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         entityData.set(SPEECH, clean);
         speechTicks = Math.max(20, ticks);
         rememberDialogue(clean);
-        if (level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-            ChatFormatting nameColor = WorldMenaceManager.isHerobrine(this)
-                    ? ChatFormatting.RED : ChatFormatting.AQUA;
-            Component chat = Component.literal(getFighterName()).withStyle(nameColor)
-                    .append(Component.literal(": " + clean).withStyle(ChatFormatting.WHITE));
-            for (ServerPlayer player : serverLevel.getEntitiesOfClass(ServerPlayer.class, getBoundingBox().inflate(15.0D),
-                    p -> !p.isSpectator() && p.distanceToSqr(this) <= 225.0D)) {
-                player.sendSystemMessage(chat);
-            }
-        }
     }
 
     public List<String> getDialogueHistory() { return List.copyOf(dialogueHistory); }

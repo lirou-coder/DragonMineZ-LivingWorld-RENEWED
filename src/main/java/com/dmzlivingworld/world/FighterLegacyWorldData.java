@@ -101,6 +101,12 @@ public final class FighterLegacyWorldData extends SavedData {
         return recordId != null && deadRecordIds.contains(recordId);
     }
 
+    public void resetData() {
+        fallen.clear();
+        deadRecordIds.clear();
+        setDirty();
+    }
+
     /** Removes the death tombstone/archive when a Dragon Ball wish restores this person. */
     public void reviveRecord(java.util.UUID recordId) {
         if (recordId == null) return;

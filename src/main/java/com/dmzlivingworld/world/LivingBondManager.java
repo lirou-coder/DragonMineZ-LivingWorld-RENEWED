@@ -874,7 +874,15 @@ public final class LivingBondManager {
 
         LOGGER.warn("[LW CompanionRecovery] recreated missing travelling companion logical identity oldUuid={} newUuid={} record={} name={} player={}",
                 previousUuid, recreated.getUUID(), recordId, recreated.getFighterName(), player.getGameProfile().getName());
-        root.putUUID("Companion", recreated.getUUID());
+        // Keep the roster's logical slot in sync with the recreated body.  Updating only the
+        // legacy primary UUID left the old UUID in CompanionIds, which later recovered a second
+        // copy after a player chose Let Go.
+        List<UUID> roster = companionIds(player);
+        int slot = roster.indexOf(previousUuid);
+        if (slot >= 0) roster.set(slot, recreated.getUUID());
+        else roster.add(0, recreated.getUUID());
+        writeCompanionIds(root, roster);
+        root.putUUID("Companion", roster.get(0));
         root.putLong("LastCompanionRegroup", player.getServer().overworld().getGameTime());
         root.remove("CompanionMissingSince");
         rememberCompanionState(player, root, recreated);
@@ -917,6 +925,7 @@ public final class LivingBondManager {
         root.putString("CompanionName", npc.getFighterName());
         root.put("CompanionProfile", npc.writeMemoryProfile().copy());
         if (npc.getMemoryRecordId() != null) root.putUUID("CompanionRecord", npc.getMemoryRecordId());
+        else root.remove("CompanionRecord");
         root.putString("CompanionDimension", npc.level().dimension().location().toString());
         root.putInt("CompanionLastX", npc.blockPosition().getX());
         root.putInt("CompanionLastY", npc.blockPosition().getY());

@@ -33,7 +33,9 @@ public final class LivingWorldConfig {
     public static final ForgeConfigSpec.DoubleValue LEVEL_MULTIPLIER_PER_SAGA;
     public static final ForgeConfigSpec.DoubleValue MAX_DEFENSE_MITIGATION;
     public static final ForgeConfigSpec.DoubleValue BP_VISUAL_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue NPC_POWER_MULTIPLIER;
     public static final ForgeConfigSpec.BooleanValue CAN_MEDITATION_PROC_SKILL_PROGRESSION;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_WORLD_MENACES;
     public static final ForgeConfigSpec.DoubleValue BRAWLER_MELEE_SHARE, BRAWLER_DEFENSE_SHARE, BRAWLER_KI_SHARE, BRAWLER_HEALTH_SHARE;
     public static final ForgeConfigSpec.DoubleValue MARTIAL_ARTIST_MELEE_SHARE, MARTIAL_ARTIST_DEFENSE_SHARE, MARTIAL_ARTIST_KI_SHARE, MARTIAL_ARTIST_HEALTH_SHARE;
     public static final ForgeConfigSpec.DoubleValue SPEED_FIGHTER_MELEE_SHARE, SPEED_FIGHTER_DEFENSE_SHARE, SPEED_FIGHTER_KI_SHARE, SPEED_FIGHTER_HEALTH_SHARE;
@@ -166,10 +168,16 @@ public final class LivingWorldConfig {
                         "Affects scouters, Ki Sense, the fighter interaction menu and BP comparisons used by fusion.",
                         "Does not affect stats, effective/reference budgets, AI, training or real NPC BP.")
                 .defineInRange("BpVisualMultiplier", 1.0D, 0.0D, 1_000_000.0D);
+        NPC_POWER_MULTIPLIER = builder.comment(
+                        "Final multiplier applied to the calculated world-era NPC Reference.",
+                        "This changes natural NPC stat budgets, unlike the visual BP multiplier.")
+                .defineInRange("npcPowerMultiplier", 1.0D, 0.0D, 1_000_000.0D);
         CAN_MEDITATION_PROC_SKILL_PROGRESSION = builder.comment(
                         "Allow Living World's integrated player meditation to trigger DMZ Skill Progression's mob-defeat skill roll every 10 seconds.",
                         "Each meditation stage uses its configured TP multiplier as the number of reward-roll opportunities.")
                 .define("canMeditationProcSkillProgression", true);
+        ENABLE_WORLD_MENACES = builder.comment("Enable World Menace spawning, activity and related faction content.")
+                .define("enableWorldMenaces", true);
         builder.push("archetypeStatDistribution");
         builder.comment(
                 "Fraction of the effective stat budget assigned to each real combat attribute.",
@@ -301,8 +309,10 @@ public final class LivingWorldConfig {
     public static double levelMultiplierPerSaga() { return LEVEL_MULTIPLIER_PER_SAGA.get(); }
     public static double maxDefenseMitigation() { return MAX_DEFENSE_MITIGATION.get(); }
     public static double bpVisualMultiplier() { return BP_VISUAL_MULTIPLIER.get(); }
+    public static double npcPowerMultiplier() { return NPC_POWER_MULTIPLIER.get(); }
     public static int maxRememberedDeadFighters() { return MAX_REMEMBERED_DEAD_FIGHTERS.get(); }
     public static boolean canMeditationProcSkillProgression() { return CAN_MEDITATION_PROC_SKILL_PROGRESSION.get(); }
+    public static boolean worldMenacesEnabled() { return ENABLE_WORLD_MENACES.get(); }
     public static double npcStrengthScale() { return npcStrengthPercent() / 100.0D; }
     public static int npcGrowthPercent() { return NPC_GROWTH_PERCENT.get(); }
     public static double npcGrowthScale() { return npcGrowthPercent() / 100.0D; }
@@ -361,9 +371,9 @@ public final class LivingWorldConfig {
                 socialTalk(), talkBaseGain(), talkRelationshipCap(), talkCooldownMinSeconds(), talkCooldownMaxSeconds(),
                 npcSocializing(), npcChaosPercent(), companionSagaHelp(), npcKiMode(), npcStrengthPercent(), npcGrowthPercent(), attackMinecraftMobs(),
                 npcChatFrequencyPercent(), earthGuardianResponsePercent(), maxRememberedDeadFighters(), npcDespawnProtectionRadius(),
-                levelMultiplierPerSaga(), maxDefenseMitigation(), bpVisualMultiplier(), canMeditationProcSkillProgression(),
+                levelMultiplierPerSaga(), maxDefenseMitigation(), bpVisualMultiplier(), npcPowerMultiplier(), canMeditationProcSkillProgression(),
                 npcRaceBlacklist(), treatRaceBlacklistAsWhitelist(), canUseClothes(), dimensionWhitelist(), treatDimensionWhitelistAsBlacklist(), companionDimensionBlacklist(),
-                archetypeShares());
+                archetypeShares(), worldMenacesEnabled());
     }
 
     public static void apply(Snapshot value) {
@@ -401,7 +411,9 @@ public final class LivingWorldConfig {
         LEVEL_MULTIPLIER_PER_SAGA.set(clamp(value.levelMultiplierPerSaga(), .1D, 1000D));
         MAX_DEFENSE_MITIGATION.set(clamp(value.maxDefenseMitigation(), 0D, .99D));
         BP_VISUAL_MULTIPLIER.set(clamp(value.bpVisualMultiplier(), 0D, 1_000_000D));
+        NPC_POWER_MULTIPLIER.set(clamp(value.npcPowerMultiplier(), 0D, 1_000_000D));
         CAN_MEDITATION_PROC_SKILL_PROGRESSION.set(value.canMeditationProcSkillProgression());
+        ENABLE_WORLD_MENACES.set(value.worldMenacesEnabled());
         NPC_RACE_BLACKLIST.set(List.copyOf(value.npcRaceBlacklist()));
         TREAT_RACE_BLACKLIST_AS_WHITELIST.set(value.treatRaceBlacklistAsWhitelist());
         CAN_USE_CLOTHES.set(List.copyOf(value.canUseClothes()));
@@ -417,10 +429,10 @@ public final class LivingWorldConfig {
     public static Snapshot defaults() {
         return new Snapshot(2, 20, 6, true, true, true, 2, 256, 15,
                 true, true, true, 1400, true, 2, 20, 120, 240, true, 100, true, 1, 100, 100, true, 100, 100,
-                20, 288, 5D, .7D, 1D, true, List.of(), false,
+                20, 288, 5D, .7D, 1D, 1D, true, List.of(), false,
                 List.of("human", "saiyan", "namekian", "majin"), List.of("minecraft:overworld", "dragonminez:namek"), false,
                 List.of("dmzplus:cereal_orbit", "dmzplus:earth_orbit", "dmzplus:hell_planet_orbit", "dmzplus:namek_orbit", "dmzplus:vampa_orbit", "dmzplus:vegeta_orbit", "dmzplus:yardrat_orbit", "dmzplus:otherworld_space", "dmzplus:universe_7_deep_space", "dragonminez:otherworld"),
-                List.of(.20,.10,.06,.64, .17,.14,.17,.52, .15,.08,.15,.62, .10,.20,.10,.60, .06,.10,.20,.64));
+                List.of(.20,.10,.06,.64, .17,.14,.17,.52, .15,.08,.15,.62, .10,.20,.10,.60, .06,.10,.20,.64), true);
     }
 
     private static List<Double> archetypeShares() {
@@ -455,9 +467,9 @@ public final class LivingWorldConfig {
                            int npcStrengthPercent, int npcGrowthPercent, boolean attackMinecraftMobs,
                            int npcChatFrequencyPercent, int earthGuardianResponsePercent,
                            int maxRememberedDeadFighters, int npcDespawnProtectionRadius,
-                           double levelMultiplierPerSaga, double maxDefenseMitigation, double bpVisualMultiplier,
+                           double levelMultiplierPerSaga, double maxDefenseMitigation, double bpVisualMultiplier, double npcPowerMultiplier,
                            boolean canMeditationProcSkillProgression, List<String> npcRaceBlacklist,
                            boolean treatRaceBlacklistAsWhitelist, List<String> canUseClothes,
                            List<String> dimensionWhitelist, boolean treatDimensionWhitelistAsBlacklist, List<String> companionDimensionBlacklist,
-                           List<Double> archetypeShares) {}
+                           List<Double> archetypeShares, boolean worldMenacesEnabled) {}
 }

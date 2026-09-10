@@ -7,6 +7,8 @@ import net.minecraft.client.KeyMapping;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
+import net.minecraftforge.client.settings.KeyConflictContext;
+import net.minecraftforge.client.settings.KeyModifier;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
@@ -22,6 +24,9 @@ public final class ClientModEvents {
     public static final KeyMapping FIGHTER_INTERACT = new KeyMapping(
             "key.dmzlivingworld.fighter_interact", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_SHIFT,
             "key.categories.dmzlivingworld");
+    public static final KeyMapping TOGGLE_FACTION_QUEST = new KeyMapping(
+            "key.dmzlivingworld.toggle_faction_quest", KeyConflictContext.IN_GAME, KeyModifier.ALT,
+            InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_L, "key.categories.dmzlivingworld");
 
     private ClientModEvents() {}
 
@@ -35,5 +40,6 @@ public final class ClientModEvents {
         event.register(OPEN_LIVING_WORLD);
         event.register(TRACK_LAST_WORLD_EVENT);
         event.register(FIGHTER_INTERACT);
+        event.register(TOGGLE_FACTION_QUEST);
     }
 }

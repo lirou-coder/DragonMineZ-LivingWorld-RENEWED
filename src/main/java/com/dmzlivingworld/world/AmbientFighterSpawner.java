@@ -47,6 +47,9 @@ public final class AmbientFighterSpawner {
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             if (!(player.level() instanceof ServerLevel level)) continue;
             if (!LivingWorldDimensions.isSupported(level)) continue;
+            // The Nether is reserved for the controlled afterlife pipeline.  Letting the normal
+            // ambient scheduler run there bypasses its dead-soul identity and local-cap checks.
+            if (level.dimension().equals(net.minecraft.world.level.Level.NETHER)) continue;
             if (!organizationsTicked) {
                 FactionWorldData.get(level).tickOrganizations(level);
                 organizationsTicked = true;

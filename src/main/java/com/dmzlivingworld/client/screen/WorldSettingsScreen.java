@@ -35,15 +35,15 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             livingPresenceRadius, factionResidentCap, worldEventAlertRadius, talkBaseGain,
             talkRelationshipCap, talkCooldownMinSeconds, talkCooldownMaxSeconds, npcChaosPercent, npcKiMode, npcStrengthPercent, npcGrowthPercent, npcChatFrequencyPercent, earthGuardianResponsePercent;
     private boolean factionEncounters, dynamicEncounters, recurringFighters, automaticPowerSensing,
-            worldIncidents, worldEventAlerts, socialTalk, npcSocializing, companionSagaHelp, attackMinecraftMobs;
+            worldIncidents, worldEventAlerts, socialTalk, npcSocializing, companionSagaHelp, attackMinecraftMobs, worldMenacesEnabled;
     private int maxRememberedDeadFighters, npcDespawnProtectionRadius;
-    private double levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier;
+    private double levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier, npcPowerMultiplier;
     private boolean canMeditationProcSkillProgression, treatRaceBlacklistAsWhitelist, treatDimensionWhitelistAsBlacklist;
     private String npcRaceBlacklist, canUseClothes, dimensionWhitelist, companionDimensionBlacklist;
     private double[] archetypeShares = new double[20];
 
     // Living World client values
-    private double nameScale, dialogueScale, verticalOffset;
+    private double nameScale, dialogueScale, verticalOffset, hudScale, factionQuestHudScale;
     private boolean dispositionIcon, factionLabel, dialogueVisible, speechToChat;
     private int nameplateDistance, factionLabelDistance, dialogueDistance, speechChatRadius;
 
@@ -112,9 +112,10 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         talkCooldownMaxSeconds=v.talkCooldownMaxSeconds(); npcSocializing=v.npcSocializing();
         npcChaosPercent=v.npcChaosPercent(); companionSagaHelp=v.companionSagaHelp(); npcKiMode=v.npcKiMode(); npcStrengthPercent=v.npcStrengthPercent();
         npcGrowthPercent=v.npcGrowthPercent(); attackMinecraftMobs=v.attackMinecraftMobs();
+        worldMenacesEnabled=v.worldMenacesEnabled();
         npcChatFrequencyPercent=v.npcChatFrequencyPercent(); earthGuardianResponsePercent=v.earthGuardianResponsePercent();
         maxRememberedDeadFighters=v.maxRememberedDeadFighters(); npcDespawnProtectionRadius=v.npcDespawnProtectionRadius();
-        levelMultiplierPerSaga=v.levelMultiplierPerSaga(); maxDefenseMitigation=v.maxDefenseMitigation(); bpVisualMultiplier=v.bpVisualMultiplier();
+        levelMultiplierPerSaga=v.levelMultiplierPerSaga(); maxDefenseMitigation=v.maxDefenseMitigation(); bpVisualMultiplier=v.bpVisualMultiplier(); npcPowerMultiplier=v.npcPowerMultiplier();
         canMeditationProcSkillProgression=v.canMeditationProcSkillProgression();
         npcRaceBlacklist=String.join(",",v.npcRaceBlacklist()); treatRaceBlacklistAsWhitelist=v.treatRaceBlacklistAsWhitelist();
         canUseClothes=String.join(",",v.canUseClothes()); dimensionWhitelist=String.join(",",v.dimensionWhitelist());
@@ -127,7 +128,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         nameScale=v.nameplateScale(); dialogueScale=v.dialogueScale(); verticalOffset=v.verticalOffset();
         dispositionIcon=v.showDispositionIcon(); factionLabel=v.showFactionLabel(); dialogueVisible=v.showDialogue();
         nameplateDistance=v.nameplateDistance(); factionLabelDistance=v.factionLabelDistance(); dialogueDistance=v.dialogueDistance();
-        speechToChat=v.speechToChat(); speechChatRadius=v.speechChatRadius();
+        speechToChat=v.speechToChat(); speechChatRadius=v.speechChatRadius(); hudScale=v.hudScale(); factionQuestHudScale=v.factionQuestHudScale();
     }
 
     private void loadMeditation(MeditationConfig.ServerSnapshot v) {
@@ -159,14 +160,14 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 socialTalk, talkBaseGain, talkRelationshipCap, talkCooldownMinSeconds, talkCooldownMaxSeconds,
                 npcSocializing, npcChaosPercent, companionSagaHelp, npcKiMode, npcStrengthPercent, npcGrowthPercent, attackMinecraftMobs,
                 npcChatFrequencyPercent, earthGuardianResponsePercent, maxRememberedDeadFighters, npcDespawnProtectionRadius,
-                levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier, canMeditationProcSkillProgression,
+                levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier, npcPowerMultiplier, canMeditationProcSkillProgression,
                 csv(npcRaceBlacklist), treatRaceBlacklistAsWhitelist, csv(canUseClothes), csv(dimensionWhitelist),
-                treatDimensionWhitelistAsBlacklist, csv(companionDimensionBlacklist), java.util.Arrays.stream(archetypeShares).boxed().toList());
+                treatDimensionWhitelistAsBlacklist, csv(companionDimensionBlacklist), java.util.Arrays.stream(archetypeShares).boxed().toList(), worldMenacesEnabled);
     }
 
     private LivingWorldClientConfig.Snapshot clientSnapshot() {
         return new LivingWorldClientConfig.Snapshot(nameScale, dialogueScale, verticalOffset, dispositionIcon,
-                factionLabel, dialogueVisible, nameplateDistance, factionLabelDistance, dialogueDistance, speechToChat, speechChatRadius);
+                factionLabel, dialogueVisible, nameplateDistance, factionLabelDistance, dialogueDistance, speechToChat, speechChatRadius, hudScale, factionQuestHudScale);
     }
 
     private MeditationConfig.ServerSnapshot meditationSnapshot() {
@@ -184,7 +185,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     }
 
     private int rowCount() {
-        return switch (tab) { case 0 -> 12; case 1 -> 6; case 2 -> 11; case 3 -> 15; case 4 -> 10; case 6 -> 32; default -> 8; };
+        return switch (tab) { case 0 -> 12; case 1 -> 6; case 2 -> 13; case 3 -> 15; case 4 -> 10; case 6 -> 33; default -> 9; };
     }
 
     private boolean serverTab() { return tab == 0 || tab == 1 || tab == 3 || tab == 5 || tab == 6; }
@@ -238,6 +239,9 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         }
         LivingWorldGuiStyle.drawButton(g, font, defaultsX, footerY, defaultsW, 20, compact == 1 ? "Reset" : "Defaults",
                 mouseX, mouseY, rowEditable(), false, false);
+        if (tab == 0 && canEdit)
+            LivingWorldGuiStyle.drawButton(g, font, defaultsX + defaultsW + gap, footerY, 130, 20,
+                    "Reset NPC Data", mouseX, mouseY, true, false, false);
         LivingWorldGuiStyle.drawButton(g, font, saveX, footerY, bw, 20, "Save", mouseX, mouseY,
                 !serverTab() || canEdit, false, true);
         LivingWorldGuiStyle.drawButton(g, font, backX, footerY, bw, 20, "Back", mouseX, mouseY, true, false, false);
@@ -328,7 +332,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 2 -> switch (r) { case 0 -> "Name size"; case 1 -> "Dialogue size"; case 2 -> "Name height";
                 case 3 -> "Attitude badge"; case 4 -> "Faction label"; case 5 -> "Floating dialogue";
                 case 6 -> "Name distance"; case 7 -> "Faction distance"; case 8 -> "Dialogue distance";
-                case 9 -> "NPC speech output"; default -> "Chat speech radius"; };
+                case 9 -> "NPC speech output"; case 10 -> "Chat speech radius"; case 11 -> "HUD scale"; default -> "Faction quest HUD scale"; };
             case 3 -> switch (r) { case 0 -> "Meditation"; case 1 -> "TP rewards"; case 2 -> "TP reward scale";
                 case 3 -> "Reward interval"; case 4 -> "Calm TP"; case 5 -> "Focused TP"; case 6 -> "Centered TP";
                 case 7 -> "Deep TP"; case 8 -> "Transcendent TP"; case 9 -> "NPC meditation";
@@ -341,7 +345,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 6 -> advancedName(r);
             default -> switch (r) { case 0 -> "World activity"; case 1 -> "Power sensing"; case 2 -> "Companion saga help";
                 case 3 -> "NPC Ki block damage"; case 4 -> "NPC strength"; case 5 -> "NPC growth speed";
-                case 6 -> "NPC chat frequency"; default -> "Attack Minecraft mobs"; };
+                case 6 -> "NPC chat frequency"; case 7 -> "Attack Minecraft mobs"; default -> "Enable World Menaces"; };
         };
     }
 
@@ -410,7 +414,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 4 -> npcStrengthPercent == 100 ? "100%: normal Living World fighter strength" : npcStrengthPercent + "%: world-era fighter baseline";
             case 5 -> npcGrowthPercent == 0 ? "0%: earned fighter progression is frozen" : npcGrowthPercent == 100 ? "100%: normal earned progression" : npcGrowthPercent + "%: earned training, meditation, jogging and battle growth";
             case 6 -> npcChatFrequencyPercent == 100 ? "100%: established autonomous NPC conversation cadence" : npcChatFrequencyPercent + "%: scales autonomous NPC chatter";
-            default -> attackMinecraftMobs ? "LW fighters may engage Minecraft entities under normal combat rules" : "LW fighters leave Minecraft entities alone except registered companion defense and authored conflicts";
+            case 7 -> attackMinecraftMobs ? "LW fighters may engage Minecraft entities under normal combat rules" : "LW fighters leave Minecraft entities alone except registered companion defense and authored conflicts";
+            default -> worldMenacesEnabled ? "World Menaces and their related content are active" : "World Menaces, their activity, spawns and related faction content are disabled";
         };
     }
 
@@ -426,7 +431,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 2 -> switch (r) { case 0 -> pct(nameScale); case 1 -> pct(dialogueScale); case 2 -> String.format(java.util.Locale.ROOT,"%.2f",verticalOffset);
                 case 3 -> onOff(dispositionIcon); case 4 -> onOff(factionLabel); case 5 -> onOff(dialogueVisible);
                 case 6 -> nameplateDistance+" blocks"; case 7 -> factionLabelDistance+" blocks"; case 8 -> dialogueDistance+" blocks";
-                case 9 -> chatSpeechMode(); default -> speechChatRadius+" blocks"; };
+                case 9 -> chatSpeechMode(); case 10 -> speechChatRadius+" blocks";
+                case 11 -> pct(hudScale); default -> pct(factionQuestHudScale); };
             case 3 -> switch (r) { case 0 -> onOff(medEnabled); case 1 -> onOff(medTpRewards); case 2 -> medTpScale+"%";
                 case 3 -> medRewardInterval+"s"; case 4 -> "x"+medCalmMultiplier; case 5 -> "x"+medFocusedMultiplier;
                 case 6 -> "x"+medCenteredMultiplier; case 7 -> "x"+medDeepMultiplier; case 8 -> "x"+medTranscendentMultiplier;
@@ -440,7 +446,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 6 -> advancedValue(r);
             default -> switch (r) { case 0 -> npcChaosPercent+"%"; case 1 -> onOff(automaticPowerSensing);
                 case 2 -> onOff(companionSagaHelp); case 3 -> kiModeLabel(); case 4 -> npcStrengthPercent+"%";
-                case 5 -> npcGrowthPercent+"%"; case 6 -> npcChatFrequencyPercent+"%"; default -> onOff(attackMinecraftMobs); };
+                case 5 -> npcGrowthPercent+"%"; case 6 -> npcChatFrequencyPercent+"%"; case 7 -> onOff(attackMinecraftMobs); default -> onOff(worldMenacesEnabled); };
         };
     }
 
@@ -494,7 +500,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                     case 2 -> verticalOffset=clamp(verticalOffset+stepSign*0.05,-0.25,8.0); case 3 -> dispositionIcon=stepSign>0; case 4 -> factionLabel=stepSign>0;
                     case 5 -> dialogueVisible=stepSign>0; case 6 -> nameplateDistance=clamp(nameplateDistance+stepSign*16,8,4096);
                     case 7 -> factionLabelDistance=clamp(factionLabelDistance+stepSign*16,6,4096); case 8 -> dialogueDistance=clamp(dialogueDistance+stepSign*16,8,4096);
-                    case 9 -> setSpeechMode(speechModeIndex()+stepSign); case 10 -> speechChatRadius=clamp(speechChatRadius+stepSign*2,8,70); default -> {} } }
+                    case 9 -> setSpeechMode(speechModeIndex()+stepSign); case 10 -> speechChatRadius=clamp(speechChatRadius+stepSign*2,8,70);
+                    case 11 -> hudScale=clamp(hudScale+stepSign*.05D,.5D,3D); case 12 -> factionQuestHudScale=clamp(factionQuestHudScale+stepSign*.05D,.5D,3D); default -> {} } }
             case 3 -> { switch (r) { case 0 -> medEnabled=stepSign>0; case 1 -> medTpRewards=stepSign>0; case 2 -> medTpScale=clamp(medTpScale+stepSign*10,0,5000);
                     case 3 -> medRewardInterval=clamp(medRewardInterval+stepSign,1,120); case 4 -> medCalmMultiplier=clamp(medCalmMultiplier+stepSign,1,100);
                     case 5 -> medFocusedMultiplier=clamp(medFocusedMultiplier+stepSign,1,100); case 6 -> medCenteredMultiplier=clamp(medCenteredMultiplier+stepSign,1,100);
@@ -515,6 +522,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 5 -> npcGrowthPercent=clamp(npcGrowthPercent+stepSign*10,0,1000);
                 case 6 -> npcChatFrequencyPercent=clamp(npcChatFrequencyPercent+stepSign*5,0,500);
                 case 7 -> attackMinecraftMobs=stepSign>0;
+                case 8 -> worldMenacesEnabled=stepSign>0;
                 default -> {}
             } }
             case 6 -> changeAdvanced(r, stepSign);
@@ -531,7 +539,6 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         if (inside(mouseX,mouseY,panelLeft+panelWidth-35,panelTop+8,24,20)) { back(); return true; }
         int tx=panelLeft+8, ty=panelTop+43, gap=3, total=panelWidth-16-gap*(TAB_NAMES.length-1), tw=Math.max(18,total/TAB_NAMES.length);
         for (int i=0;i<TAB_NAMES.length;i++) if (inside(mouseX,mouseY,tx+i*(tw+gap),ty,tw,20)) { tab=TAB_ORDER[i]; scroll=0; clampScroll(); return true; }
-
         int left=panelLeft+12,right=panelLeft+panelWidth-12;
         int controlW=Math.min(200,Math.max(108,(right-left)/3)), arrow=Math.min(26,Math.max(20,controlW/5)), gutter=4;
         int controlX=right-controlW-5, valueX=controlX+arrow+gutter, valueW=Math.max(28,controlW-arrow*2-gutter*2), rx=valueX+valueW+gutter;
@@ -557,6 +564,9 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         int normalNeed=(compact==1?56:72)+(compact==1?52:68)*2+gapB*2;
         if(panelWidth-20<normalNeed){int each=Math.max(24,(panelWidth-20-gapB*2)/3);defaultsW=bw=each;saveX=defaultsX+each+gapB;backX=saveX+each+gapB;}
         else{bw=compact==1?52:68;defaultsW=compact==1?56:72;backX=panelLeft+panelWidth-10-bw;saveX=backX-gapB-bw;}
+        if (tab == 0 && canEdit && inside(mouseX, mouseY, defaultsX + defaultsW + gapB, footerY, 130, 20)) {
+            Minecraft.getInstance().setScreen(new ResetNpcDataConfirmScreen(this)); return true;
+        }
         if (inside(mouseX,mouseY,defaultsX,footerY,defaultsW,20)) { resetCurrent(); return true; }
         if (inside(mouseX,mouseY,saveX,footerY,bw,20)) { save(); return true; }
         if (inside(mouseX,mouseY,backX,footerY,bw,20)) { back(); return true; }
@@ -597,12 +607,12 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 4 -> livingPresenceRadius; case 5 -> factionResidentCap; case 10 -> worldEventAlertRadius; default -> earthGuardianResponsePercent; };
             case 1 -> switch (row) { case 1 -> talkBaseGain; case 2 -> talkRelationshipCap; case 3 -> talkCooldownMinSeconds; default -> talkCooldownMaxSeconds; };
             case 2 -> switch (row) { case 0 -> nameScale * 100.0D; case 1 -> dialogueScale * 100.0D; case 2 -> verticalOffset;
-                case 6 -> nameplateDistance; case 7 -> factionLabelDistance; case 8 -> dialogueDistance; default -> speechChatRadius; };
+                case 6 -> nameplateDistance; case 7 -> factionLabelDistance; case 8 -> dialogueDistance; case 10 -> speechChatRadius; case 11 -> hudScale * 100D; default -> factionQuestHudScale * 100D; };
             case 3 -> switch (row) { case 2 -> medTpScale; case 3 -> medRewardInterval; case 4 -> medCalmMultiplier;
                 case 5 -> medFocusedMultiplier; case 6 -> medCenteredMultiplier; case 7 -> medDeepMultiplier; case 8 -> medTranscendentMultiplier;
                 case 12 -> medBreakthroughChance; default -> medBreakthroughPoints; };
             case 4 -> switch (row) { case 3 -> medHudOffset; case 4 -> medAuraIntensity; case 6 -> medSealIntensity; default -> medSealSize; };
-            case 6 -> advancedNumericValue(row);
+            case 6 -> row == 5 ? npcPowerMultiplier * 100.0D : advancedNumericValue(row);
             default -> switch (row) { case 0 -> npcChaosPercent; case 4 -> npcStrengthPercent; case 5 -> npcGrowthPercent; default -> npcChatFrequencyPercent; };
         };
     }
@@ -611,7 +621,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         return switch (tab) {
             case 0 -> switch (row) { case 0,1,3 -> 0.0D; case 4 -> 96.0D; case 5 -> 4.0D; case 10 -> 128.0D; default -> 0.0D; };
             case 1 -> switch (row) { case 1,2 -> 0.0D; case 3,4 -> 10.0D; default -> 0.0D; };
-            case 2 -> switch (row) { case 0,1 -> 65.0D; case 2 -> -0.25D; case 6,8,10 -> 8.0D; case 7 -> 6.0D; default -> 0.0D; };
+            case 2 -> switch (row) { case 0,1,11,12 -> 50D; case 2 -> -0.25D; case 6,8,10 -> 8.0D; case 7 -> 6.0D; default -> 0.0D; };
             case 3 -> switch (row) { case 2 -> 0.0D; case 3,4,5,6,7,8,13 -> 1.0D; case 12 -> 0.0D; default -> 0.0D; };
             case 4 -> switch (row) { case 3,4 -> 0.0D; case 6 -> 25.0D; case 7 -> 60.0D; default -> 0.0D; };
             case 6 -> row == 1 ? 96D : row == 2 ? .1D : 0D;
@@ -624,11 +634,11 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 0 -> switch (row) { case 0 -> 4096.0D; case 1 -> Math.max(0, nearbyFighterCap); case 3 -> 128.0D;
                 case 4 -> 8192.0D; case 5 -> 512.0D; case 10 -> 32768.0D; default -> 500.0D; };
             case 1 -> switch (row) { case 1 -> 50.0D; case 2 -> 100.0D; case 3,4 -> 86400.0D; default -> 500.0D; };
-            case 2 -> switch (row) { case 0,1 -> 400.0D; case 2 -> 8.0D; case 10 -> 70.0D; default -> 4096.0D; };
+            case 2 -> switch (row) { case 0,1 -> 400.0D; case 2 -> 8.0D; case 10 -> 70.0D; case 11,12 -> 300D; default -> 4096.0D; };
             case 3 -> switch (row) { case 2 -> 5000.0D; case 3 -> 120.0D; case 4,5,6,7,8 -> 100.0D;
                 case 12 -> 100.0D; default -> 100.0D; };
             case 4 -> switch (row) { case 3 -> 240.0D; case 4 -> 250.0D; case 6 -> 200.0D; default -> 160.0D; };
-            case 6 -> row == 0 || row == 1 ? 4096D : row == 2 ? 1000D : row == 3 ? .99D : row == 4 ? 1_000_000D : 10D;
+            case 6 -> row == 0 || row == 1 ? 4096D : row == 2 ? 1000D : row == 3 ? .99D : row == 4 ? 1_000_000D : row == 5 ? 1000D : 10D;
             default -> switch (row) { case 0,4,5 -> 1000.0D; case 6 -> 500.0D; default -> 1000.0D; };
         };
     }
@@ -665,6 +675,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 7 -> factionLabelDistance=clamp((int)Math.round(raw/16.0D)*16,6,4096);
                 case 8 -> dialogueDistance=clamp((int)Math.round(raw/16.0D)*16,8,4096);
                 case 10 -> speechChatRadius=clamp((int)Math.round(raw/2.0D)*2,8,70);
+                case 11 -> hudScale=clamp(Math.round(raw/5D)*5D/100D,.5D,3D);
+                case 12 -> factionQuestHudScale=clamp(Math.round(raw/5D)*5D/100D,.5D,3D);
                 default -> {}
             } }
             case 3 -> { switch (row) {
@@ -693,7 +705,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 6 -> npcChatFrequencyPercent=clamp((int)Math.round(raw/5.0D)*5,0,500);
                 default -> {}
             } }
-            case 6 -> setAdvancedNumeric(row, raw);
+            case 6 -> setAdvancedNumeric(row, row == 5 ? raw / 100.0D : raw);
         }
         markDirty();
     }
@@ -798,6 +810,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         npcGrowthPercent = d.npcGrowthPercent();
         npcChatFrequencyPercent = d.npcChatFrequencyPercent();
         attackMinecraftMobs = d.attackMinecraftMobs();
+        worldMenacesEnabled = d.worldMenacesEnabled();
     }
 
     private void resetAdvancedDefaults() {
@@ -862,11 +875,13 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         return switch (tab) {
             case 0 -> row == 0 || row == 1 || row == 3 || row == 4 || row == 5 || row == 10 || row == 11;
             case 1 -> row >= 1 && row <= 4;
-            case 2 -> row == 0 || row == 1 || row == 2 || row == 6 || row == 7 || row == 8 || row == 10;
+            case 2 -> row == 0 || row == 1 || row == 2 || row == 6 || row == 7 || row == 8 || row == 10 || row == 11 || row == 12;
             case 3 -> row == 2 || row == 3 || (row >= 4 && row <= 8) || row == 12 || row == 13;
             case 4 -> row == 3 || row == 4 || row == 6 || row == 7;
             case 5 -> row == 0 || row == 4 || row == 5 || row == 6;
-            case 6 -> row != 5 && row != 7 && row != 10;
+            // Advanced NPC: rows 6, 8 and 11 are boolean toggles.  Row 5 is
+            // the NPC power multiplier and must remain a numeric slider.
+            case 6 -> row != 6 && row != 8 && row != 11;
             default -> false;
         };
     }
@@ -898,6 +913,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 7 -> Integer.toString(factionLabelDistance);
                 case 8 -> Integer.toString(dialogueDistance);
                 case 10 -> Integer.toString(speechChatRadius);
+                case 11 -> formatNumber(hudScale * 100D, 2);
+                case 12 -> formatNumber(factionQuestHudScale * 100D, 2);
                 default -> "";
             };
             case 3 -> switch (row) {
@@ -1043,6 +1060,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 7 -> factionLabelDistance = clamp(Integer.parseInt(raw), 6, 4096);
             case 8 -> dialogueDistance = clamp(Integer.parseInt(raw), 8, 4096);
             case 10 -> speechChatRadius = clamp(Integer.parseInt(raw), 8, 70);
+            case 11 -> hudScale = clamp(value / 100D, .5D, 3D);
+            case 12 -> factionQuestHudScale = clamp(value / 100D, .5D, 3D);
             default -> throw new NumberFormatException("not numeric");
         }
     }
@@ -1073,38 +1092,38 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         }
     }
 
-    private static boolean isTextRow(int selectedTab,int row){return selectedTab==6&&(row==6||row==8||row==9||row==11);}
+    private static boolean isTextRow(int selectedTab,int row){return selectedTab==6&&(row==7||row==9||row==10||row==12);}
     private static java.util.List<String> csv(String text){
         if(text==null||text.isBlank())return java.util.List.of();
         return java.util.Arrays.stream(text.split(",")).map(String::trim).filter(s->!s.isBlank()).toList();
     }
     private String advancedName(int r){
-        if(r<12)return switch(r){case 0->"Remembered dead fighters";case 1->"NPC despawn protection";case 2->"Saga level multiplier";
-            case 3->"Maximum defense mitigation";case 4->"Visual BP multiplier";case 5->"Meditation skill discovery";
-            case 6->"NPC race blacklist";case 7->"Race list is whitelist";case 8->"Races that use clothes";
-            case 9->"Spawn dimensions";case 10->"Dimension list is blacklist";default->"Companion dimension blacklist";};
+        if(r<13)return switch(r){case 0->"Remembered dead fighters";case 1->"NPC despawn protection";case 2->"Saga level multiplier";
+            case 3->"Maximum defense mitigation";case 4->"Visual BP multiplier";case 5->"NPC Power Multiplier";case 6->"Meditation skill discovery";
+            case 7->"NPC race blacklist";case 8->"Race list is whitelist";case 9->"Races that use clothes";
+            case 10->"Spawn dimensions";case 11->"Dimension list is blacklist";default->"Companion dimension blacklist";};
         String[] archetypes={"Brawler","Martial Artist","Speed Fighter","Guardian","Ki Specialist"};
-        String[] stats={"Melee","Defense","Ki","Health"}; int i=r-12; return archetypes[i/4]+" "+stats[i%4]+" share";
+        String[] stats={"Melee","Defense","Ki","Health"}; int i=r-13; return archetypes[i/4]+" "+stats[i%4]+" share";
     }
     private String advancedValue(int r){
-        if(r>=12)return pct(archetypeShares[r-12]);
+        if(r>=13)return pct(archetypeShares[r-13]);
         return switch(r){case 0->Integer.toString(maxRememberedDeadFighters);case 1->npcDespawnProtectionRadius+" blocks";
             case 2->"x"+formatNumber(levelMultiplierPerSaga,2);case 3->pct(maxDefenseMitigation);case 4->"x"+formatNumber(bpVisualMultiplier,2);
-            case 5->onOff(canMeditationProcSkillProgression);case 6->npcRaceBlacklist.isBlank()?"(empty)":npcRaceBlacklist;
-            case 7->onOff(treatRaceBlacklistAsWhitelist);case 8->canUseClothes;case 9->dimensionWhitelist;
-            case 10->onOff(treatDimensionWhitelistAsBlacklist);default->companionDimensionBlacklist;};
+            case 5->pct(npcPowerMultiplier);case 6->onOff(canMeditationProcSkillProgression);case 7->npcRaceBlacklist.isBlank()?"(empty)":npcRaceBlacklist;
+            case 8->onOff(treatRaceBlacklistAsWhitelist);case 9->canUseClothes;case 10->dimensionWhitelist;
+            case 11->onOff(treatDimensionWhitelistAsBlacklist);default->companionDimensionBlacklist;};
     }
-    private String advancedRawValue(int r){if(isTextRow(6,r))return r==6?npcRaceBlacklist:r==8?canUseClothes:r==9?dimensionWhitelist:companionDimensionBlacklist;
-        return formatNumber(advancedNumericValue(r),4);}
-    private double advancedNumericValue(int r){if(r>=12)return archetypeShares[r-12];return switch(r){case 0->maxRememberedDeadFighters;
-        case 1->npcDespawnProtectionRadius;case 2->levelMultiplierPerSaga;case 3->maxDefenseMitigation;case 4->bpVisualMultiplier;default->0D;};}
-    private void changeAdvanced(int r,int d){if(r==5)canMeditationProcSkillProgression=d>0;else if(r==7)treatRaceBlacklistAsWhitelist=d>0;
-        else if(r==10)treatDimensionWhitelistAsBlacklist=d>0;else if(!isTextRow(6,r))setAdvancedNumeric(r,advancedNumericValue(r)+d*(r>=12?.01D:r==3?.01D:r==2?.1D:1D));}
-    private void setAdvancedNumeric(int r,double v){if(r>=12)archetypeShares[r-12]=clamp(v,0D,10D);else switch(r){case 0->maxRememberedDeadFighters=clamp((int)Math.round(v),0,4096);
+    private String advancedRawValue(int r){if(isTextRow(6,r))return r==7?npcRaceBlacklist:r==9?canUseClothes:r==10?dimensionWhitelist:companionDimensionBlacklist;
+        return formatNumber(r == 5 ? npcPowerMultiplier * 100.0D : advancedNumericValue(r),4);}
+    private double advancedNumericValue(int r){if(r>=13)return archetypeShares[r-13];return switch(r){case 0->maxRememberedDeadFighters;
+        case 1->npcDespawnProtectionRadius;case 2->levelMultiplierPerSaga;case 3->maxDefenseMitigation;case 4->bpVisualMultiplier;case 5->npcPowerMultiplier;default->0D;};}
+    private void changeAdvanced(int r,int d){if(r==6)canMeditationProcSkillProgression=d>0;else if(r==8)treatRaceBlacklistAsWhitelist=d>0;
+        else if(r==11)treatDimensionWhitelistAsBlacklist=d>0;else if(!isTextRow(6,r))setAdvancedNumeric(r,advancedNumericValue(r)+d*(r>=13?.01D:r==3?.01D:r==2?.1D:r==5?.01D:1D));}
+    private void setAdvancedNumeric(int r,double v){if(r>=13)archetypeShares[r-13]=clamp(v,0D,10D);else switch(r){case 0->maxRememberedDeadFighters=clamp((int)Math.round(v),0,4096);
         case 1->npcDespawnProtectionRadius=clamp((int)Math.round(v),96,4096);case 2->levelMultiplierPerSaga=clamp(v,.1D,1000D);
-        case 3->maxDefenseMitigation=clamp(v,0D,.99D);case 4->bpVisualMultiplier=clamp(v,0D,1_000_000D);default->{}}}
-    private void commitAdvanced(int r,String raw){if(r==6)npcRaceBlacklist=raw;else if(r==8)canUseClothes=raw;else if(r==9)dimensionWhitelist=raw;else if(r==11)companionDimensionBlacklist=raw;
-        else setAdvancedNumeric(r,Double.parseDouble(raw));}
+        case 3->maxDefenseMitigation=clamp(v,0D,.99D);case 4->bpVisualMultiplier=clamp(v,0D,1_000_000D);case 5->npcPowerMultiplier=clamp(v,0D,1_000_000D);default->{}}}
+    private void commitAdvanced(int r,String raw){if(r==7)npcRaceBlacklist=raw;else if(r==9)canUseClothes=raw;else if(r==10)dimensionWhitelist=raw;else if(r==12)companionDimensionBlacklist=raw;
+        else setAdvancedNumeric(r,r == 5 ? Double.parseDouble(raw) / 100.0D : Double.parseDouble(raw));}
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
@@ -1115,7 +1134,15 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    private void back() { commitNumericEditor(); LWNetwork.requestMenu("world",0); }
+    private void back() {
+        commitNumericEditor();
+        if (FactionRequestTrackerOverlay.hasActiveRequest()) {
+            FactionRequestTrackerOverlay.resumeAfterWorldMenu();
+            Minecraft.getInstance().setScreen(null);
+            return;
+        }
+        LWNetwork.requestMenu("world",0);
+    }
     private void setStatus(String s,long ms){status=s;statusUntil=Util.getMillis()+ms;}
     private void markDirty(){ dirty=true; status=""; statusUntil=0L; }
     private int settingsBodyBottom(){ return footerY - 30; }
