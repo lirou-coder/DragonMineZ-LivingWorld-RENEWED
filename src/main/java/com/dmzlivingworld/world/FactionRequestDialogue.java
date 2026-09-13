@@ -1,5 +1,7 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
+
 import java.util.Locale;
 
 /** Mission-specific dialogue pools for faction requests. */
@@ -13,9 +15,13 @@ public final class FactionRequestDialogue {
     public static String yield(String type, long seed) { return pick(type, "yield", seed); }
 
     private static String pick(String type, String pool, long seed) {
-        String[] lines = lines(type == null ? "" : type.toUpperCase(Locale.ROOT), pool);
-        if (lines.length == 0) return "Stay focused. This operation matters.";
-        return lines[Math.floorMod(Long.hashCode(seed), lines.length)];
+        String normalizedType = type == null ? "" : type.toUpperCase(Locale.ROOT);
+        String[] lines = lines(normalizedType, pool);
+        if (lines.length == 0) return LWLang.speechKey("dialogue.faction_request.fallback", "Stay focused. This operation matters.");
+        int index = Math.floorMod(Long.hashCode(seed), lines.length);
+        String keyType = normalizedType.isBlank() ? "generic" : normalizedType.toLowerCase(Locale.ROOT);
+        String keyPool = pool == null || pool.isBlank() ? "default" : pool.toLowerCase(Locale.ROOT);
+        return LWLang.speechKey("dialogue.faction_request." + keyType + "." + keyPool + "." + index, lines[index]);
     }
 
     private static String[] lines(String type, String pool) {

@@ -1,5 +1,7 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
+
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterPersonality;
@@ -176,34 +178,47 @@ public final class FighterPowerSpikeReactionManager {
             double ratio = sourcePower / Math.max(1.0D, observer.getBattlePower());
             observer.getLookControl().setLookAt(source, 42.0F, 36.0F);
             String subject = npcSource && source instanceof AmbientFighterEntity f ? f.getFighterName() : "you";
-            String possessive = npcSource ? subject + "'s" : "your";
             if (ratio >= 2.0D && (observer.getPersonality() == FighterPersonality.CAUTIOUS
                     || ReactiveWorldManager.temperament(observer) == ReactiveWorldManager.Temperament.ALOOF)) {
                 ReactiveWorldManager.reactStrong(observer, ReactiveWorldManager.Mood.WARY,
                         "feeling " + subject + "'s sudden power spike", 1050);
                 moveAway(observer, source, level);
                 observer.speak(pick(observer,
-                        transform ? "That transformation changed the pressure around the whole area." : "That's a serious amount of Ki. I'm giving that some room.",
-                        transform ? "I felt " + possessive + " power change instantly. I'm keeping my distance." : "I felt that immediately. I'm not standing right on top of it.",
-                        transform ? "Whatever form that is, it just made " + subject + " much harder to ignore." : "That power just jumped hard. Keep some distance.",
-                        transform ? "Yeah... I'm not pretending I didn't feel that transformation." : "That Ki is climbing fast."), 82);
+                        transform ? LWLang.speechKey("dialogue.power_spike.cautious.transform.0", "That transformation changed the pressure around the whole area.")
+                                : LWLang.speechKey("dialogue.power_spike.cautious.charge.0", "That's a serious amount of Ki. I'm giving that some room."),
+                        transform ? LWLang.speechKey("dialogue.power_spike.cautious.transform.1", "I felt %s's power change instantly. I'm keeping my distance.", subject)
+                                : LWLang.speechKey("dialogue.power_spike.cautious.charge.1", "I felt that immediately. I'm not standing right on top of it."),
+                        transform ? LWLang.speechKey("dialogue.power_spike.cautious.transform.2", "Whatever form that is, it just made %s much harder to ignore.", subject)
+                                : LWLang.speechKey("dialogue.power_spike.cautious.charge.2", "That power just jumped hard. Keep some distance."),
+                        transform ? LWLang.speechKey("dialogue.power_spike.cautious.transform.3", "Yeah... I'm not pretending I didn't feel that transformation.")
+                                : LWLang.speechKey("dialogue.power_spike.cautious.charge.3", "That Ki is climbing fast.")), 82);
             } else if (observer.getPersonality() == FighterPersonality.PROUD || observer.getPersonality() == FighterPersonality.AGGRESSIVE) {
                 ReactiveWorldManager.react(observer, ReactiveWorldManager.Mood.FOCUSED,
                         "answering " + subject + "'s power spike", 850);
                 if (observer.getRandom().nextFloat() < 0.58F) observer.flareAura(34);
                 observer.speak(pick(observer,
-                        transform ? "There it is. Now show me what that form can actually do." : "Heh. So you're powering up too.",
-                        transform ? possessive.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + possessive.substring(1) + " power just changed. Good." : "I felt that. Don't expect me not to answer it.",
-                        "Now that's enough power to get my attention.",
-                        transform ? "So that's " + subject + " after transforming... interesting." : "Keep raising it. I want to see where it stops."), 80);
+                        transform ? LWLang.speechKey("dialogue.power_spike.proud.transform.0", "There it is. Now show me what that form can actually do.")
+                                : LWLang.speechKey("dialogue.power_spike.proud.charge.0", "Heh. So you're powering up too."),
+                        transform ? LWLang.speechKey("dialogue.power_spike.proud.transform.1", "%s's power just changed. Good.", subject)
+                                : LWLang.speechKey("dialogue.power_spike.proud.charge.1", "I felt that. Don't expect me not to answer it."),
+                        LWLang.speechKey("dialogue.power_spike.proud.any.2", "Now that's enough power to get my attention."),
+                        transform ? LWLang.speechKey("dialogue.power_spike.proud.transform.3", "So that's %s after transforming... interesting.", subject)
+                                : LWLang.speechKey("dialogue.power_spike.keep_raising", "Keep raising it. I want to see where it stops.")), 80);
             } else {
                 ReactiveWorldManager.react(observer, ratio > 1.35D ? ReactiveWorldManager.Mood.WARY : ReactiveWorldManager.Mood.FOCUSED,
                         "noticing " + subject + "'s sudden power spike", 720);
                 observer.speak(pick(observer,
-                        transform ? (npcSource ? subject + " feels completely different after that transformation." : "Your energy changed completely.") : "I can feel that Ki rising from here.",
-                        transform ? "That form has a completely different pressure." : "That's a noticeable jump in power.",
-                        transform ? "The shape isn't the only thing that changed. " + possessive + " Ki did too." : (ratio > 1.5D ? "Okay... that's stronger than I expected." : "I noticed that. You're putting out more power now."),
-                        transform ? (ratio > 1.5D ? "That's a serious transformation. The difference is obvious." : "Interesting. That transformation changed the feel of the Ki more than the amount.") : "That's enough of a rise to notice."), 80);
+                        transform ? (npcSource ? LWLang.speechKey("dialogue.power_spike.normal.transform.0_npc", "%s feels completely different after that transformation.", subject)
+                                : LWLang.speechKey("dialogue.power_spike.normal.transform.0_player", "Your energy changed completely."))
+                                : LWLang.speechKey("dialogue.power_spike.normal.charge.0", "I can feel that Ki rising from here."),
+                        transform ? LWLang.speechKey("dialogue.power_spike.normal.transform.1", "That form has a completely different pressure.")
+                                : LWLang.speechKey("dialogue.power_spike.normal.charge.1", "That's a noticeable jump in power."),
+                        transform ? LWLang.speechKey("dialogue.power_spike.normal.transform.2", "The shape isn't the only thing that changed. %s's Ki did too.", subject)
+                                : (ratio > 1.5D ? LWLang.speechKey("dialogue.power_spike.normal.charge.2_strong", "Okay... that's stronger than I expected.")
+                                : LWLang.speechKey("dialogue.power_spike.normal.charge.2", "I noticed that. You're putting out more power now.")),
+                        transform ? (ratio > 1.5D ? LWLang.speechKey("dialogue.power_spike.normal.transform.3_strong", "That's a serious transformation. The difference is obvious.")
+                                : LWLang.speechKey("dialogue.power_spike.normal.transform.3", "Interesting. That transformation changed the feel of the Ki more than the amount."))
+                                : LWLang.speechKey("dialogue.power_spike.normal.charge.3", "That's enough of a rise to notice.")), 80);
             }
             ReactiveWorldManager.rememberEvent(observer, transform ? "POWER_TRANSFORM" : "POWER_CHARGE", subject,
                     transform ? "reacted to a nearby transformation" : "reacted to a nearby Ki surge");
@@ -239,7 +254,9 @@ public final class FighterPowerSpikeReactionManager {
         double bp = PlayerWorldManager.playerBattlePower(player);
         SOURCE_COOLDOWN.remove(player.getUUID());
         react(level, player, bp, false, transform, level.getServer().overworld().getGameTime(), true);
-        player.displayClientMessage(Component.literal("[Living World] Forced nearby NPC reactions to your " + (transform ? "transformation" : "Ki charge") + "."), false);
+        player.displayClientMessage(Component.translatable(transform
+                ? "dmzlivingworld.message.debug.power_reaction.player_transform"
+                : "dmzlivingworld.message.debug.power_reaction.player_charge"), false);
         return 1;
     }
 
@@ -253,7 +270,9 @@ public final class FighterPowerSpikeReactionManager {
         if (transform) source.flareAura(48); else source.setKiCharge(true);
         react(level, source, source.getBattlePower(), true, transform, level.getServer().overworld().getGameTime(), true);
         if (!transform) source.getPersistentData().putLong("LWDebugStopChargeAt", level.getGameTime() + 55L);
-        player.displayClientMessage(Component.literal("[Living World] Forced nearby NPC reactions to " + source.getFighterName() + "'s " + (transform ? "transformation-style power spike" : "Ki charge") + "."), false);
+        player.displayClientMessage(Component.translatable(transform
+                ? "dmzlivingworld.message.debug.power_reaction.npc_transform"
+                : "dmzlivingworld.message.debug.power_reaction.npc_charge", source.getFighterName()), false);
         return 1;
     }
 

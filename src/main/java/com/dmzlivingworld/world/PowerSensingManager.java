@@ -50,9 +50,9 @@ public final class PowerSensingManager {
     public static void clearRuntime() { NEXT_PULSE.clear(); LAST_SIGNAL.clear(); }
     public static int runtimeEntries() { return NEXT_PULSE.size() + LAST_SIGNAL.size(); }
 
-    public static String senseNow(ServerPlayer player) {
+    public static Component senseNow(ServerPlayer player) {
         Sensed sensed = findBest(player);
-        if (sensed == null) return "You don't sense any noteworthy power nearby.";
+        if (sensed == null) return Component.translatable("dmzlivingworld.message.power_sense.none");
         return describe(player, sensed);
     }
 
@@ -63,8 +63,8 @@ public final class PowerSensingManager {
         UUID previous = LAST_SIGNAL.get(player.getUUID());
         if (!forced && previous != null && previous.equals(sensed.fighter.getUUID()) && player.tickCount % 360 != 0) return;
         LAST_SIGNAL.put(player.getUUID(), sensed.fighter.getUUID());
-        player.displayClientMessage(Component.literal("POWER SENSE • ").withStyle(ChatFormatting.AQUA)
-                .append(Component.literal(describe(player, sensed)).withStyle(ChatFormatting.WHITE)), true);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.power_sense.prefix").withStyle(ChatFormatting.AQUA)
+                .append(describe(player, sensed).copy().withStyle(ChatFormatting.WHITE)), true);
     }
 
     private static boolean hasKiSense(ServerPlayer player) {
@@ -96,27 +96,26 @@ public final class PowerSensingManager {
                 .orElse(null);
     }
 
-    private static String describe(ServerPlayer player, Sensed sensed) {
+    private static Component describe(ServerPlayer player, Sensed sensed) {
         AmbientFighterEntity fighter = sensed.fighter;
         int distance = Mth.floor(Math.sqrt(fighter.distanceToSqr(player)));
         if (WorldMenaceManager.isHerobrine(fighter))
-            return "an unreadable presence • " + compass(player, fighter.getX(), fighter.getZ()) + " • " + distance + " blocks";
-        String magnitude;
-        if (fighter.isRememberedFor(player)) magnitude = "a familiar power";
-        else if (sensed.ratio >= 2.65D) magnitude = "an overwhelming power";
-        else if (sensed.ratio >= 1.80D) magnitude = "a massive power";
-        else if (sensed.fighting) magnitude = "powers clashing";
-        else magnitude = "a strong power";
-        return magnitude + " • " + compass(player, fighter.getX(), fighter.getZ()) + " • " + distance + " blocks";
+            return Component.translatable("dmzlivingworld.message.power_sense.reading.unreadable", compass(player, fighter.getX(), fighter.getZ()), distance);
+        String magnitude = fighter.isRememberedFor(player) ? "familiar"
+                : sensed.ratio >= 2.65D ? "overwhelming" : sensed.ratio >= 1.80D ? "massive"
+                : sensed.fighting ? "clashing" : "strong";
+        return Component.translatable("dmzlivingworld.message.power_sense.reading." + magnitude,
+                compass(player, fighter.getX(), fighter.getZ()), distance);
     }
 
-    private static String compass(ServerPlayer player, double x, double z) {
+    private static Component compass(ServerPlayer player, double x, double z) {
         double dx = x - player.getX();
         double dz = z - player.getZ();
         double yaw = Math.toDegrees(Math.atan2(-dx, dz));
         if (yaw < 0.0D) yaw += 360.0D;
         String[] names = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
-        return names[Math.floorMod((int)Math.round(yaw / 45.0D), 8)];
+        String value = names[Math.floorMod((int)Math.round(yaw / 45.0D), 8)];
+        return Component.translatable("dmzlivingworld.direction." + value.toLowerCase(java.util.Locale.ROOT));
     }
 
     private record Sensed(AmbientFighterEntity fighter, double ratio, boolean fighting, double score) {}

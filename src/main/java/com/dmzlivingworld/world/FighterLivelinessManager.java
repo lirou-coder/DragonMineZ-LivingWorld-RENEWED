@@ -152,19 +152,19 @@ public final class FighterLivelinessManager {
             int bond = FighterNpcSocialManager.bond(fighter, other);
             boolean rival = "RIVAL".equals(reason);
             if (rival && fighter.getRandom().nextFloat() < 0.14F) {
-                fighter.speak(fighter.getRandom().nextBoolean() ? "Still training, I see." : "Don't fall behind.", 38);
+                fighter.speakKey(fighter.getRandom().nextBoolean() ? "dialogue.liveliness.rival.training" : "dialogue.liveliness.rival.behind", 38);
                 d.putLong(LAST_GREETING, now);
             } else if (bond >= 6 && fighter.getRandom().nextFloat() < 0.10F) {
-                fighter.speak(fighter.getRandom().nextBoolean() ? "Hey." : "Good to see you.", 34);
+                fighter.speakKey(fighter.getRandom().nextBoolean() ? "dialogue.liveliness.friend.hey" : "dialogue.liveliness.friend.greeting", 34);
                 d.putLong(LAST_GREETING, now);
             } else if ("FACTION".equals(reason) && fighter.getRandom().nextFloat() < 0.055F) {
-                fighter.speak(fighter.getRandom().nextBoolean() ? "Hey." : "All good?", 30);
+                fighter.speakKey(fighter.getRandom().nextBoolean() ? "dialogue.liveliness.friend.hey" : "dialogue.liveliness.faction.greeting", 30);
                 d.putLong(LAST_GREETING, now);
             }
         } else if (entity instanceof ServerPlayer player) {
             int relationship = FighterRelationshipManager.relationshipOrUnknown(player, fighter);
             if (relationship >= 35 && relationship <= 100 && fighter.getRandom().nextFloat() < 0.075F) {
-                fighter.speak(fighter.getRandom().nextBoolean() ? "Hey, you're back." : "Good timing.", 34);
+                fighter.speakKey(fighter.getRandom().nextBoolean() ? "dialogue.liveliness.return.hey" : "dialogue.liveliness.return.timing", 34);
                 d.putLong(LAST_GREETING, now);
             }
         }

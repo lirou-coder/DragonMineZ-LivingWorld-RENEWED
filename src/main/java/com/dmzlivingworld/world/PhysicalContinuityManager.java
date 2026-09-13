@@ -175,9 +175,9 @@ public final class PhysicalContinuityManager {
         data.putLong(DEPART_AT, now + MIN_VISIBLE_STAY + fighter.getRandom().nextInt(EXTRA_VISIBLE_STAY));
         FighterMemoryManager.notePhysicalArrival(owner, fighter);
 
-        if (fighter.wasRescuedByMemoryOwner()) fighter.speak("I remember you. You saved me.", 78);
-        else if (fighter.getMemoryRelationship() <= -20) fighter.speak("You again. Good.", 78);
-        else fighter.speak("We meet again.", 78);
+        if (fighter.wasRescuedByMemoryOwner()) fighter.speakKey("dialogue.continuity.rescuer", 78);
+        else if (fighter.getMemoryRelationship() <= -20) fighter.speakKey("dialogue.continuity.enemy", 78);
+        else fighter.speakKey("dialogue.continuity.met_again", 78);
 
         if (fighter.getMemoryRelationship() <= -25 && fighter.getAlignment() == FighterAlignment.BAD) fighter.setTarget(owner);
     }

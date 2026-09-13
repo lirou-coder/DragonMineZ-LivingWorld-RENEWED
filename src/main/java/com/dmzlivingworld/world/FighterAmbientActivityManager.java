@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.client.particle.LWKiTrainingParticles;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
@@ -847,7 +848,7 @@ public final class FighterAmbientActivityManager {
                     session.nextBeat = now + 85L + fighter.getRandom().nextInt(86);
                     if (session.scientistResearchVariant == 0) {
                         if (fighter.getRandom().nextBoolean()) fighter.swing(InteractionHand.MAIN_HAND, true);
-                        if (fighter.getRandom().nextFloat() < 0.18F) fighter.speak(pick(fighter,
+                        if (fighter.getRandom().nextFloat() < 0.18F) fighter.speak(pickKey(fighter, "ambient.scientist.lab",
                                 "Growth medium is stable. Now the temperament problem.",
                                 "That batch adapted faster than the last one.",
                                 "If I adjust the cultivation ratio, the next specimen should hold more power.",
@@ -860,7 +861,7 @@ public final class FighterAmbientActivityManager {
                         fighter.getLookControl().setLookAt(fighter.getX() + Math.cos(angle) * 10.0D,
                                 fighter.getEyeY() + fighter.getRandom().nextDouble() * 2.0D - 1.0D,
                                 fighter.getZ() + Math.sin(angle) * 10.0D, 28.0F, 24.0F);
-                        if (fighter.getRandom().nextFloat() < 0.16F) fighter.speak(pick(fighter,
+                        if (fighter.getRandom().nextFloat() < 0.16F) fighter.speak(pickKey(fighter, "ambient.scientist.field",
                                 "Deployment readings are cleaner than the last batch.",
                                 "Reaction time improved. Stability still needs work.",
                                 "I'm comparing their combat response against the cultivation notes.",
@@ -1674,7 +1675,7 @@ public final class FighterAmbientActivityManager {
         fighter.getNavigation().stop();
         fighter.setAmbientPose(9 + Math.max(0, Math.min(1, variant)));
         fighter.getPersistentData().putLong("LWIdleStretchUntil", level.getGameTime() + 62L);
-        fighter.speak(pick(fighter, "Needed that stretch.", "Loosen up a little.", "Back was getting stiff.", "Just stretching out."), 58);
+        fighter.speak(pickKey(fighter, "ambient.stretch", "Needed that stretch.", "Loosen up a little.", "Back was getting stiff.", "Just stretching out."), 58);
         recordDebugSubject(player, fighter);
         return 1;
     }
@@ -1693,7 +1694,7 @@ public final class FighterAmbientActivityManager {
             fighter.getNavigation().stop();
             fighter.setAmbientPose(9 + variant);
             fighter.getPersistentData().putLong("LWIdleStretchUntil", level.getGameTime() + 62L);
-            fighter.speak(pick(fighter, "Needed that stretch.", "Loosen up a little.", "Back was getting stiff.", "Just stretching out."), 58);
+            fighter.speak(pickKey(fighter, "ambient.stretch", "Needed that stretch.", "Loosen up a little.", "Back was getting stiff.", "Just stretching out."), 58);
             recordDebugSubject(player, fighter);
             used.add(fighter.getUUID());
             started++;
@@ -2143,7 +2144,7 @@ public final class FighterAmbientActivityManager {
         ServerPlayer closest = near.stream().min(java.util.Comparator.comparingDouble(fighter::distanceToSqr)).orElse(null);
         if (closest == null) return;
         if (now >= session.nextProximityWarning) {
-            fighter.speak(pick(fighter, "Careful—I'm training here.", "Heads up. You're inside my training range.", "Give me a little room—these strikes are fast.",
+            fighter.speak(pickKey(fighter, "ambient.training.warning", "Careful—I'm training here.", "Heads up. You're inside my training range.", "Give me a little room—these strikes are fast.",
                     "Watch the reach on this one.", "Give me two steps of space, please.", "You're close enough to catch a stray hit."), 52);
             session.nextProximityWarning = now + 180L;
         }
@@ -2155,7 +2156,7 @@ public final class FighterAmbientActivityManager {
             double dx = closest.getX() - fighter.getX(), dz = closest.getZ() - fighter.getZ();
             double len = Math.max(0.01D, Math.sqrt(dx * dx + dz * dz));
             closest.push(dx / len * 0.35D, 0.12D, dz / len * 0.35D);
-            fighter.speak(pick(fighter, "Whoa—careful!", "Sorry! I warned you.", "You okay? That's why I need space.", "Sorry—that one reached farther than I thought.", "My fault. Step back a little."), 48);
+            fighter.speak(pickKey(fighter, "ambient.training.accident", "Whoa—careful!", "Sorry! I warned you.", "You okay? That's why I need space.", "Sorry—that one reached farther than I thought.", "My fault. Step back a little."), 48);
         }
     }
 
@@ -2180,37 +2181,44 @@ public final class FighterAmbientActivityManager {
         String lower = flower.toLowerCase(Locale.ROOT);
         String line;
         if (lower.contains("dandelion")) {
-            line = pick(fighter, "A dandelion. Tough little thing.", "These grow anywhere they get the chance.",
+            line = pickKey(fighter, "ambient.flower.dandelion", "A dandelion. Tough little thing.", "These grow anywhere they get the chance.",
                     "Yellow really stands out after staring at dirt and stone all day.");
         } else if (lower.contains("poppy")) {
-            line = pick(fighter, "That poppy is ridiculously bright.", "A red poppy in the middle of all this. Nice.",
+            line = pickKey(fighter, "ambient.flower.poppy", "That poppy is ridiculously bright.", "A red poppy in the middle of all this. Nice.",
                     "I'd probably have crushed that poppy if I wasn't looking down.");
         } else if (lower.contains("blue orchid")) {
-            line = pick(fighter, "A blue orchid... you don't see that everywhere.", "That blue orchid almost looks unreal.",
+            line = pickKey(fighter, "ambient.flower.blue_orchid", "A blue orchid... you don't see that everywhere.", "That blue orchid almost looks unreal.",
                     "Okay, this one's worth stopping for.");
         } else if (lower.contains("tulip")) {
-            line = pick(fighter, "A " + flower + ". Clean shape. I like it.", "That " + flower + " looks almost planted on purpose.",
-                    "Somebody would probably put this " + flower + " in a vase. I'd rather leave it here.");
+            line = pickKeyArgs(fighter, "ambient.flower.tulip", new Object[]{flower},
+                    "A %s. Clean shape. I like it.", "That %s looks almost planted on purpose.",
+                    "Somebody would probably put this %s in a vase. I'd rather leave it here.");
         } else if (lower.contains("lily")) {
-            line = pick(fighter, "A " + flower + ". Pretty calm-looking for this world.", "This " + flower + " picked a peaceful spot.",
+            line = pickKeyArgs(fighter, "ambient.flower.lily", new Object[]{flower},
+                    "A %s. Pretty calm-looking for this world.", "This %s picked a peaceful spot.",
                     "I'd hate to step on this one by accident.");
         } else if (lower.contains("cornflower")) {
-            line = pick(fighter, "That cornflower is a good shade of blue.", "A cornflower. Small, but hard to miss once you notice it.",
+            line = pickKey(fighter, "ambient.flower.cornflower", "That cornflower is a good shade of blue.", "A cornflower. Small, but hard to miss once you notice it.",
                     "I almost walked straight past that blue.");
         } else if (lower.contains("allium")) {
-            line = pick(fighter, "An allium. Looks like a tiny purple explosion.", "That allium has more personality than some fighters I know.",
+            line = pickKey(fighter, "ambient.flower.allium", "An allium. Looks like a tiny purple explosion.", "That allium has more personality than some fighters I know.",
                     "Purple suits this place better than I expected.");
         } else {
-            line = pick(fighter,
-                    "A " + flower + ". Didn't expect to find one here.",
-                    "Almost walked right past this " + flower + ".",
-                    "You ever actually stop and look at a " + flower + "?",
-                    "Not bad. This " + flower + " picked a good spot.",
-                    "Even fighters can appreciate a decent " + flower + ".",
-                    "Funny how a little " + flower + " can survive out here.",
-                    "I know power levels better than plants, but this " + flower + " is pretty nice.",
-                    session != null && session.flowerTaken ? "Hope this " + flower + " survives the trip." : "I'll leave this " + flower + " where it is.",
-                    fighter.level().isNight() ? "A " + flower + " under the night sky. Not bad." : "The light catches this " + flower + " nicely.");
+            int variant = fighter.getRandom().nextInt(9);
+            String suffix = variant == 7 ? (session != null && session.flowerTaken ? "taken" : "left")
+                    : variant == 8 ? (fighter.level().isNight() ? "night" : "day") : Integer.toString(variant);
+            String fallback = switch (variant) {
+                case 0 -> "A %s. Didn't expect to find one here.";
+                case 1 -> "Almost walked right past this %s.";
+                case 2 -> "You ever actually stop and look at a %s?";
+                case 3 -> "Not bad. This %s picked a good spot.";
+                case 4 -> "Even fighters can appreciate a decent %s.";
+                case 5 -> "Funny how a little %s can survive out here.";
+                case 6 -> "I know power levels better than plants, but this %s is pretty nice.";
+                case 7 -> session != null && session.flowerTaken ? "Hope this %s survives the trip." : "I'll leave this %s where it is.";
+                default -> fighter.level().isNight() ? "A %s under the night sky. Not bad." : "The light catches this %s nicely.";
+            };
+            line = LWLang.speechKey("dialogue.ambient.flower.generic." + suffix, fallback, flower);
         }
         fighter.speak(line, 70);
     }
@@ -2367,68 +2375,78 @@ public final class FighterAmbientActivityManager {
         if (strong) {
             line = switch (mood) {
                 case UPBEAT -> switch (type) {
-                    case DANCING -> pick(fighter, "Okay, this is actually fun.", "I needed a good moment like this.", "Yeah, I needed this.", "I'm keeping this mood while it lasts.");
-                    case EATING -> "Good food, good mood. Hard to argue with that.";
-                    case RELAXED_FLIGHT -> "The air feels great today.";
+                    case DANCING -> pickKey(fighter, "ambient.mood.upbeat.dancing", "Okay, this is actually fun.", "I needed a good moment like this.", "Yeah, I needed this.", "I'm keeping this mood while it lasts.");
+                    case EATING -> LWLang.speechKey("dialogue.ambient.mood.upbeat.eating", "Good food, good mood. Hard to argue with that.");
+                    case RELAXED_FLIGHT -> LWLang.speechKey("dialogue.ambient.mood.upbeat.relaxed_flight", "The air feels great today.");
                     default -> null;
                 };
                 case FOCUSED -> switch (type) {
-                    case SCOUTING -> pick(fighter, "I'm keeping my attention on the area. No distractions.", "Eyes up. I'm checking every angle.", "I want a clean read on this place.");
-                    case REST -> pick(fighter, "Just a short reset. Then I'm back to it.", "A minute down, then I keep moving.", "Rest is part of the training too.");
+                    case SCOUTING -> pickKey(fighter, "ambient.mood.focused.scouting", "I'm keeping my attention on the area. No distractions.", "Eyes up. I'm checking every angle.", "I want a clean read on this place.");
+                    case REST -> pickKey(fighter, "ambient.mood.focused.rest", "Just a short reset. Then I'm back to it.", "A minute down, then I keep moving.", "Rest is part of the training too.");
                     default -> null;
                 };
                 case WARY -> switch (type) {
-                    case SCOUTING -> pick(fighter, "I'm checking twice. Something still feels off.", "I don't like the quiet around here.", "I'm not convinced we're alone.");
-                    case REST -> pick(fighter, "I'm resting, not dropping my guard.", "Taking a break doesn't mean I'm not watching.", "I'll rest. My eyes stay open.");
+                    case SCOUTING -> pickKey(fighter, "ambient.mood.wary.scouting", "I'm checking twice. Something still feels off.", "I don't like the quiet around here.", "I'm not convinced we're alone.");
+                    case REST -> pickKey(fighter, "ambient.mood.wary.rest", "I'm resting, not dropping my guard.", "Taking a break doesn't mean I'm not watching.", "I'll rest. My eyes stay open.");
                     default -> null;
                 };
                 case IRRITATED -> switch (type) {
-                    case SCOUTING -> pick(fighter, "I need a little space. I'm clearing my head.", "I'm walking this off before I say something stupid.", "Just let me check the perimeter alone.");
-                    case REST -> pick(fighter, "I'm staying here until I cool off.", "Give me a minute before I get moving again.", "I'm stopping here before this mood gets worse.");
+                    case SCOUTING -> pickKey(fighter, "ambient.mood.irritated.scouting", "I need a little space. I'm clearing my head.", "I'm walking this off before I say something stupid.", "Just let me check the perimeter alone.");
+                    case REST -> pickKey(fighter, "ambient.mood.irritated.rest", "I'm staying here until I cool off.", "Give me a minute before I get moving again.", "I'm stopping here before this mood gets worse.");
                     default -> null;
                 };
                 case SOMBER -> switch (type) {
-                    case STARGAZING -> pick(fighter, "Quiet helps right now.", "The sky doesn't ask questions.", "I can think better looking up there.");
-                    case REST -> pick(fighter, "I don't feel like doing much. Just give me a minute.", "I'm not ready to move yet.", "I need the world to be quiet for a bit.");
-                    case FISHING -> pick(fighter, "This is easier than talking right now.", "The water's good company today.", "I'd rather listen to the river for a while.");
+                    case STARGAZING -> pickKey(fighter, "ambient.mood.somber.stargazing", "Quiet helps right now.", "The sky doesn't ask questions.", "I can think better looking up there.");
+                    case REST -> pickKey(fighter, "ambient.mood.somber.rest", "I don't feel like doing much. Just give me a minute.", "I'm not ready to move yet.", "I need the world to be quiet for a bit.");
+                    case FISHING -> pickKey(fighter, "ambient.mood.somber.fishing", "This is easier than talking right now.", "The water's good company today.", "I'd rather listen to the river for a while.");
                     default -> null;
                 };
                 case WEARY -> switch (type) {
-                    case REST -> pick(fighter, "I really needed to stop for a while.", "My body was asking for this break.", "I'm running on fumes. This helps.");
-                    case EATING -> pick(fighter, "Maybe some food will put me back together.", "I need fuel more than motivation right now.", "Food first. Everything else after.");
+                    case REST -> pickKey(fighter, "ambient.mood.weary.rest", "I really needed to stop for a while.", "My body was asking for this break.", "I'm running on fumes. This helps.");
+                    case EATING -> pickKey(fighter, "ambient.mood.weary.eating", "Maybe some food will put me back together.", "I need fuel more than motivation right now.", "Food first. Everything else after.");
                     default -> null;
                 };
                 case CONTENT -> null;
             };
         }
         if (line == null) line = switch (type) {
-            case FISHING -> pick(fighter, "Quiet water, quiet mind.", "If this fish can sense Ki, I'm in trouble.", "I could stay here a while.", "No rush. That's the best part.", "I'm trying not to scare everything in the water with my Ki.", "This is a surprisingly good way to reset.", "Maybe patience counts as training.", "I wonder if fish can tell when someone's staring at the float.");
-            case REST -> pick(fighter, "A short break won't hurt.", "Even fighters are allowed to slow down sometimes.", "Nice to have five minutes without an explosion.", "I'm letting the day slow down for a minute.", "I can train harder after I actually recover.", "No reason to burn myself out.", "I'm not quitting. I'm resting.", "A quiet minute can do more than another hundred punches.");
-            case NAP -> pick(fighter, "I'm closing my eyes for a bit.", "Wake me when something explodes.", "A short nap should put me back together.", "I'm more tired than I thought.", "Just twenty minutes. Probably.");
-            case SITTING -> pick(fighter, "Sometimes I just want to sit here.", "No training plan. No mission. Just sitting.", "The ground is surprisingly comfortable.", "I could get used to a quiet minute like this.", "I'm staying put for a little while.", "Nothing wrong with doing absolutely nothing for a minute.", "Good spot to let the muscles settle.", "I didn't realize how much I needed to sit down.");
-            case JOGGING -> pick(fighter, "Just loosening up.", "A light run clears my head.", "Not every workout needs to shake the planet.", "Keeping the legs moving.", "Easy pace. I'm building the engine.", "Footwork starts before the fight does.", "A few more laps and I'll call it.", "Keeping my breathing steady.");
-            case TRAINING -> pick(fighter, "One more set.", "If I stop improving, somebody else won't.", "I'm working on the basics until they stop feeling basic.", "Power means nothing if I can't control it.", "Again. Cleaner this time.", "Hands back to guard after every strike.", "Speed comes after the motion is right.", "I can feel where the last punch went wrong.", "No wasted movement. That's the goal.", "Again. Full extension, clean recovery.");
-            case STRENGTH_TRAINING -> pick(fighter, "Keep the body straight. One more rep.", "Chest down. Drive back up.", "No rushing the bottom of the rep.", "One more set before I stop.", "Core tight. Keep the form clean.");
-            case KI_TRAINING -> pick(fighter, "Hold it steady. Don't waste the energy.", "More control, less flare.", "Build it up. Let it settle. Again.", "Ki gets sloppy when you rush it.", "I'm trying to make every bit of energy count.");
-            case WALKING -> pick(fighter, "A walk clears my head.", "No rush. Just moving for a bit.", "I needed to get out and stretch my legs.", "Sometimes it's better to move without training for something.");
-            case SCIENTIST_RESEARCH -> pick(fighter, "A better formula means a better specimen.", "I need cleaner data from the last deployment.", "Cultivation variables first. Combat testing later.", "Small changes make dangerous differences.",
+            case FISHING -> pickKey(fighter, "ambient.activity.fishing", "Quiet water, quiet mind.", "If this fish can sense Ki, I'm in trouble.", "I could stay here a while.", "No rush. That's the best part.", "I'm trying not to scare everything in the water with my Ki.", "This is a surprisingly good way to reset.", "Maybe patience counts as training.", "I wonder if fish can tell when someone's staring at the float.");
+            case REST -> pickKey(fighter, "ambient.activity.rest", "A short break won't hurt.", "Even fighters are allowed to slow down sometimes.", "Nice to have five minutes without an explosion.", "I'm letting the day slow down for a minute.", "I can train harder after I actually recover.", "No reason to burn myself out.", "I'm not quitting. I'm resting.", "A quiet minute can do more than another hundred punches.");
+            case NAP -> pickKey(fighter, "ambient.activity.nap", "I'm closing my eyes for a bit.", "Wake me when something explodes.", "A short nap should put me back together.", "I'm more tired than I thought.", "Just twenty minutes. Probably.");
+            case SITTING -> pickKey(fighter, "ambient.activity.sitting", "Sometimes I just want to sit here.", "No training plan. No mission. Just sitting.", "The ground is surprisingly comfortable.", "I could get used to a quiet minute like this.", "I'm staying put for a little while.", "Nothing wrong with doing absolutely nothing for a minute.", "Good spot to let the muscles settle.", "I didn't realize how much I needed to sit down.");
+            case JOGGING -> pickKey(fighter, "ambient.activity.jogging", "Just loosening up.", "A light run clears my head.", "Not every workout needs to shake the planet.", "Keeping the legs moving.", "Easy pace. I'm building the engine.", "Footwork starts before the fight does.", "A few more laps and I'll call it.", "Keeping my breathing steady.");
+            case TRAINING -> pickKey(fighter, "ambient.activity.training", "One more set.", "If I stop improving, somebody else won't.", "I'm working on the basics until they stop feeling basic.", "Power means nothing if I can't control it.", "Again. Cleaner this time.", "Hands back to guard after every strike.", "Speed comes after the motion is right.", "I can feel where the last punch went wrong.", "No wasted movement. That's the goal.", "Again. Full extension, clean recovery.");
+            case STRENGTH_TRAINING -> pickKey(fighter, "ambient.activity.strength_training", "Keep the body straight. One more rep.", "Chest down. Drive back up.", "No rushing the bottom of the rep.", "One more set before I stop.", "Core tight. Keep the form clean.");
+            case KI_TRAINING -> pickKey(fighter, "ambient.activity.ki_training", "Hold it steady. Don't waste the energy.", "More control, less flare.", "Build it up. Let it settle. Again.", "Ki gets sloppy when you rush it.", "I'm trying to make every bit of energy count.");
+            case WALKING -> pickKey(fighter, "ambient.activity.walking", "A walk clears my head.", "No rush. Just moving for a bit.", "I needed to get out and stretch my legs.", "Sometimes it's better to move without training for something.");
+            case SCIENTIST_RESEARCH -> pickKey(fighter, "ambient.activity.scientist_research", "A better formula means a better specimen.", "I need cleaner data from the last deployment.", "Cultivation variables first. Combat testing later.", "Small changes make dangerous differences.",
                     "Ki density is up, but so is metabolic drift. That's not a free improvement.", "Control group stable. Combat batch... less stable.",
                     "I need to separate inherited power from cultivation gain or the whole dataset is garbage.", "Reaction latency fell three ticks. Finally, a variable moving in the right direction.",
                     "If the survival curve collapses again, I'm lowering the aggression stimulus instead of the power target.");
-            case STUDYING -> pick(fighter, "I keep notes so I don't repeat the same mistakes.", "There's always something I missed the first time.", "Technique is easier to fix when you actually think about it.", "I'm reviewing what worked and what didn't.");
-            case FLOWER -> pick(fighter, "That one stands out.", "Not every interesting thing has a power level.", "Good spot for a flower.", "Funny what you notice when you stop rushing.", "That color really catches the eye.", "I almost missed this one.");
-            case FOOD_GATHERING -> pick(fighter, "I should find something real to eat.", "Food first. Then I can get back to the day.", "I saw tracks around here. Might as well look.", "Better to hunt nearby than burn through supplies.");
-            case TREE -> pick(fighter, "An apple break sounded good.", "Training fuel.", "Hard to beat something simple.", "Found a decent spot for a snack.", "A few strikes and lunch sorts itself out.", "Fresh apple beats carrying rations.", "This tree picked the wrong day to look useful.", "I earned this snack.");
-            case STARGAZING -> pick(fighter, "You forget how big the sky is.", "That's a good view.", "Imagine trying to count all of those. No thanks.", "Somewhere up there, somebody is probably training too hard.", "Makes this whole planet feel small.", "I wonder how many worlds are looking back.", "Hard to think about power levels under a sky like that.", "I could stay out here until sunrise.");
-            case EATING -> pick(fighter, "I needed that.", "Training on an empty stomach is a terrible idea.", "Finally, something that isn't a Senzu Bean.", "That hit the spot.", "I was getting way too hungry to focus.", "Food tastes better after training.");
-            case SCOUTING -> pick(fighter, "Nothing strange so far.", "Good view from here.", "I'm checking the area. And definitely not being nosy.", "I'm learning the terrain while it's quiet.", "Better to know the exits before you need them.", "No trouble in sight. That's usually when I get suspicious.");
-            case RELAXED_FLIGHT -> pick(fighter, "Sometimes flying is the whole point.", "No destination. That's nice for once.", "Walking feels optional when you can do this.", "The view's better when you're not in a hurry.", "I forgot how good the air feels up here.", "No mission. Just a little sky.");
-            case DANCING -> pick(fighter, "Don't judge me. The rhythm won.", "A little music would improve this.", "Sometimes you just move.", "This counts as footwork practice if anyone asks.", "I refuse to explain myself.", "Okay, one more round and I'm done.");
+            case STUDYING -> pickKey(fighter, "ambient.activity.studying", "I keep notes so I don't repeat the same mistakes.", "There's always something I missed the first time.", "Technique is easier to fix when you actually think about it.", "I'm reviewing what worked and what didn't.");
+            case FLOWER -> pickKey(fighter, "ambient.activity.flower", "That one stands out.", "Not every interesting thing has a power level.", "Good spot for a flower.", "Funny what you notice when you stop rushing.", "That color really catches the eye.", "I almost missed this one.");
+            case FOOD_GATHERING -> pickKey(fighter, "ambient.activity.food_gathering", "I should find something real to eat.", "Food first. Then I can get back to the day.", "I saw tracks around here. Might as well look.", "Better to hunt nearby than burn through supplies.");
+            case TREE -> pickKey(fighter, "ambient.activity.tree", "An apple break sounded good.", "Training fuel.", "Hard to beat something simple.", "Found a decent spot for a snack.", "A few strikes and lunch sorts itself out.", "Fresh apple beats carrying rations.", "This tree picked the wrong day to look useful.", "I earned this snack.");
+            case STARGAZING -> pickKey(fighter, "ambient.activity.stargazing", "You forget how big the sky is.", "That's a good view.", "Imagine trying to count all of those. No thanks.", "Somewhere up there, somebody is probably training too hard.", "Makes this whole planet feel small.", "I wonder how many worlds are looking back.", "Hard to think about power levels under a sky like that.", "I could stay out here until sunrise.");
+            case EATING -> pickKey(fighter, "ambient.activity.eating", "I needed that.", "Training on an empty stomach is a terrible idea.", "Finally, something that isn't a Senzu Bean.", "That hit the spot.", "I was getting way too hungry to focus.", "Food tastes better after training.");
+            case SCOUTING -> pickKey(fighter, "ambient.activity.scouting", "Nothing strange so far.", "Good view from here.", "I'm checking the area. And definitely not being nosy.", "I'm learning the terrain while it's quiet.", "Better to know the exits before you need them.", "No trouble in sight. That's usually when I get suspicious.");
+            case RELAXED_FLIGHT -> pickKey(fighter, "ambient.activity.relaxed_flight", "Sometimes flying is the whole point.", "No destination. That's nice for once.", "Walking feels optional when you can do this.", "The view's better when you're not in a hurry.", "I forgot how good the air feels up here.", "No mission. Just a little sky.");
+            case DANCING -> pickKey(fighter, "ambient.activity.dancing", "Don't judge me. The rhythm won.", "A little music would improve this.", "Sometimes you just move.", "This counts as footwork practice if anyone asks.", "I refuse to explain myself.", "Okay, one more round and I'm done.");
         };
         fighter.speak(line, 70);
     }
 
     private static String pick(AmbientFighterEntity fighter, String... values) { return values[fighter.getRandom().nextInt(values.length)]; }
+
+    private static String pickKey(AmbientFighterEntity fighter, String group, String... values) {
+        int index = fighter.getRandom().nextInt(values.length);
+        return LWLang.speechKey("dialogue." + group + "." + index, values[index]);
+    }
+
+    private static String pickKeyArgs(AmbientFighterEntity fighter, String group, Object[] arguments, String... values) {
+        int index = fighter.getRandom().nextInt(values.length);
+        return LWLang.speechKey("dialogue." + group + "." + index, values[index], arguments);
+    }
 
     /** Immediate lifecycle cleanup used by death/archive handling. */
     public static void cancelFor(AmbientFighterEntity fighter) {

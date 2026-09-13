@@ -43,8 +43,13 @@ public final class WorldIncidentData extends SavedData {
 
     public List<String> recent(int limit) {
         List<String> out = new ArrayList<>();
-        int start = Math.max(0, history.size() - Math.max(1, limit));
-        for (int i = history.size() - 1; i >= start; i--) out.add(history.get(i));
+        for (int i = history.size() - 1; i >= 0 && out.size() < Math.max(1, limit); i--) {
+            String line = history.get(i);
+            // An early localization build persisted the untranslated format template itself.
+            // It contains no participant names and cannot be reconstructed; hide that corrupt
+            // row and expose the next real incident instead. Newly recorded rows are encoded.
+            if (line != null && !line.contains("%s: %s vs %s")) out.add(line);
+        }
         return out;
     }
 

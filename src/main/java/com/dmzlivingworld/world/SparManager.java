@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -50,36 +51,36 @@ public final class SparManager {
     public static boolean request(ServerPlayer player, AmbientFighterEntity fighter) {
         if (player == null || fighter == null || !fighter.isAlive()) return false;
         if (FactionRequestMissionManager.isRequestActionLocked(fighter)) {
-            message(player, fighter.getFighterName() + " is busy with an active faction request.", ChatFormatting.GRAY);
+            messageKey(player, "busy_request", ChatFormatting.GRAY, fighter.getFighterName());
             return false;
         }
         if (WorldMenaceManager.isWorldMenace(fighter)) {
-            message(player, "Herobrine does not spar.", ChatFormatting.DARK_RED);
+            messageKey(player, "herobrine_refusal", ChatFormatting.DARK_RED);
             return false;
         }
         if (WorldIncidentManager.isActive()) {
-            message(player, "The world is already hosting another organized fight.", ChatFormatting.GRAY);
+            messageKey(player, "world_busy", ChatFormatting.GRAY);
             return false;
         }
         if (isPlayerInSpar(player) || fighter.isSanctionedMatchParticipant()) {
-            message(player, "A spar is already in progress.", ChatFormatting.GRAY);
+            messageKey(player, "already_active", ChatFormatting.GRAY);
             return false;
         }
         if (fighter.isCaptive() || fighter.isDefeated() || fighter.isRecovering() || fighter.isNonCombatant()
                 || fighter.isMeditating() || fighter.getTarget() != null) {
-            message(player, fighter.getFighterName() + " isn't available to spar right now.", ChatFormatting.GRAY);
+            messageKey(player, "fighter_unavailable", ChatFormatting.GRAY, fighter.getFighterName());
             return false;
         }
         if (fighter.getAlignment() == com.dmzlivingworld.entity.FighterAlignment.BAD
                 && fighter.isRememberedFor(player) && fighter.getMemoryRelationship() <= -30) {
-            message(player, fighter.getFighterName() + " isn't interested in a friendly spar.", ChatFormatting.RED);
+            messageKey(player, "not_interested", ChatFormatting.RED, fighter.getFighterName());
             return false;
         }
         int relationship = fighter.isRememberedFor(player) ? fighter.getMemoryRelationship() : 0;
         String moodRefusal = ReactiveInteractionManager.sparRefusal(player, fighter, relationship);
         if (moodRefusal != null) {
             fighter.speak(moodRefusal, 86);
-            message(player, fighter.getFighterName() + " doesn't want to spar right now.", ChatFormatting.GRAY);
+            messageKey(player, "refused", ChatFormatting.GRAY, fighter.getFighterName());
             return false;
         }
 
@@ -88,15 +89,15 @@ public final class SparManager {
         long readyAt = fighter.getLegacyData().getLong(cooldownKey);
         if (readyAt > now) {
             long seconds = Math.max(1L, (readyAt - now + 19L) / 20L);
-            message(player, fighter.getFighterName() + " needs a little longer to recover (" + seconds + "s).", ChatFormatting.GRAY);
+            messageKey(player, "recovering", ChatFormatting.GRAY, fighter.getFighterName(), seconds);
             return false;
         }
         if (fighter.getHealth() < fighter.getMaxHealth() * 0.30F) {
-            message(player, fighter.getFighterName() + " is too hurt to spar safely right now.", ChatFormatting.GRAY);
+            messageKey(player, "fighter_hurt", ChatFormatting.GRAY, fighter.getFighterName());
             return false;
         }
         if (player.getHealth() < player.getMaxHealth() * 0.30F) {
-            message(player, "You're too hurt to start a safe spar right now.", ChatFormatting.GRAY);
+            messageKey(player, "player_hurt", ChatFormatting.GRAY);
             return false;
         }
         SESSIONS.put(player.getUUID(), new Session(player.getUUID(), fighter.getUUID(), now));
@@ -105,11 +106,11 @@ public final class SparManager {
         fighter.beginSanctionedMatch(player);
         rememberReconnectState(player, fighter, 0L);
         fighter.recordLegacyEvent("Accepted a spar with " + player.getGameProfile().getName());
-        fighter.speak("All right. Let's spar.", 58);
-        message(player, "Spar started with " + fighter.getFighterName() + ".", ChatFormatting.GREEN);
+        fighter.speakKey("dialogue.spar.start", "All right. Let's spar.", 58);
+        messageKey(player, "started", ChatFormatting.GREEN, fighter.getFighterName());
         SanctionedMatchGuard.noteSparStart(player, fighter);
         if (SanctionedMatchGuard.isTraceEnabled(player)) {
-            player.displayClientMessage(Component.literal("[LW SparTrace] Auto-recording this spar and the 30s cleanup window in latest.log.")
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar.trace_recording")
                     .withStyle(ChatFormatting.AQUA), false);
         }
         return true;
@@ -119,21 +120,21 @@ public final class SparManager {
     public static boolean requestX7(ServerPlayer player, AmbientFighterEntity fighter) {
         if (player == null || fighter == null || !RedRibbonExperimentManager.isExperiment(fighter)) return false;
         if (player.isCreative() || player.isSpectator() || !player.isAlive()) {
-            player.displayClientMessage(Component.literal("[Living World] X-7 will not spar in your current state."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar.x7_bad_state"), false);
             return false;
         }
         if (player.distanceToSqr(fighter) > 12.0D * 12.0D) return false;
         if (!fighter.isAlive() || fighter.isDefeated() || fighter.isCaptive() || fighter.isSanctionedMatchParticipant()) {
-            player.displayClientMessage(Component.literal("[Living World] X-7 is not available for a controlled bout right now."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar.x7_unavailable"), false);
             return false;
         }
         if (isPlayerInSpar(player)) {
-            player.displayClientMessage(Component.literal("[Living World] You are already in a sanctioned bout."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar.x7_already_active"), false);
             return false;
         }
         for (X7SparSession session : X7_SPARS.values()) {
             if (session.fighterId().equals(fighter.getUUID())) {
-                player.displayClientMessage(Component.literal("[Living World] X-7 is already testing another opponent."), false);
+                player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar.x7_other_opponent"), false);
                 return false;
             }
         }
@@ -145,8 +146,8 @@ public final class SparManager {
         fighter.setTarget(player);
         X7_SPARS.put(player.getUUID(), new X7SparSession(fighter.getUUID(), now));
         SanctionedMatchGuard.noteSparStart(player, fighter);
-        fighter.speak("Very well. Show me what you can do.", 80);
-        player.displayClientMessage(Component.literal("[Living World] X-7 SPAR • non-lethal • either side concedes at roughly 30% health."), false);
+        fighter.speakKey("dialogue.spar.x7_start", "Very well. Show me what you can do.", 80);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar.x7_started"), false);
         return true;
     }
 
@@ -180,7 +181,7 @@ public final class SparManager {
             ServerPlayer player = server.getPlayerList().getPlayer(session.playerId);
             AmbientFighterEntity fighter = find(server, session.fighterId);
             if (player == null || fighter == null) {
-                end(server, session, player, fighter, false, false, "Spar ended");
+                end(server, session, player, fighter, false, false, summaryKey("ended", "Spar ended."));
                 continue;
             }
             SanctionedMatchGuard.noteSparTick(player, fighter);
@@ -188,7 +189,7 @@ public final class SparManager {
                 // Last-resort recovery for DMZ damage paths that reached vanilla death state.
                 fighter.restoreSanctionedLivingState(false);
                 fighter.concedeSanctionedMatch();
-                end(server, session, player, fighter, true, true, player.getGameProfile().getName() + " won the spar");
+                end(server, session, player, fighter, true, true, summaryKey("winner", "%s won the spar.", player.getGameProfile().getName()));
                 continue;
             }
             // A spar is a controlled test, not a near-death fight. The first participant to
@@ -198,21 +199,21 @@ public final class SparManager {
             boolean playerLow = player.getHealth() <= player.getMaxHealth() * 0.30F;
             if (fighterLow || playerLow) {
                 if (fighterLow && playerLow) {
-                    end(server, session, player, fighter, false, false, "Spar ended at the safety limit");
+                    end(server, session, player, fighter, false, false, summaryKey("safety_limit", "Spar ended at the safety limit."));
                 } else if (fighterLow) {
                     fighter.concedeSanctionedMatch();
-                    end(server, session, player, fighter, true, true, player.getGameProfile().getName() + " won the spar");
+                    end(server, session, player, fighter, true, true, summaryKey("winner", "%s won the spar.", player.getGameProfile().getName()));
                 } else {
-                    end(server, session, player, fighter, false, true, fighter.getFighterName() + " won the spar");
+                    end(server, session, player, fighter, false, true, summaryKey("winner", "%s won the spar.", fighter.getFighterName()));
                 }
                 continue;
             }
             if (fighter.isDefeated()) {
-                end(server, session, player, fighter, true, true, player.getGameProfile().getName() + " won the spar");
+                end(server, session, player, fighter, true, true, summaryKey("winner", "%s won the spar.", player.getGameProfile().getName()));
                 continue;
             }
             if (now - session.startedAt >= MAX_SPAR_TICKS || player.distanceToSqr(fighter) > 160.0D * 160.0D) {
-                end(server, session, player, fighter, false, false, "Spar ended without a winner");
+                end(server, session, player, fighter, false, false, summaryKey("draw", "Spar ended without a winner."));
             }
         }
     }
@@ -241,15 +242,15 @@ public final class SparManager {
         X7SparSession x7 = X7_SPARS.get(player.getUUID());
         if (x7 != null && x7.fighterId().equals(fighter.getUUID())) {
             finishX7(player.getServer(), player.getUUID(), playerWon,
-                    playerWon ? "X-7 lowers his guard. \"Enough. You proved the point.\""
-                            : fighter.getFighterName() + " won the spar.", true);
+                    playerWon ? summaryKey("x7_player_won", "X-7 lowers his guard. \"Enough. You proved the point.\"")
+                            : summaryKey("winner", "%s won the spar.", fighter.getFighterName()), true);
             return;
         }
         Session session = SESSIONS.get(player.getUUID());
         if (session == null || !session.fighterId.equals(fighter.getUUID())) return;
         if (playerWon) fighter.concedeSanctionedMatch();
         end(player.getServer(), session, player, fighter, playerWon, true,
-                (playerWon ? player.getGameProfile().getName() : fighter.getFighterName()) + " won the spar");
+                summaryKey("winner", "%s won the spar.", playerWon ? player.getGameProfile().getName() : fighter.getFighterName()));
             LivingBondManager.clearPostSparFlight(fighter);
     }
 
@@ -257,19 +258,19 @@ public final class SparManager {
         if (player == null) return;
         X7SparSession x7 = X7_SPARS.get(player.getUUID());
         if (x7 != null && (fighter == null || x7.fighterId().equals(fighter.getUUID()))) {
-            finishX7(player.getServer(), player.getUUID(), false, "You concede. X-7 immediately disengages.", true);
+            finishX7(player.getServer(), player.getUUID(), false, summaryKey("x7_concede", "You concede. X-7 immediately disengages."), true);
             return;
         }
         if (fighter == null) return;
         Session session = SESSIONS.get(player.getUUID());
         if (session == null || !session.fighterId.equals(fighter.getUUID())) return;
-        end(player.getServer(), session, player, fighter, false, true, fighter.getFighterName() + " won the spar");
+        end(player.getServer(), session, player, fighter, false, true, summaryKey("winner", "%s won the spar.", fighter.getFighterName()));
     }
 
     public static void concedePlayer(ServerPlayer player) {
         if (player == null) return;
         if (X7_SPARS.containsKey(player.getUUID())) {
-            finishX7(player.getServer(), player.getUUID(), false, "You concede. X-7 immediately disengages.", true);
+            finishX7(player.getServer(), player.getUUID(), false, summaryKey("x7_concede", "You concede. X-7 immediately disengages."), true);
             return;
         }
         Session session = SESSIONS.get(player.getUUID());
@@ -289,11 +290,11 @@ public final class SparManager {
         AmbientFighterEntity fighter = session == null ? null : find(player.getServer(), session.fighterId);
         if (fighter != null && fighter.getSpeech().isEmpty()) {
             String line = switch (fighter.getPersonality()) {
-                case PROUD -> "A Senzu? During a spar? Seriously?";
-                case HEROIC -> "Hey—save the Senzu for after the spar.";
-                case CALM -> "Using a Senzu rather defeats the point of a spar.";
-                case CAUTIOUS -> "You're healing now? Then this isn't much of a test.";
-                case AGGRESSIVE -> "Oh, come on! No beans in the middle of this!";
+                case PROUD -> LWLang.speechKey("dialogue.spar.senzu.proud", "A Senzu? During a spar? Seriously?");
+                case HEROIC -> LWLang.speechKey("dialogue.spar.senzu.heroic", "Hey—save the Senzu for after the spar.");
+                case CALM -> LWLang.speechKey("dialogue.spar.senzu.calm", "Using a Senzu rather defeats the point of a spar.");
+                case CAUTIOUS -> LWLang.speechKey("dialogue.spar.senzu.cautious", "You're healing now? Then this isn't much of a test.");
+                case AGGRESSIVE -> LWLang.speechKey("dialogue.spar.senzu.aggressive", "Oh, come on! No beans in the middle of this!");
             };
             fighter.speak(line, 82);
         }
@@ -338,7 +339,7 @@ public final class SparManager {
         String name = pd.getString(RECONNECT_NAME);
         long elapsed = Math.max(0L, Math.min(MAX_SPAR_TICKS - 1L, pd.getLong(RECONNECT_ELAPSED)));
         PENDING_RESUMES.put(player.getUUID(), new PendingResume(fighterId, now + 100L, elapsed, dimension, lastPos, name));
-        message(player, "Your spar" + (name.isBlank() ? "" : " with " + name) + " will resume in 5 seconds.", ChatFormatting.YELLOW);
+        messageKey(player, name.isBlank() ? "resume_countdown_no_name" : "resume_countdown", ChatFormatting.YELLOW, name);
     }
 
     private static void tickX7(MinecraftServer server, long now) {
@@ -354,11 +355,11 @@ public final class SparManager {
             }
             if (player.level() != fighter.level() || player.distanceToSqr(fighter) > 160.0D * 160.0D
                     || now - session.startedAt() > MAX_X7_SPAR_TICKS) {
-                finishX7(server, playerId, false, "The controlled bout ends as the fighters separate.", false);
+                finishX7(server, playerId, false, summaryKey("x7_separated", "The controlled bout ends as the fighters separate."), false);
                 continue;
             }
             if (fighter.isDefeated()) {
-                finishX7(server, playerId, true, "X-7 lowers his guard. \"Enough. You proved the point.\"", true);
+                finishX7(server, playerId, true, summaryKey("x7_player_won", "X-7 lowers his guard. \"Enough. You proved the point.\""), true);
                 continue;
             }
             fighter.maintainSanctionedMatch(player);
@@ -380,7 +381,8 @@ public final class SparManager {
             if (player != null) SanctionedMatchGuard.beginPostSparPeace(fighter, player);
         }
         if (player != null && text != null && !text.isBlank())
-            player.displayClientMessage(Component.literal("[Living World] " + text), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.prefix").withStyle(ChatFormatting.GOLD)
+                    .append(LWLang.speech(text)), false);
         if (player != null && decisive) DMZSkillProgressionCompat.onFighterDefeated(player);
     }
 
@@ -432,7 +434,7 @@ public final class SparManager {
         }
         if (player != null) {
             SENZU_WARNED.remove(player.getUUID());
-            message(player, summary + ".", ChatFormatting.GOLD);
+            message(player, summary, ChatFormatting.GOLD);
         }
     }
 
@@ -475,7 +477,7 @@ public final class SparManager {
                 if (fighter != null) FighterBattleGrowthManager.clearProgressiveAdvance(fighter, FighterBattleGrowthManager.Source.SPAR);
                 clearReconnectState(player);
                 PENDING_RESUMES.remove(playerId);
-                message(player, "The interrupted spar could not be safely resumed.", ChatFormatting.GRAY);
+                messageKey(player, "resume_failed", ChatFormatting.GRAY);
                 continue;
             }
             fighter.getNavigation().stop();
@@ -487,7 +489,7 @@ public final class SparManager {
             clearReconnectState(player);
             SENZU_WARNED.remove(playerId);
             SanctionedMatchGuard.noteSparStart(player, fighter);
-            message(player, "Spar resumed with " + fighter.getFighterName() + ".", ChatFormatting.GREEN);
+            messageKey(player, "resumed", ChatFormatting.GREEN, fighter.getFighterName());
         }
     }
 
@@ -516,8 +518,17 @@ public final class SparManager {
     }
 
     private static void message(ServerPlayer player, String text, ChatFormatting color) {
-        if (player != null) player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                .append(Component.literal(text).withStyle(color)), false);
+        if (player != null) player.displayClientMessage(Component.translatable("dmzlivingworld.message.prefix").withStyle(ChatFormatting.GOLD)
+                .append(LWLang.speech(text).copy().withStyle(color)), false);
+    }
+
+    private static String summaryKey(String key, String fallback, Object... args) {
+        return LWLang.speechKey("message.spar.summary." + key, fallback, args);
+    }
+
+    private static void messageKey(ServerPlayer player, String key, ChatFormatting color, Object... args) {
+        if (player != null) player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar." + key, args)
+                .withStyle(color), false);
     }
 
     public static void clearRuntime(UUID playerId) {

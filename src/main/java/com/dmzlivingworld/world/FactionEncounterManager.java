@@ -4,6 +4,7 @@ import com.dmzlivingworld.compat.MeditationCompat;
 import com.dmzlivingworld.config.LivingWorldConfig;
 
 import com.dmzlivingworld.entity.AmbientFighterEntity;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.FighterArchetype;
 import com.dmzlivingworld.entity.FighterRank;
 import net.minecraft.core.BlockPos;
@@ -164,7 +165,8 @@ public final class FactionEncounterManager {
             if (fighter == null) { cleanup(members); return 0; }
             members.add(fighter);
         }
-        members.get(0).speak(FactionWorldData.get(level).supplies(faction) < 20 ? "We need food. Spread out." : "Let's bring something back.", 58);
+        members.get(0).speakKey(FactionWorldData.get(level).supplies(faction) < 20
+                ? "dialogue.faction.encounter.forage.low" : "dialogue.faction.encounter.forage.normal", 58);
         FactionActivityRegistry.acquire(level, faction, debug ? 900L : 1600L);
         return members.size();
     }
@@ -195,8 +197,8 @@ public final class FactionEncounterManager {
             }
             int duration = debug ? 700 : AmbientFighterEntity.naturalMeditationDuration(player.getRandom(), 1400);
             for (AmbientFighterEntity member : group) member.beginMeditation(duration + member.getRandom().nextInt(241), true);
-            group.get(0).speak(faction.structure() == FactionStructure.CULT ? "Still your thoughts. Listen inward."
-                    : "Settle in. We train the mind too.", 76);
+            group.get(0).speakKey(faction.structure() == FactionStructure.CULT
+                    ? "dialogue.faction.encounter.meditation.cult" : "dialogue.faction.encounter.meditation.default", 76);
             FactionActivityRegistry.acquire(level, faction, debug ? 1000L : Math.max(3000L, duration + 300L));
             return group.size();
         }
@@ -209,8 +211,8 @@ public final class FactionEncounterManager {
                 ? spawnMember(player, faction, anchor, party, false, FactionRole.MEMBER, null, false) : null;
         if (instructor == null || trainee == null) return cleanup(instructor, trainee, observer);
         instructor.startDuel(trainee); trainee.startDuel(instructor);
-        instructor.speak("One clean round. Ready?", 62);
-        trainee.speak("Ready.", 52);
+        instructor.speakKey("dialogue.faction.encounter.training.instructor", 62);
+        trainee.speakKey("dialogue.faction.encounter.training.trainee", 52);
         FactionActivityRegistry.acquire(level, faction, debug ? 1100L : 1900L);
         return observer == null ? 2 : 3;
     }
@@ -243,13 +245,17 @@ public final class FactionEncounterManager {
                 a.get(i).startDuel(b.get(i)); b.get(i).startDuel(a.get(i));
             }
         }
-        a.get(0).speak(war ? "War party! Spread out!" : relation == FactionRelation.ENEMY ? "Spread out!" : "Let's settle this properly.", 58);
-        b.get(0).speak(war ? "Don't let them through!" : relation == FactionRelation.ENEMY ? "Take them!" : "Finally.", 54);
+        a.get(0).speakKey(war ? "dialogue.faction.encounter.clash.war_a" : relation == FactionRelation.ENEMY
+                ? "dialogue.faction.encounter.clash.enemy_a" : "dialogue.faction.encounter.clash.rival_a", 58);
+        b.get(0).speakKey(war ? "dialogue.faction.encounter.clash.war_b" : relation == FactionRelation.ENEMY
+                ? "dialogue.faction.encounter.clash.enemy_b" : "dialogue.faction.encounter.clash.rival_b", 54);
         FactionActivityRegistry.acquirePair(level, firstFaction, secondFaction, debug ? 1800L : 3000L);
         // Rare third-party intervention is layered on top of the already-working clash,
         // never substituted for its choreography.
         PeacekeeperManager.maybeInterveneInClash(player, firstFaction, secondFaction, a, b, debug);
-        String event = war ? "WAR SKIRMISH" : relation == FactionRelation.ENEMY ? "FACTION CLASH" : "RIVAL CLASH";
+        String event = war ? com.dmzlivingworld.client.LWLang.speechKey("message.world_event.war_skirmish", "WAR SKIRMISH")
+                : relation == FactionRelation.ENEMY ? com.dmzlivingworld.client.LWLang.speechKey("message.world_event.faction_clash", "FACTION CLASH")
+                : com.dmzlivingworld.client.LWLang.speechKey("message.world_event.rival_clash", "RIVAL CLASH");
         WorldEventNotifier.announce(level, anchor, event, firstFaction.name() + " ↔ " + secondFaction.name());
         return 6;
     }
@@ -298,8 +304,9 @@ public final class FactionEncounterManager {
         }
         data.markLeaderSpawned(faction, leader.blockPosition());
         FactionActivityRegistry.acquire(level, faction, debug ? 1000L : 1800L);
-        leader.speak(AntagonistManager.isAntagonistFaction(level, faction)
-                ? faction.name() + ". No loose ends." : faction.name() + ". Keep moving.", 72);
+        leader.speakKey(AntagonistManager.isAntagonistFaction(level, faction)
+                ? "dialogue.faction.encounter.entourage.antagonist" : "dialogue.faction.encounter.entourage.default",
+                AntagonistManager.isAntagonistFaction(level, faction) ? "%s. No loose ends." : "%s. Keep moving.", 72, faction.name());
         reactToPlayer(player, faction, entourage);
         return entourage.size();
     }
@@ -365,35 +372,35 @@ public final class FactionEncounterManager {
                 PeacekeeperManager.markNpcAggressor(player, member);
                 member.setTarget(player);
             }
-            members.get(0).speak(AntagonistManager.isAntagonistFaction(player.serverLevel(), faction)
-                    ? "There you are. Don't let them leave." : "There. That's the one.", 70);
+            members.get(0).speakKey(AntagonistManager.isAntagonistFaction(player.serverLevel(), faction)
+                    ? "dialogue.faction.encounter.player.antagonist" : "dialogue.faction.encounter.player.hostile", 70);
         } else if (rep >= FactionManager.FRIENDLY_REP) {
-            members.get(0).speak("Good to see you out here.", 58);
+            members.get(0).speakKey("dialogue.faction.encounter.player.friendly", 58);
         }
     }
 
     private static String homeLine(WorldFaction faction) {
         return switch (faction.structure()) {
-            case GANG, SYNDICATE -> "You're in our stretch now.";
-            case CULT -> "The strong always find their way here.";
-            case SCHOOL -> "This is where we train.";
-            case ORDER, CLAN -> "Our people are nearby.";
-            case GUARD -> "We keep watch around here.";
-            case CREW -> "Our crew runs this route.";
+            case GANG, SYNDICATE -> LWLang.speechKey("dialogue.faction.encounter.home.gang", "You're in our stretch now.");
+            case CULT -> LWLang.speechKey("dialogue.faction.encounter.home.cult", "The strong always find their way here.");
+            case SCHOOL -> LWLang.speechKey("dialogue.faction.encounter.home.school", "This is where we train.");
+            case ORDER, CLAN -> LWLang.speechKey("dialogue.faction.encounter.home.order", "Our people are nearby.");
+            case GUARD -> LWLang.speechKey("dialogue.faction.encounter.home.guard", "We keep watch around here.");
+            case CREW -> LWLang.speechKey("dialogue.faction.encounter.home.crew", "Our crew runs this route.");
         };
     }
 
     private static String patrolLine(WorldFaction faction) {
         return switch (faction.ethos()) {
-            case MARTIAL_SCHOOL -> "Stay sharp. Training never stops.";
-            case WANDERING_GUARD, NAMEK_WARDENS -> "Keep an eye on the road.";
-            case KI_ORDER, ASCETIC_ORDER, ROOT_CIRCLE -> "I can feel several powers nearby.";
-            case CHALLENGERS -> "Maybe we'll find someone strong today.";
-            case MERCENARIES -> "Keep moving. We have work to do.";
-            case STREET_GANG, CRIME_FAMILY, SYNDICATE -> "This stretch is ours.";
-            case RAIDERS -> "Look alive. Easy targets travel these roads.";
-            case SEEKERS -> "There's a strong signature somewhere nearby.";
-            case POWER_CULT -> "Power reveals who deserves to stand.";
+            case MARTIAL_SCHOOL -> LWLang.speechKey("dialogue.faction.encounter.patrol.school", "Stay sharp. Training never stops.");
+            case WANDERING_GUARD, NAMEK_WARDENS -> LWLang.speechKey("dialogue.faction.encounter.patrol.guard", "Keep an eye on the road.");
+            case KI_ORDER, ASCETIC_ORDER, ROOT_CIRCLE -> LWLang.speechKey("dialogue.faction.encounter.patrol.ki_order", "I can feel several powers nearby.");
+            case CHALLENGERS -> LWLang.speechKey("dialogue.faction.encounter.patrol.challengers", "Maybe we'll find someone strong today.");
+            case MERCENARIES -> LWLang.speechKey("dialogue.faction.encounter.patrol.mercenaries", "Keep moving. We have work to do.");
+            case STREET_GANG, CRIME_FAMILY, SYNDICATE -> LWLang.speechKey("dialogue.faction.encounter.patrol.gang", "This stretch is ours.");
+            case RAIDERS -> LWLang.speechKey("dialogue.faction.encounter.patrol.raiders", "Look alive. Easy targets travel these roads.");
+            case SEEKERS -> LWLang.speechKey("dialogue.faction.encounter.patrol.seekers", "There's a strong signature somewhere nearby.");
+            case POWER_CULT -> LWLang.speechKey("dialogue.faction.encounter.patrol.power_cult", "Power reveals who deserves to stand.");
         };
     }
 

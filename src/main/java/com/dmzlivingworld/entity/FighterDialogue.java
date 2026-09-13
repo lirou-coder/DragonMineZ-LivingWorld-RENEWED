@@ -1,11 +1,20 @@
 package com.dmzlivingworld.entity;
 
 import com.dmzlivingworld.world.FighterGoalManager;
+import com.dmzlivingworld.client.LWLang;
 import net.minecraft.util.RandomSource;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.IdentityHashMap;
+import java.util.Locale;
+import java.util.Map;
 
 /** Sparse overhead dialogue tied to visible fight events, never normal chat spam. */
 public final class FighterDialogue {
     private FighterDialogue() {}
+
+    private static final Map<String[], String> DIALOGUE_POOLS = new IdentityHashMap<>();
 
     private static final String[] OPEN_GOOD = {"Back off.", "Leave them alone.", "I'm stopping this.", "You picked the wrong target.", "That's enough. Step away.", "You don't get to hurt people here.", "Try me instead.", "I'm not letting this continue.", "Put them down and walk away.", "You've done enough.", "Find someone else to threaten.", "I'm giving you one chance to stop.", "They're not fighting alone anymore.", "That's over. Right now.", "If you want a fight, you found one.", "Step away before this gets worse.", "Pick on someone who can answer back.", "You stop here.", "I saw enough. Back away.", "Not another step.", "Whatever this was, it ends with me.", "You can leave now or I can make you."};
     private static final String[] OPEN_NEUTRAL = {"All right.", "Show me your technique.", "Let's see what you've got.", "Come on, then.", "No excuses. Show me where you stand.", "Let's make this worth the energy.", "I want to see how you fight.", "Fine. We settle it here.", "Let's test each other properly.", "All right. No cheap shots.", "I've been wanting a real match.", "Let's see what your habits are.", "I won't learn anything if you hold back.", "Show me how you handle pressure.", "Let's settle this cleanly.", "I want a proper measure of your strength.", "Let’s see how you manage distance.", "Show me what you do under pressure.", "I want a clean exchange.", "No audience needed. Just fight.", "Let’s find the holes in each other’s style.", "Don’t waste the first opening."};
@@ -52,16 +61,27 @@ public final class FighterDialogue {
     private static final String[] RESCUED = {"You came... thank you.", "I thought I was finished.", "You got me out. Thanks.", "I owe you one.", "I didn't think anyone was coming. Thank you.", "That was close. I won't forget this.", "You actually came back for me.", "I can breathe again. Thanks.", "You got here in time.", "I seriously owe you for that.", "I thought nobody saw what happened.", "Thanks. I wasn't getting out alone.", "That could've ended badly.", "You saved me a lot worse than a bruise.", "I won't forget who showed up.", "Give me a second. Then thank you properly."};
     private static final String[] CAPTIVE = {"Help!", "Frieza's soldiers have me pinned!", "Over here!", "Get these soldiers off me!", "I need help over here!", "They've got me surrounded!", "Hey! I could use a hand!", "Break their line and I can move!"};
 
+    static {
+        for (Field field : FighterDialogue.class.getDeclaredFields()) {
+            if (field.getType() != String[].class || !Modifier.isStatic(field.getModifiers())) continue;
+            try {
+                field.setAccessible(true);
+                String[] pool = (String[]) field.get(null);
+                if (pool != null) DIALOGUE_POOLS.put(pool, "dialogue.fighter." + field.getName().toLowerCase(Locale.ROOT));
+            } catch (IllegalAccessException ignored) { }
+        }
+    }
+
     public static String opening(RandomSource random, FighterAlignment alignment) {
         return opening(random, alignment, FighterPersonality.CALM);
     }
 
     public static String opening(RandomSource random, FighterAlignment alignment, FighterPersonality personality) {
         if (personality == FighterPersonality.PROUD && random.nextBoolean()) {
-            return pick(random, new String[]{"You can make the first move.", "Try to impress me.", "I hope you're worth this.", "Show me."});
+            return pick(random, "opening.proud", new String[]{"You can make the first move.", "Try to impress me.", "I hope you're worth this.", "Show me."});
         }
         if (personality == FighterPersonality.AGGRESSIVE && random.nextBoolean()) {
-            return pick(random, new String[]{"I'm done talking!", "Come here!", "You're finished!", "Let's go!"});
+            return pick(random, "opening.aggressive", new String[]{"I'm done talking!", "Come here!", "You're finished!", "Let's go!"});
         }
         return pick(random, switch (alignment) {
             case GOOD -> OPEN_GOOD;
@@ -71,8 +91,8 @@ public final class FighterDialogue {
     }
 
     public static String openingReply(RandomSource random, FighterAlignment alignment, FighterPersonality personality) {
-        if (personality == FighterPersonality.PROUD) return pick(random, new String[]{"You first.", "Don't regret saying that.", "Good.", "Then begin."});
-        if (personality == FighterPersonality.AGGRESSIVE) return pick(random, new String[]{"Gladly!", "Enough!", "Here I come!", "Too late!"});
+        if (personality == FighterPersonality.PROUD) return pick(random, "opening_reply.proud", new String[]{"You first.", "Don't regret saying that.", "Good.", "Then begin."});
+        if (personality == FighterPersonality.AGGRESSIVE) return pick(random, "opening_reply.aggressive", new String[]{"Gladly!", "Enough!", "Here I come!", "Too late!"});
         return pick(random, OPEN_REPLY);
     }
 
@@ -130,8 +150,8 @@ public final class FighterDialogue {
         return pick(random, personality == FighterPersonality.PROUD ? POWER_UP_PROUD : POWER_UP);
     }
     public static String powerUpReply(RandomSource random, FighterPersonality personality) {
-        if (personality == FighterPersonality.AGGRESSIVE) return pick(random, new String[]{"I won't let you!", "Too slow!", "I'm coming in!", "Not happening!"});
-        if (personality == FighterPersonality.PROUD) return pick(random, new String[]{"Keep going.", "More.", "Is that all?", "Good. Don't stop."});
+        if (personality == FighterPersonality.AGGRESSIVE) return pick(random, "power_up_reply.aggressive", new String[]{"I won't let you!", "Too slow!", "I'm coming in!", "Not happening!"});
+        if (personality == FighterPersonality.PROUD) return pick(random, "power_up_reply.proud", new String[]{"Keep going.", "More.", "Is that all?", "Good. Don't stop."});
         return pick(random, POWER_UP_REPLY);
     }
     public static String powerReady(RandomSource random, FighterPersonality personality) { return pick(random, POWER_READY); }
@@ -154,9 +174,9 @@ public final class FighterDialogue {
 
     /** Quiet NPC-to-NPC conversation. Lines are selected from facts that are actually true for the pair. */
     public static String npcSocialOpening(RandomSource random, AmbientFighterEntity speaker, AmbientFighterEntity other, int bond) {
-        if (speaker == null || other == null) return "Good to see you.";
+        if (speaker == null || other == null) return fixed("social.opening.default", "Good to see you.");
         if (bond >= 3 && random.nextFloat() < 0.075F) {
-            return pick(random, new String[]{
+            return pick(random, "social.opening.humor", new String[]{
                     "You know, for people who can fly, we spend a lot of time walking.",
                     "Quiet day. Suspiciously few craters.",
                     "I tried counting how many fights I've been in. I got bored and stopped.",
@@ -168,49 +188,49 @@ public final class FighterDialogue {
             });
         }
         if (speaker.isFactionMember() && other.isFactionMember() && speaker.getFactionId().equals(other.getFactionId())) {
-            if (bond >= 6) return pick(random, new String[]{"Good to see you again.", "Everything quiet on your side?", "How's training been?"});
-            return pick(random, new String[]{"Anything unusual nearby?", "Keep an eye on the area.", "You doing all right?"});
+            if (bond >= 6) return pick(random, "social.opening.faction_close", new String[]{"Good to see you again.", "Everything quiet on your side?", "How's training been?"});
+            return pick(random, "social.opening.faction", new String[]{"Anything unusual nearby?", "Keep an eye on the area.", "You doing all right?"});
         }
         if (bond >= 4 && random.nextFloat() < 0.20F) {
             com.dmzlivingworld.world.FighterHobby hobby = com.dmzlivingworld.world.FighterHobby.of(speaker);
             return switch (hobby) {
-                case COOKING -> "I tried cooking something new. It survived, so that's progress.";
-                case STARGAZING -> "Sky should be clear tonight. Good night for stargazing.";
-                case FISHING -> "I found a quiet fishing spot. Don't tell every fighter you meet.";
-                case MUSIC -> "I've been listening for new rhythms between training sessions.";
-                case MECHANICS -> "I fixed a piece of gear earlier. Took longer than the fight that broke it.";
-                case MAPMAKING -> "I've added a few places to my maps. This world keeps changing.";
-                case GARDENING -> "My plants are somehow still alive. I'm counting that as a win.";
-                case TEA -> "I found a tea that actually helps after training.";
-                case ROCK_COLLECTING -> "Found an unusual stone earlier. Completely ordinary. I like it anyway.";
-                case CLOUD_WATCHING -> "I spent ten minutes watching clouds today. Highly recommended.";
-                case MARTIAL_NOTES -> "I've been writing down a few things I noticed in fights.";
-                case CARD_GAMES -> "We should play cards sometime. No Ki attacks over a bad hand.";
-                case CAMPING -> "I could use a quiet campfire after all this.";
-                case FASHION -> "I'm thinking of changing my outfit. We can't all dress like we're permanently mid-fight.";
-                case BULGARIAN_FOLKLORE -> "I was reading Bulgarian mountain legends again. Those people knew how to tell a story.";
+                case COOKING -> fixed("social.hobby.cooking", "I tried cooking something new. It survived, so that's progress.");
+                case STARGAZING -> fixed("social.hobby.stargazing", "Sky should be clear tonight. Good night for stargazing.");
+                case FISHING -> fixed("social.hobby.fishing", "I found a quiet fishing spot. Don't tell every fighter you meet.");
+                case MUSIC -> fixed("social.hobby.music", "I've been listening for new rhythms between training sessions.");
+                case MECHANICS -> fixed("social.hobby.mechanics", "I fixed a piece of gear earlier. Took longer than the fight that broke it.");
+                case MAPMAKING -> fixed("social.hobby.mapmaking", "I've added a few places to my maps. This world keeps changing.");
+                case GARDENING -> fixed("social.hobby.gardening", "My plants are somehow still alive. I'm counting that as a win.");
+                case TEA -> fixed("social.hobby.tea", "I found a tea that actually helps after training.");
+                case ROCK_COLLECTING -> fixed("social.hobby.rock_collecting", "Found an unusual stone earlier. Completely ordinary. I like it anyway.");
+                case CLOUD_WATCHING -> fixed("social.hobby.cloud_watching", "I spent ten minutes watching clouds today. Highly recommended.");
+                case MARTIAL_NOTES -> fixed("social.hobby.martial_notes", "I've been writing down a few things I noticed in fights.");
+                case CARD_GAMES -> fixed("social.hobby.card_games", "We should play cards sometime. No Ki attacks over a bad hand.");
+                case CAMPING -> fixed("social.hobby.camping", "I could use a quiet campfire after all this.");
+                case FASHION -> fixed("social.hobby.fashion", "I'm thinking of changing my outfit. We can't all dress like we're permanently mid-fight.");
+                case BULGARIAN_FOLKLORE -> fixed("social.hobby.bulgarian_folklore", "I was reading Bulgarian mountain legends again. Those people knew how to tell a story.");
             };
         }
         String goal = FighterGoalManager.summary(speaker);
         if (goal.startsWith("Learn ") || goal.startsWith("Complete ") || goal.startsWith("Advance ")) {
-            return pick(random, new String[]{"I've been putting more time into training.", "Still working toward my next step.", "Progress is slow, but it's progress."});
+            return pick(random, "social.opening.goal_training", new String[]{"I've been putting more time into training.", "Still working toward my next step.", "Progress is slow, but it's progress."});
         }
-        if (goal.startsWith("Acquire ")) return pick(random, new String[]{"I'm still looking for better equipment.", "Seen any useful gear around?", "I need to improve my equipment."});
-        if (goal.startsWith("Defeat ") || goal.startsWith("Win ")) return pick(random, new String[]{"I've got another fight on my mind.", "I need a real test soon.", "I'm looking for a stronger challenge."});
-        if (bond >= 8) return pick(random, new String[]{"It's been a while.", "Good timing. I was about to take a break.", "Nice seeing a familiar face."});
+        if (goal.startsWith("Acquire ")) return pick(random, "social.opening.goal_equipment", new String[]{"I'm still looking for better equipment.", "Seen any useful gear around?", "I need to improve my equipment."});
+        if (goal.startsWith("Defeat ") || goal.startsWith("Win ")) return pick(random, "social.opening.goal_fight", new String[]{"I've got another fight on my mind.", "I need a real test soon.", "I'm looking for a stronger challenge."});
+        if (bond >= 8) return pick(random, "social.opening.familiar", new String[]{"It's been a while.", "Good timing. I was about to take a break.", "Nice seeing a familiar face."});
         return switch (speaker.getPersonality()) {
-            case HEROIC -> pick(random, new String[]{"Everything okay around here?", "Need a hand with anything?", "Stay alert out there."});
-            case CALM -> pick(random, new String[]{"Quiet day.", "Good time to clear your head.", "How have things been?"});
-            case PROUD -> pick(random, new String[]{"Still training?", "You'd better not be getting rusty.", "Have you improved since last time?"});
-            case AGGRESSIVE -> pick(random, new String[]{"Been in any good fights lately?", "I'm getting restless.", "Tell me something interesting happened."});
-            case CAUTIOUS -> pick(random, new String[]{"Area seems safe enough.", "Anything I should know about?", "You've been okay?"});
+            case HEROIC -> pick(random, "social.opening.heroic", new String[]{"Everything okay around here?", "Need a hand with anything?", "Stay alert out there."});
+            case CALM -> pick(random, "social.opening.calm", new String[]{"Quiet day.", "Good time to clear your head.", "How have things been?"});
+            case PROUD -> pick(random, "social.opening.proud", new String[]{"Still training?", "You'd better not be getting rusty.", "Have you improved since last time?"});
+            case AGGRESSIVE -> pick(random, "social.opening.aggressive", new String[]{"Been in any good fights lately?", "I'm getting restless.", "Tell me something interesting happened."});
+            case CAUTIOUS -> pick(random, "social.opening.cautious", new String[]{"Area seems safe enough.", "Anything I should know about?", "You've been okay?"});
         };
     }
 
     public static String npcSocialReply(RandomSource random, AmbientFighterEntity speaker, AmbientFighterEntity other, int bond) {
-        if (speaker == null || other == null) return "Yeah.";
+        if (speaker == null || other == null) return fixed("social.reply.default", "Yeah.");
         if (bond >= 3 && random.nextFloat() < 0.07F) {
-            return pick(random, new String[]{
+            return pick(random, "social.reply.humor", new String[]{
                     "Walking builds character. Apparently.",
                     "Give it time. Someone will make a crater.",
                     "That sounds like a problem for your future self.",
@@ -223,56 +243,56 @@ public final class FighterDialogue {
         }
         if (bond >= 6) {
             return switch (speaker.getPersonality()) {
-                case HEROIC -> "Good. Let's keep it that way.";
-                case CALM -> "Yeah. It's nice when things slow down.";
-                case PROUD -> "Of course. I haven't stopped improving.";
-                case AGGRESSIVE -> "Not enough. I could use a real fight.";
-                case CAUTIOUS -> "So far. I'm still keeping watch.";
+                case HEROIC -> fixed("social.reply.close.heroic", "Good. Let's keep it that way.");
+                case CALM -> fixed("social.reply.close.calm", "Yeah. It's nice when things slow down.");
+                case PROUD -> fixed("social.reply.close.proud", "Of course. I haven't stopped improving.");
+                case AGGRESSIVE -> fixed("social.reply.close.aggressive", "Not enough. I could use a real fight.");
+                case CAUTIOUS -> fixed("social.reply.close.cautious", "So far. I'm still keeping watch.");
             };
         }
         return switch (speaker.getPersonality()) {
-            case HEROIC -> pick(random, new String[]{"I'm fine. You?", "All good here.", "Nothing I can't handle."});
-            case CALM -> pick(random, new String[]{"Can't complain.", "Quiet is fine by me.", "I'm doing well."});
-            case PROUD -> pick(random, new String[]{"Better than ever.", "Still sharp.", "Worry about yourself."});
-            case AGGRESSIVE -> pick(random, new String[]{"Too quiet.", "I need something to happen.", "I've had worse days."});
-            case CAUTIOUS -> pick(random, new String[]{"For now.", "Nothing strange yet.", "I'm keeping my eyes open."});
+            case HEROIC -> pick(random, "social.reply.heroic", new String[]{"I'm fine. You?", "All good here.", "Nothing I can't handle."});
+            case CALM -> pick(random, "social.reply.calm", new String[]{"Can't complain.", "Quiet is fine by me.", "I'm doing well."});
+            case PROUD -> pick(random, "social.reply.proud", new String[]{"Better than ever.", "Still sharp.", "Worry about yourself."});
+            case AGGRESSIVE -> pick(random, "social.reply.aggressive", new String[]{"Too quiet.", "I need something to happen.", "I've had worse days."});
+            case CAUTIOUS -> pick(random, "social.reply.cautious", new String[]{"For now.", "Nothing strange yet.", "I'm keeping my eyes open."});
         };
     }
 
     public static String npcMeditationInvite(RandomSource random, FighterPersonality personality) {
         return switch (personality) {
-            case CALM -> pick(random, new String[]{"Want to meditate for a while?", "Let's clear our heads for a bit.", "A short meditation?"});
-            case HEROIC -> pick(random, new String[]{"Let's take a moment to focus.", "We should reset before moving on.", "Meditate with me for a bit?"});
-            case CAUTIOUS -> pick(random, new String[]{"It's quiet enough to meditate.", "We have a safe moment. Let's use it.", "Let's focus while we can."});
-            case PROUD -> pick(random, new String[]{"Try to keep your focus beside mine.", "Let's see how disciplined you are.", "Meditate. Don't fall behind."});
-            case AGGRESSIVE -> pick(random, new String[]{"Fine. I need to cool off anyway.", "Let's focus before I get restless again.", "A minute. Then I need to move."});
+            case CALM -> pick(random, "meditation.invite.calm", new String[]{"Want to meditate for a while?", "Let's clear our heads for a bit.", "A short meditation?"});
+            case HEROIC -> pick(random, "meditation.invite.heroic", new String[]{"Let's take a moment to focus.", "We should reset before moving on.", "Meditate with me for a bit?"});
+            case CAUTIOUS -> pick(random, "meditation.invite.cautious", new String[]{"It's quiet enough to meditate.", "We have a safe moment. Let's use it.", "Let's focus while we can."});
+            case PROUD -> pick(random, "meditation.invite.proud", new String[]{"Try to keep your focus beside mine.", "Let's see how disciplined you are.", "Meditate. Don't fall behind."});
+            case AGGRESSIVE -> pick(random, "meditation.invite.aggressive", new String[]{"Fine. I need to cool off anyway.", "Let's focus before I get restless again.", "A minute. Then I need to move."});
         };
     }
 
     public static String senzuThanks(RandomSource random, FighterPersonality personality, boolean closeFriend) {
-        if (closeFriend) return pick(random, new String[]{"Thanks. I needed that.", "You always come prepared. Thanks.", "I owe you one."});
+        if (closeFriend) return pick(random, "senzu.close_friend", new String[]{"Thanks. I needed that.", "You always come prepared. Thanks.", "I owe you one."});
         return switch (personality) {
-            case HEROIC -> pick(random, new String[]{"Thank you. I'll put it to good use.", "Thanks. That helps a lot.", "I appreciate it."});
-            case CALM -> pick(random, new String[]{"Thank you.", "I appreciate that.", "Good timing. Thanks."});
-            case PROUD -> pick(random, new String[]{"...Thanks. I did need it.", "I'll accept it. Thank you.", "Don't make a habit of saving me. Thanks."});
-            case AGGRESSIVE -> pick(random, new String[]{"Perfect. Thanks.", "Good. I can keep moving now.", "Thanks. That's exactly what I needed."});
-            case CAUTIOUS -> pick(random, new String[]{"Thank you. I'll remember that.", "That's generous. Thanks.", "I appreciate it."});
+            case HEROIC -> pick(random, "senzu.heroic", new String[]{"Thank you. I'll put it to good use.", "Thanks. That helps a lot.", "I appreciate it."});
+            case CALM -> pick(random, "senzu.calm", new String[]{"Thank you.", "I appreciate that.", "Good timing. Thanks."});
+            case PROUD -> pick(random, "senzu.proud", new String[]{"...Thanks. I did need it.", "I'll accept it. Thank you.", "Don't make a habit of saving me. Thanks."});
+            case AGGRESSIVE -> pick(random, "senzu.aggressive", new String[]{"Perfect. Thanks.", "Good. I can keep moving now.", "Thanks. That's exactly what I needed."});
+            case CAUTIOUS -> pick(random, "senzu.cautious", new String[]{"Thank you. I'll remember that.", "That's generous. Thanks.", "I appreciate it."});
         };
     }
 
     public static String npcMeditationReply(RandomSource random, FighterPersonality personality) {
         return switch (personality) {
-            case CALM, HEROIC -> pick(random, new String[]{"All right.", "Let's do it.", "Good idea."});
-            case CAUTIOUS -> pick(random, new String[]{"For a little while.", "All right. Stay alert afterward.", "Okay."});
-            case PROUD -> pick(random, new String[]{"Don't distract me.", "Fine.", "Keep up."});
-            case AGGRESSIVE -> pick(random, new String[]{"Yeah, fine.", "For a minute.", "All right."});
+            case CALM, HEROIC -> pick(random, "meditation.reply.calm_heroic", new String[]{"All right.", "Let's do it.", "Good idea."});
+            case CAUTIOUS -> pick(random, "meditation.reply.cautious", new String[]{"For a little while.", "All right. Stay alert afterward.", "Okay."});
+            case PROUD -> pick(random, "meditation.reply.proud", new String[]{"Don't distract me.", "Fine.", "Keep up."});
+            case AGGRESSIVE -> pick(random, "meditation.reply.aggressive", new String[]{"Yeah, fine.", "For a minute.", "All right."});
         };
     }
 
     /** Rare reflective lines used while the fighter is actually meditating. */
     public static String meditationWisdom(RandomSource random, FighterPersonality personality, boolean shared) {
         if (shared && random.nextFloat() < 0.42F) {
-            return pick(random, new String[]{
+            return pick(random, "meditation.wisdom.shared", new String[]{
                     "Don't match my breathing. Find your own rhythm.",
                     "Two people can share silence without thinking the same thoughts.",
                     "A calm mind makes another calm mind easier to find.",
@@ -282,35 +302,35 @@ public final class FighterDialogue {
             });
         }
         return switch (personality) {
-            case CALM -> pick(random, new String[]{
+            case CALM -> pick(random, "meditation.wisdom.calm", new String[]{
                     "A quiet mind notices what power usually hides.",
                     "Breath first. Power follows.",
                     "Stillness is not doing nothing. It's learning what moves you.",
                     "If you chase every thought, none of them ever pass.",
                     "Breathe. Let the noise pass without chasing it."
             });
-            case HEROIC -> pick(random, new String[]{
+            case HEROIC -> pick(random, "meditation.wisdom.heroic", new String[]{
                     "Strength means more when you remember what you're protecting.",
                     "Power without purpose gets heavy fast.",
                     "A clear mind makes it easier to choose when not to fight.",
                     "Rest is part of protecting people too.",
                     "Strength is easier to use when your mind isn't fighting itself."
             });
-            case PROUD -> pick(random, new String[]{
+            case PROUD -> pick(random, "meditation.wisdom.proud", new String[]{
                     "Discipline is the part of strength nobody can give you.",
                     "Control proves more than noise ever will.",
                     "If I cannot command my own Ki, I have no right to boast about it.",
                     "Mastery starts where showing off stops.",
                     "Control first. Power leaking everywhere is just waste."
             });
-            case AGGRESSIVE -> pick(random, new String[]{
+            case AGGRESSIVE -> pick(random, "meditation.wisdom.aggressive", new String[]{
                     "Stillness is harder than fighting. That's why I practice it.",
                     "Even a fighter needs to know when not to swing.",
                     "Anger is useful. Letting it choose for you isn't.",
                     "The hardest opponent to rush is your own impulse.",
                     "I hate sitting still... but I can feel the difference."
             });
-            case CAUTIOUS -> pick(random, new String[]{
+            case CAUTIOUS -> pick(random, "meditation.wisdom.cautious", new String[]{
                     "Listen long enough and danger stops feeling so sudden.",
                     "A quiet moment tells you what panic was hiding.",
                     "You notice more when you stop expecting the worst for a minute.",
@@ -324,6 +344,30 @@ public final class FighterDialogue {
     public static String captive(RandomSource random) { return pick(random, CAPTIVE); }
 
     private static String pick(RandomSource random, String[] pool) {
-        return pool[random.nextInt(pool.length)];
+        int index = random.nextInt(pool.length);
+        String line = pool[index];
+        String key = DIALOGUE_POOLS.get(pool);
+        if (key == null) {
+            for (Field field : FighterDialogue.class.getDeclaredFields()) {
+                if (field.getType() != String[].class || !Modifier.isStatic(field.getModifiers())) continue;
+                try {
+                    if (field.get(null) == pool) {
+                        key = "dialogue.fighter." + field.getName().toLowerCase(Locale.ROOT);
+                        DIALOGUE_POOLS.put(pool, key);
+                        break;
+                    }
+                } catch (IllegalAccessException ignored) { }
+            }
+        }
+        return key == null ? line : LWLang.speechKey(key + "." + index, line);
+    }
+
+    private static String pick(RandomSource random, String group, String[] pool) {
+        int index = random.nextInt(pool.length);
+        return LWLang.speechKey("dialogue.fighter." + group + "." + index, pool[index]);
+    }
+
+    private static String fixed(String key, String fallback) {
+        return LWLang.speechKey("dialogue.fighter." + key, fallback);
     }
 }

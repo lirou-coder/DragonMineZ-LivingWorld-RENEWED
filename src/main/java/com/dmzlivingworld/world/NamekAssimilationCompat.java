@@ -141,7 +141,7 @@ public final class NamekAssimilationCompat {
                     .invoke(null, player, data, cooldownKey, lastUseTag, cooldownSeconds);
             finish(player, data, target, consent);
         } catch (ReflectiveOperationException | ClassCastException ex) {
-            player.displayClientMessage(Component.literal("[Living World] Revamp assimilation compatibility failed safely."), true);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.assimilation.revamp_failed"), true);
         }
     }
 

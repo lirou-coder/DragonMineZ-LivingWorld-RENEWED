@@ -1,6 +1,8 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
+import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -11,6 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -34,7 +37,8 @@ public final class FighterLegacyManager {
         }
     }
 
-    @SubscribeEvent
+    // Resolve the life budget before the other death listeners inspect permanent-death state.
+    @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onDeath(LivingDeathEvent event) {
         Entity attacker = event.getSource().getEntity();
         if (event.getEntity() instanceof AmbientFighterEntity victim && victim.level() instanceof ServerLevel level) {
@@ -49,19 +53,33 @@ public final class FighterLegacyManager {
             if (attacker instanceof AmbientFighterEntity other) {
                 killerPower = other.getBattlePower();
                 other.recordLegacyBattle(victim.getFighterName(), victim.getBattlePower(), true, true, false);
-                FighterAftermathManager.beginLethalScene(victim, other);
                 FighterGoalManager.onBattleVictory(other, victim);
                 FighterPromotionManager.evaluate(other);
             } else if (attacker instanceof ServerPlayer player) {
                 killerPower = (int)Math.min(Integer.MAX_VALUE - 1L, Math.round(PlayerWorldManager.playerBattlePower(player)));
                 killerIsPlayer = true;
-                FighterAftermathManager.beginLethalScene(victim, player);
+                FighterMemoryManager.strengthenRelationship(player, victim, -10, "Killed this fighter");
             }
             victim.recordLegacyBattle(killerName.isBlank() ? "Unknown" : killerName, killerPower, false, true, killerIsPlayer);
+            // Every ordinary fighter has three physical lives.  The counter lives in the
+            // identity/profile data, so a scheduled materialization remains the same person
+            // and cannot reset their lives merely by unloading or respawning.
+            int maximumLives = LivingWorldConfig.npcCombatLives();
+            boolean forcedPermanent = isForcedPermanentDeath(victim, attacker);
+            // Authored permanent-death scenes bypass the ordinary life budget entirely.
+            int defeats = forcedPermanent ? maximumLives
+                    : Math.min(maximumLives, Math.max(0, victim.getLegacyData().getInt("LWCombatLivesUsed")) + 1);
+            victim.getLegacyData().putInt("LWCombatLivesUsed", defeats);
             if (!isPermanentDeath(victim, attacker)) {
+                FighterAftermathManager.beginLethalScene(victim, attacker);
+                FighterAfterlifeManager.scheduleRecovery(victim);
                 notifyTemporaryDefeat(victim);
                 return;
             }
+            if (attacker instanceof ServerPlayer player) {
+                FighterMemoryManager.forgetPermanentlyKilled(player, victim);
+            }
+            notifyPermanentDeath(victim);
             FighterArsenalManager.inheritFromFallen(victim);
             FighterLegacyWorldData legacyWorld = FighterLegacyWorldData.get(level);
             java.util.UUID deadRecordId = victim.getMemoryRecordId() != null ? victim.getMemoryRecordId() : victim.getUUID();
@@ -85,18 +103,37 @@ public final class FighterLegacyManager {
     }
 
     public static boolean isPermanentDeath(AmbientFighterEntity victim, Entity attacker) {
+        // Keep forced outcomes identifiable even to listeners that query the event independently.
+        return victim != null && (isForcedPermanentDeath(victim, attacker)
+                || victim.getLegacyData().getInt("LWCombatLivesUsed") >= LivingWorldConfig.npcCombatLives());
+    }
+
+    private static boolean isForcedPermanentDeath(AmbientFighterEntity victim, Entity attacker) {
+        if (victim == null) return false;
+        if (victim.isWanted()) return true;
         if (attacker instanceof AmbientFighterEntity killer && WorldMenaceManager.isWorldMenace(killer)) return true;
-        if (attacker instanceof ServerPlayer player && FactionRequestManager.causesPermanentDeathNotice(player, victim)) return true;
-        return false;
+        return attacker instanceof ServerPlayer player
+                && FactionRequestManager.causesPermanentDeathNotice(player, victim);
     }
 
     private static void notifyTemporaryDefeat(AmbientFighterEntity victim) {
         if (!(victim.level() instanceof ServerLevel level)) return;
-        Component message = Component.literal("[LIVING WORLD] " + victim.getFighterName()
-                + " was heavily damaged, but will return soon").withStyle(ChatFormatting.YELLOW);
+        Component message = LWLang.text("message.fighter.temporary_defeat", victim.getFighterName(),
+                Math.max(0, LivingWorldConfig.npcCombatLives() - victim.getLegacyData().getInt("LWCombatLivesUsed"))).copy().withStyle(ChatFormatting.YELLOW);
         for (ServerPlayer player : level.players()) {
             if (!player.isSpectator() && player.distanceToSqr(victim) <= 20.0D * 20.0D)
                 player.displayClientMessage(message, false);
+        }
+    }
+
+    private static void notifyPermanentDeath(AmbientFighterEntity victim) {
+        if (!(victim.level() instanceof ServerLevel level)) return;
+        Component message = LWLang.text("message.fighter.death_permanent", victim.getFighterName())
+                .copy().withStyle(ChatFormatting.DARK_GRAY);
+        for (ServerPlayer player : level.players()) {
+            if (!player.isSpectator() && player.distanceToSqr(victim) <= 20.0D * 20.0D) {
+                player.displayClientMessage(message, false);
+            }
         }
     }
 

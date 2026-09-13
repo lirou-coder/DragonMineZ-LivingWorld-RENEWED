@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import net.minecraft.ChatFormatting;
@@ -8,6 +9,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.Locale;
 import java.util.UUID;
 
 /** Natural social contact: conversation introduces people, while shared experiences build real trust. */
@@ -19,20 +21,19 @@ public final class FighterSocialManager {
     public static void talk(ServerPlayer player, AmbientFighterEntity fighter) {
         if (player == null || fighter == null || !fighter.isAlive()) return;
         if (FactionRequestMissionManager.isRequestActionLocked(fighter)) {
-            player.displayClientMessage(Component.literal("[Living World] " + fighter.getFighterName()
-                    + " is busy with an active faction request."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.busy_request", fighter.getFighterName()), false);
             return;
         }
         if (!LivingWorldConfig.socialTalk()) {
-            player.displayClientMessage(Component.literal("[Living World] Talk interactions are disabled by the world configuration."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.disabled"), false);
             return;
         }
         if (fighter.isDefeated() || fighter.isCaptive() || fighter.isMeditating() || fighter.isSanctionedMatchParticipant()) {
-            player.displayClientMessage(Component.literal("[Living World] This is not a good moment to talk."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.bad_moment"), false);
             return;
         }
         if (WorldMenaceManager.isWorldMenace(fighter)) {
-            player.displayClientMessage(Component.literal("[Living World] World Menaces do not answer social prompts.").withStyle(ChatFormatting.DARK_GRAY), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.menace_refusal").withStyle(ChatFormatting.DARK_GRAY), false);
             return;
         }
 
@@ -42,8 +43,7 @@ public final class FighterSocialManager {
                 && PlayerAlignmentBridge.alignment(player) <= 32 && relationship >= 45;
         if (fighter.getTarget() == player || (disposition == FighterRelationshipManager.Disposition.HOSTILE && !trustedDespiteAlignment) || relationship <= -35) {
             fighter.speak(hostileLine(fighter), 66);
-            player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                    .append(Component.literal(fighter.getFighterName() + " isn't willing to talk to you.").withStyle(ChatFormatting.RED)), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.unwilling", fighter.getFighterName()).withStyle(ChatFormatting.RED), false);
             return;
         }
         // Cooldown is a hard availability gate, not another social attempt. Check it before
@@ -51,9 +51,7 @@ public final class FighterSocialManager {
         long talkCooldownRemaining = FighterMemoryManager.socialContactCooldownRemaining(player, fighter);
         if (talkCooldownRemaining > 0L) {
             long seconds = Math.max(1L, talkCooldownRemaining / 20L);
-            player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                    .append(Component.literal("You've already caught up with " + fighter.getFighterName()
-                            + " recently • another meaningful conversation in about " + seconds + "s.").withStyle(ChatFormatting.GRAY)), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.cooldown", fighter.getFighterName(), seconds).withStyle(ChatFormatting.GRAY), false);
             return;
         }
 
@@ -62,8 +60,7 @@ public final class FighterSocialManager {
             fighter.speak(refusal, 90);
             ReactiveWorldManager.rememberEvent(fighter, "DECLINED_TALK", player.getGameProfile().getName(),
                     "did not want to talk while " + ReactiveWorldManager.mood(fighter).label().toLowerCase(java.util.Locale.ROOT));
-            player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                    .append(Component.literal(fighter.getFighterName() + " doesn't want to talk right now.").withStyle(ChatFormatting.GRAY)), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.refused", fighter.getFighterName()).withStyle(ChatFormatting.GRAY), false);
             return;
         }
 
@@ -83,9 +80,7 @@ public final class FighterSocialManager {
         // answer despite the rejection. Do not create any new speech/reaction while cooling down.
         if (result.coolingDown()) {
             long seconds = Math.max(1L, result.remainingTicks() / 20L);
-            player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                    .append(Component.literal("You've already caught up with " + fighter.getFighterName()
-                            + " recently • another meaningful conversation in about " + seconds + "s.").withStyle(ChatFormatting.GRAY)), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.cooldown", fighter.getFighterName(), seconds).withStyle(ChatFormatting.GRAY), false);
             return;
         }
 
@@ -96,18 +91,17 @@ public final class FighterSocialManager {
         int before = result.relationship() - result.gained();
         String previousStage = FighterRelationshipManager.relationshipStage(before);
         if (result.gained() > 0 && !stage.equals(previousStage)) {
-            player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                    .append(Component.literal(fighter.getFighterName() + " now sees you as " + stage + ".")
-                            .withStyle(ChatFormatting.GREEN)), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.new_stage", fighter.getFighterName(), relationshipLabel(stage)).withStyle(ChatFormatting.GREEN), false);
         } else if (result.gained() > 0) {
-            player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                    .append(Component.literal("The conversation goes well • " + stage + ".")
-                            .withStyle(ChatFormatting.GRAY)), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.went_well", relationshipLabel(stage)).withStyle(ChatFormatting.GRAY), false);
         } else {
-            player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                    .append(Component.literal("Talking keeps the connection alive, but deeper trust with " + fighter.getFighterName()
-                            + " now depends on what you actually do together.").withStyle(ChatFormatting.GRAY)), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.social.trust_requires_action", fighter.getFighterName()).withStyle(ChatFormatting.GRAY), false);
         }
+    }
+
+    private static Component relationshipLabel(String stage) {
+        String slug = stage.toLowerCase(Locale.ROOT).replace(' ', '_');
+        return Component.translatableWithFallback("dmzlivingworld.label.relationship." + slug, stage);
     }
 
     /** Uses only state the fighter actually owns; no invented player history or random exposition. */
@@ -144,88 +138,92 @@ public final class FighterSocialManager {
 
         if (companion != null && companion.equals(fighter.getUUID())) {
             return switch (FighterRelationshipManager.socialStyle(fighter)) {
-                case PROTECTIVE -> new Conversation("Stay close if things get ugly. I'll cover you.", "Caught up while travelling together");
-                case LOYAL -> new Conversation("I'm still with you. Where are we heading next?", "Caught up while travelling together");
-                case DISCIPLINED -> new Conversation("We should train again when we have a quiet moment.", "Discussed training while travelling");
-                case RESPECT_DRIVEN -> new Conversation("You've been keeping pace. Good.", "Discussed progress while travelling");
-                case COMPETITIVE -> new Conversation("Don't think travelling together means I'll go easy on you next time.", "Teased each other while travelling");
-                case OPEN -> new Conversation("It's nice not having to travel alone.", "Caught up while travelling together");
-                case GUARDED -> new Conversation("I don't travel with just anyone. Remember that.", "Acknowledged their travelling trust");
-                case PRAGMATIC -> new Conversation("We work well together. That's worth keeping.", "Discussed working together");
+                case PROTECTIVE -> conversationKey("companion.protective", "Stay close if things get ugly. I'll cover you.", "Caught up while travelling together");
+                case LOYAL -> conversationKey("companion.loyal", "I'm still with you. Where are we heading next?", "Caught up while travelling together");
+                case DISCIPLINED -> conversationKey("companion.disciplined", "We should train again when we have a quiet moment.", "Discussed training while travelling");
+                case RESPECT_DRIVEN -> conversationKey("companion.respect", "You've been keeping pace. Good.", "Discussed progress while travelling");
+                case COMPETITIVE -> conversationKey("companion.competitive", "Don't think travelling together means I'll go easy on you next time.", "Teased each other while travelling");
+                case OPEN -> conversationKey("companion.open", "It's nice not having to travel alone.", "Caught up while travelling together");
+                case GUARDED -> conversationKey("companion.guarded", "I don't travel with just anyone. Remember that.", "Acknowledged their travelling trust");
+                case PRAGMATIC -> conversationKey("companion.pragmatic", "We work well together. That's worth keeping.", "Discussed working together");
             };
         }
 
         if (fighter.getHealth() < fighter.getMaxHealth() * 0.45F) {
             return switch (fighter.getPersonality()) {
-                case HEROIC -> new Conversation("I'm all right. I just need a little time to recover.", "Checked on their recovery");
-                case CALM -> new Conversation("Nothing serious. I'm letting my body catch up.", "Checked on their recovery");
-                case PROUD -> new Conversation("I've had worse. Don't make a big deal out of it.", "Checked on their recovery");
-                case AGGRESSIVE -> new Conversation("I'm fine. I just need another minute.", "Checked on their recovery");
-                case CAUTIOUS -> new Conversation("I'm taking it easy until I'm back at full strength.", "Checked on their recovery");
+                case HEROIC -> conversationKey("recovery.heroic", "I'm all right. I just need a little time to recover.", "Checked on their recovery");
+                case CALM -> conversationKey("recovery.calm", "Nothing serious. I'm letting my body catch up.", "Checked on their recovery");
+                case PROUD -> conversationKey("recovery.proud", "I've had worse. Don't make a big deal out of it.", "Checked on their recovery");
+                case AGGRESSIVE -> conversationKey("recovery.aggressive", "I'm fine. I just need another minute.", "Checked on their recovery");
+                case CAUTIOUS -> conversationKey("recovery.cautious", "I'm taking it easy until I'm back at full strength.", "Checked on their recovery");
             };
         }
 
         if (fighter.wasRescuedByMemoryOwner() && relationship < 35) {
-            return new Conversation("I haven't forgotten that you helped me when I needed it.", "Talked about the earlier rescue");
+            return conversationKey("rescue_remembered", "I haven't forgotten that you helped me when I needed it.", "Talked about the earlier rescue");
         }
 
         long lastBattle = legacy.getLong("LastBattle");
         String lastOpponent = legacy.getString("LastOpponent");
         if (!lastOpponent.isBlank() && lastBattle > 0L && fighter.level().getGameTime() - lastBattle < 12000L) {
             return switch (fighter.getPersonality()) {
-                case HEROIC -> new Conversation("That fight with " + lastOpponent + " is still on my mind. I learned from it.", "Reflected on the recent fight with " + lastOpponent);
-                case CALM -> new Conversation("I've been thinking through my fight with " + lastOpponent + ". There were mistakes I can fix.", "Reflected on the recent fight with " + lastOpponent);
-                case PROUD -> new Conversation("Next time I face " + lastOpponent + ", it'll go differently.", "Reflected on the recent fight with " + lastOpponent);
-                case AGGRESSIVE -> new Conversation("I'd fight " + lastOpponent + " again right now.", "Reflected on the recent fight with " + lastOpponent);
-                case CAUTIOUS -> new Conversation("That fight with " + lastOpponent + " showed me what I need to watch for.", "Reflected on the recent fight with " + lastOpponent);
+                case HEROIC -> conversationKey("recent_fight.heroic", "That fight with %s is still on my mind. I learned from it.", "Reflected on the recent fight with " + lastOpponent, lastOpponent);
+                case CALM -> conversationKey("recent_fight.calm", "I've been thinking through my fight with %s. There were mistakes I can fix.", "Reflected on the recent fight with " + lastOpponent, lastOpponent);
+                case PROUD -> conversationKey("recent_fight.proud", "Next time I face %s, it'll go differently.", "Reflected on the recent fight with " + lastOpponent, lastOpponent);
+                case AGGRESSIVE -> conversationKey("recent_fight.aggressive", "I'd fight %s again right now.", "Reflected on the recent fight with " + lastOpponent, lastOpponent);
+                case CAUTIOUS -> conversationKey("recent_fight.cautious", "That fight with %s showed me what I need to watch for.", "Reflected on the recent fight with " + lastOpponent, lastOpponent);
             };
         }
 
         String goal = FighterGoalManager.summary(fighter);
         if (!"none".equals(goal)) {
             if (goal.startsWith("Learn ") || goal.startsWith("Complete ") || goal.startsWith("Advance ")) {
-                return new Conversation("I've been focused on training. I want the next step to be earned.", "Talked about current training goals");
+                return conversationKey("goal.training", "I've been focused on training. I want the next step to be earned.", "Talked about current training goals");
             }
             if (goal.startsWith("Acquire ")) {
-                return new Conversation("I'm still looking for equipment that actually suits how I fight.", "Talked about finding better equipment");
+                return conversationKey("goal.equipment", "I'm still looking for equipment that actually suits how I fight.", "Talked about finding better equipment");
             }
             if (goal.startsWith("Defeat ") || goal.startsWith("Win ")) {
-                return new Conversation("I need a serious fight soon. That's the only way I'll know if I've improved.", "Talked about seeking a serious challenge");
+                return conversationKey("goal.challenge", "I need a serious fight soon. That's the only way I'll know if I've improved.", "Talked about seeking a serious challenge");
             }
         }
         if (!fighter.getRivalName().isBlank()) {
-            return new Conversation("I haven't lost track of " + fighter.getRivalName() + ". That rivalry keeps me moving.", "Talked about rival " + fighter.getRivalName());
+            return conversationKey("rival", "I haven't lost track of %s. That rivalry keeps me moving.", "Talked about rival " + fighter.getRivalName(), fighter.getRivalName());
         }
         if (fighter.isFactionMember()) {
             String faction = fighter.getFactionDisplayName().isBlank() ? "my faction" : fighter.getFactionDisplayName();
             return switch (fighter.getPersonality()) {
-                case HEROIC -> new Conversation("I still have responsibilities with " + faction + ". People depend on us.", "Talked about responsibilities in " + faction);
-                case CALM -> new Conversation("Things with " + faction + " have been steady lately.", "Talked about life in " + faction);
-                case PROUD -> new Conversation(faction + " expects strength. I intend to represent it properly.", "Talked about standing in " + faction);
-                case AGGRESSIVE -> new Conversation("If " + faction + " needs a fighter, they know where to find me.", "Talked about fighting for " + faction);
-                case CAUTIOUS -> new Conversation("I'm keeping an eye on things around " + faction + ". Quiet doesn't always mean safe.", "Talked about security in " + faction);
+                case HEROIC -> conversationKey("faction.heroic", "I still have responsibilities with %s. People depend on us.", "Talked about responsibilities in " + faction, faction);
+                case CALM -> conversationKey("faction.calm", "Things with %s have been steady lately.", "Talked about life in " + faction, faction);
+                case PROUD -> conversationKey("faction.proud", "%s expects strength. I intend to represent it properly.", "Talked about standing in " + faction, faction);
+                case AGGRESSIVE -> conversationKey("faction.aggressive", "If %s needs a fighter, they know where to find me.", "Talked about fighting for " + faction, faction);
+                case CAUTIOUS -> conversationKey("faction.cautious", "I'm keeping an eye on things around %s. Quiet doesn't always mean safe.", "Talked about security in " + faction, faction);
             };
         }
 
         if (relationship >= 15) {
             return switch (FighterRelationshipManager.socialStyle(fighter)) {
-                case PROTECTIVE -> new Conversation("Watch yourself out there. Trouble travels fast.", "Checked in on each other");
-                case LOYAL -> new Conversation("It's good seeing a familiar face again.", "Caught up as familiar faces");
-                case DISCIPLINED -> new Conversation("Consistency matters more than one good day.", "Talked about consistency");
-                case RESPECT_DRIVEN -> new Conversation("Keep getting stronger. I notice effort.", "Talked about progress");
-                case COMPETITIVE -> new Conversation("Next time, let's see who improved more.", "Compared recent progress");
-                case OPEN -> new Conversation("I'm glad we actually get to talk sometimes.", "Caught up personally");
-                case GUARDED -> new Conversation("You're more reliable than I first thought.", "Acknowledged growing trust");
-                case PRAGMATIC -> new Conversation("You seem useful to have around. That's a compliment.", "Talked about working well together");
+                case PROTECTIVE -> conversationKey("familiar.protective", "Watch yourself out there. Trouble travels fast.", "Checked in on each other");
+                case LOYAL -> conversationKey("familiar.loyal", "It's good seeing a familiar face again.", "Caught up as familiar faces");
+                case DISCIPLINED -> conversationKey("familiar.disciplined", "Consistency matters more than one good day.", "Talked about consistency");
+                case RESPECT_DRIVEN -> conversationKey("familiar.respect", "Keep getting stronger. I notice effort.", "Talked about progress");
+                case COMPETITIVE -> conversationKey("familiar.competitive", "Next time, let's see who improved more.", "Compared recent progress");
+                case OPEN -> conversationKey("familiar.open", "I'm glad we actually get to talk sometimes.", "Caught up personally");
+                case GUARDED -> conversationKey("familiar.guarded", "You're more reliable than I first thought.", "Acknowledged growing trust");
+                case PRAGMATIC -> conversationKey("familiar.pragmatic", "You seem useful to have around. That's a compliment.", "Talked about working well together");
             };
         }
         return switch (fighter.getPersonality()) {
-            case HEROIC -> new Conversation("Take care out there. Not everyone will warn you first.", "Had an introductory conversation");
-            case CALM -> new Conversation("Sometimes talking tells you more than fighting.", "Had an introductory conversation");
-            case PROUD -> new Conversation("If you're serious about getting stronger, prove it over time.", "Talked about proving yourself over time");
-            case AGGRESSIVE -> new Conversation("I'm not much for talking. Fight me sometime.", "Talked about sparring sometime");
-            case CAUTIOUS -> new Conversation("I don't know you well yet. Give it time.", "Had a cautious introductory conversation");
+            case HEROIC -> conversationKey("intro.heroic", "Take care out there. Not everyone will warn you first.", "Had an introductory conversation");
+            case CALM -> conversationKey("intro.calm", "Sometimes talking tells you more than fighting.", "Had an introductory conversation");
+            case PROUD -> conversationKey("intro.proud", "If you're serious about getting stronger, prove it over time.", "Talked about proving yourself over time");
+            case AGGRESSIVE -> conversationKey("intro.aggressive", "I'm not much for talking. Fight me sometime.", "Talked about sparring sometime");
+            case CAUTIOUS -> conversationKey("intro.cautious", "I don't know you well yet. Give it time.", "Had a cautious introductory conversation");
         };
+    }
+
+    private static Conversation conversationKey(String key, String fallback, String memory, Object... args) {
+        return new Conversation(LWLang.speechKey("dialogue.social." + key, fallback, args), memory);
     }
 
     private static Conversation scientistConversation(AmbientFighterEntity fighter) {
@@ -233,11 +231,16 @@ public final class FighterSocialManager {
         int formula = FighterScientistManager.formulaProgress(fighter);
         int seeds = FighterScientistManager.availableSeeds(fighter);
         int maxSeeds = FighterScientistManager.maxSeeds(fighter);
-        String[] lines = {
+        String[] lines = speechPool("scientist", new String[]{
                 "The latest Saibaman batch is stronger, but I'm more interested in whether the growth curve stays stable.",
                 "I've been comparing combat data against the cultivation ratio. Tiny changes are producing annoyingly large behavioral differences.",
-                "I have " + seeds + " viable seed" + (seeds == 1 ? "" : "s") + " out of " + maxSeeds + ". I'd rather grow fewer useful specimens than waste a whole batch.",
-                "Formula refinement is at " + formula + " out of six. Past this point, raw power matters less than consistency.",
+                LWLang.speechKey("dialogue.social.scientist.2." + (seeds == 1 ? "one" : "many"),
+                        seeds == 1
+                                ? "I have %s viable seed out of %s. I'd rather grow fewer useful specimens than waste a whole batch."
+                                : "I have %s viable seeds out of %s. I'd rather grow fewer useful specimens than waste a whole batch.",
+                        seeds, maxSeeds),
+                LWLang.speechKey("dialogue.social.scientist.3",
+                        "Formula refinement is at %s out of six. Past this point, raw power matters less than consistency.", formula),
                 "People call them disposable. That's exactly why most researchers never learn anything from them.",
                 "A stronger master changes the entire baseline. If I don't recalibrate, yesterday's successful formula becomes today's weak specimen.",
                 "The scouter data is useful, but it lies by omission. Power level doesn't tell me why one specimen hesitates and another attacks immediately.",
@@ -248,7 +251,7 @@ public final class FighterSocialManager {
                 "I need another real combat sample. Controlled sparring contaminates the data; everyone knows they're supposed to stop.",
                 "I'm correlating permanent battle power against specimen yield. Temporary transformations are statistical noise unless I label them separately.",
                 "You'd be amazed how often 'make it stronger' produces a specimen that's technically powerful and practically useless."
-        };
+        });
         String line = lines[fighter.getRandom().nextInt(lines.length)];
         return new Conversation(line, "Talked about Saibaman research and experimental data");
     }
@@ -259,17 +262,17 @@ public final class FighterSocialManager {
         if (!info.qualifies()) return null;
         double current = PlayerWorldManager.playerBattlePower(player);
         boolean stronger = info.oldPlayerPower() > 0.0D && current >= info.oldPlayerPower() * 1.25D;
-        String[] lines = stronger ? new String[]{
+        String[] lines = stronger ? speechPool("reunion.stronger", new String[]{
                 "Good to see you again. Your Ki's changed—you've gotten stronger.",
                 "There you are. I almost didn't recognize that power. You've been training.",
                 "It's been a while. That increase in your Ki isn't subtle.",
                 "Good seeing you again. You've definitely grown since last time."
-        } : new String[]{
+        }) : speechPool("reunion.normal", new String[]{
                 "Good to see you again. It's been a while.",
                 "There you are. I was wondering when we'd cross paths again.",
                 "Been a while. Glad to see you're still moving.",
                 "Hey. Good timing—it's actually nice seeing a familiar face again."
-        };
+        });
         return new Conversation(lines[fighter.getRandom().nextInt(lines.length)], stronger
                 ? "Reunited after time apart and noticed your growth" : "Reunited after time apart");
     }
@@ -284,19 +287,15 @@ public final class FighterSocialManager {
         String name = other.getFighterName();
         String activity = FighterAmbientActivityManager.currentActivity(other);
         int bond = FighterNpcSocialManager.bond(fighter, other);
-        if (!activity.isBlank()) return new Conversation(name + " has been " + activity.toLowerCase(java.util.Locale.ROOT)
-                + " lately. I notice what people around me are doing.", "Commented about " + name);
-        if (bond >= 6) return new Conversation(name + " and I have gotten to know each other a little. They're good company.",
-                "Commented warmly about " + name);
-        if (other.getBattlePower() > fighter.getBattlePower() * 1.6D) return new Conversation(name
-                + " is strong. You can feel it before they even start fighting.", "Commented on " + name + "'s strength");
-        return new Conversation("I've seen " + name + " around here. Everybody has their own routine if you pay attention.",
-                "Commented about " + name);
+        if (!activity.isBlank()) return conversationKey("other.activity", "%s has been %s lately. I notice what people around me are doing.", "Commented about " + name, name, activityArgument(activity));
+        if (bond >= 6) return conversationKey("other.bonded", "%s and I have gotten to know each other a little. They're good company.", "Commented warmly about " + name, name);
+        if (other.getBattlePower() > fighter.getBattlePower() * 1.6D) return conversationKey("other.strong", "%s is strong. You can feel it before they even start fighting.", "Commented on " + name + "'s strength", name);
+        return conversationKey("other.seen", "I've seen %s around here. Everybody has their own routine if you pay attention.", "Commented about " + name, name);
     }
 
     /** Avoid exact Talk-line loops even when the same contextual branch wins repeatedly. */
     private static Conversation freshConversation(AmbientFighterEntity fighter, Conversation selected) {
-        if (selected == null) return new Conversation("Not much to say right now.", "Talked briefly");
+        if (selected == null) return conversationKey("fallback", "Not much to say right now.", "Talked briefly");
         CompoundTag data = fighter.getPersistentData();
         String line = selected.line();
         boolean repeated = false;
@@ -318,7 +317,7 @@ public final class FighterSocialManager {
     /** Mood-safe fallback pools keep anti-repeat logic from producing emotionally contradictory chatter. */
     private static String[] freshAlternatives(AmbientFighterEntity fighter) {
         return switch (ReactiveWorldManager.mood(fighter)) {
-            case UPBEAT -> new String[]{
+            case UPBEAT -> speechPool("mood.upbeat", new String[]{
                     "Things are actually going pretty well today.",
                     "I've got more energy than usual. Might as well use it.",
                     "Good day to be out doing something instead of standing around.",
@@ -327,8 +326,8 @@ public final class FighterSocialManager {
                     "I'm in a good rhythm today. I want to keep it going.",
                     "Nothing's dragging me down right now. That's nice for a change.",
                     "I've been noticing the little things today. The world's not all fights and disasters."
-            };
-            case CONTENT -> new String[]{
+            });
+            case CONTENT -> speechPool("mood.content", new String[]{
                     "Nothing dramatic to report. I'm fine with that.",
                     "It's been calm enough to actually think for once.",
                     "I'm taking things one day at a time. It works.",
@@ -337,8 +336,8 @@ public final class FighterSocialManager {
                     "I've been enjoying not having somewhere urgent to be.",
                     "Sometimes ordinary is exactly what I want.",
                     "I'm just letting the day happen instead of forcing something out of it."
-            };
-            case FOCUSED -> new String[]{
+            });
+            case FOCUSED -> speechPool("mood.focused", new String[]{
                     "I've got something I'm working toward. I don't want to lose the thread.",
                     "My head's on training right now. Everything else can wait a little.",
                     "I'm trying to turn what I noticed into something I can actually use.",
@@ -347,8 +346,8 @@ public final class FighterSocialManager {
                     "There's a difference between being busy and actually making progress.",
                     "I've been going over the same weakness until I understand it.",
                     "I'm not chasing every distraction. One thing at a time."
-            };
-            case WARY -> new String[]{
+            });
+            case WARY -> speechPool("mood.wary", new String[]{
                     "I'm still watching the area. Something doesn't sit right with me.",
                     "Keep your senses open. I'm not convinced we're alone here.",
                     "I keep checking the same direction for a reason.",
@@ -357,8 +356,8 @@ public final class FighterSocialManager {
                     "Don't mind me looking around. I'm keeping track of who comes close.",
                     "I'm not panicking. I'm paying attention.",
                     "Something has me on edge, so I'm keeping some distance until it passes."
-            };
-            case IRRITATED -> new String[]{
+            });
+            case IRRITATED -> speechPool("mood.irritated", new String[]{
                     "I'm still annoyed. I'd rather not pretend otherwise.",
                     "My patience is thin right now, so keep it simple.",
                     "I need a little space before I say something I don't mean.",
@@ -367,8 +366,8 @@ public final class FighterSocialManager {
                     "I'm not looking for an argument. That's why I'm keeping this short.",
                     "Give me time and I'll settle down. Right now I'm still wound up.",
                     "I'm handling it. I just don't want anyone pushing me while I do."
-            };
-            case SOMBER -> new String[]{
+            });
+            case SOMBER -> speechPool("mood.somber", new String[]{
                     "I've got a lot on my mind. Quiet feels easier right now.",
                     "I'm here. I'm just not feeling very talkative.",
                     "Some things take longer to shake than a bad fight.",
@@ -377,8 +376,8 @@ public final class FighterSocialManager {
                     "I keep drifting back into the same thoughts.",
                     "I'll be all right. I just need some time with my own head.",
                     "Not every bad feeling needs a fight to solve it."
-            };
-            case WEARY -> new String[]{
+            });
+            case WEARY -> speechPool("mood.weary", new String[]{
                     "I'm running low. I need a proper rest more than another challenge.",
                     "Everything feels heavier when you're this tired.",
                     "I'm trying not to spend energy I don't have.",
@@ -387,8 +386,16 @@ public final class FighterSocialManager {
                     "I'm still moving, just not quickly.",
                     "I need food, rest, and about half as much excitement as usual.",
                     "I'll have more to say when I don't feel like my Ki is running on fumes."
-            };
+            });
         };
+    }
+
+    private static String[] speechPool(String group, String[] fallbacks) {
+        String[] result = new String[fallbacks.length];
+        for (int i = 0; i < fallbacks.length; i++)
+            result[i] = LWLang.isSpeechKey(fallbacks[i]) ? fallbacks[i]
+                    : LWLang.speechKey("dialogue.social." + group + "." + i, fallbacks[i]);
+        return result;
     }
 
     private static Conversation situationConversation(ServerPlayer player, AmbientFighterEntity fighter, int relationship) {
@@ -396,47 +403,36 @@ public final class FighterSocialManager {
         ReactiveWorldManager.Mood mood = ReactiveWorldManager.mood(fighter);
         if (!activity.isBlank()) {
             if (activity.startsWith("Dancing")) return new Conversation(
-                    mood == ReactiveWorldManager.Mood.UPBEAT ? "Caught me at a good moment. I'm just enjoying myself."
-                            : "Yeah, I'm taking a minute to move around and clear my head.",
+                    LWLang.speechKey("dialogue.social.activity.dancing." + (mood == ReactiveWorldManager.Mood.UPBEAT ? "upbeat" : "normal")),
                     "Talked during " + activity);
             if (activity.equals("Resting")) return new Conversation(
-                    mood == ReactiveWorldManager.Mood.WEARY ? "I'm resting because I actually need it. Give me a minute to get my energy back."
-                            : mood == ReactiveWorldManager.Mood.SOMBER ? "I'm just sitting quietly for a bit. That's what I need right now."
-                            : "I'm taking a short break before I move again.",
+                    LWLang.speechKey("dialogue.social.activity.resting." + (mood == ReactiveWorldManager.Mood.WEARY ? "weary" : mood == ReactiveWorldManager.Mood.SOMBER ? "somber" : "normal")),
                     "Talked while resting");
             if (activity.equals("Sitting")) return new Conversation(
-                    fighter.getRandom().nextBoolean() ? "I'm just sitting for a bit. No big reason—I felt like stopping."
-                            : "Sometimes it's nice to stay in one place without calling it training or recovery.",
+                    LWLang.speechKey("dialogue.social.activity.sitting." + fighter.getRandom().nextInt(2)),
                     "Talked while sitting");
             if (activity.equals("Jogging")) return new Conversation(
-                    fighter.getRandom().nextBoolean() ? "Just a light run. I don't need to turn every workout into a crater."
-                            : "I'm keeping moving. A jog is good when I want to clear my head.",
+                    LWLang.speechKey("dialogue.social.activity.jogging." + fighter.getRandom().nextInt(2)),
                     "Talked during a jog");
             if (activity.equals("Training")) return new Conversation(
-                    fighter.getRandom().nextBoolean() ? "I'm actually training right now. I want the next improvement to be earned."
-                            : "Working the basics again. Real power comes from doing this when nobody's watching too.",
+                    LWLang.speechKey("dialogue.social.activity.training." + fighter.getRandom().nextInt(2)),
                     "Talked during real training");
             if (activity.equals("Inspecting a flower")) return new Conversation(
-                    fighter.getRandom().nextBoolean() ? "I saw this and got curious. Not everything interesting has a battle power."
-                            : "You spend enough time looking for opponents and you start missing little things like this.",
+                    LWLang.speechKey("dialogue.social.activity.flower." + fighter.getRandom().nextInt(2)),
                     "Talked while inspecting a flower");
             if (activity.equals("Taking an apple break")) return new Conversation(
-                    fighter.getRandom().nextBoolean() ? "Found a tree and decided an apple sounded better than another Senzu."
-                            : "Just grabbing something to eat before I keep moving.",
+                    LWLang.speechKey("dialogue.social.activity.apple." + fighter.getRandom().nextInt(2)),
                     "Talked during an apple break");
             if (activity.equals("Looking around")) return new Conversation(
-                    mood == ReactiveWorldManager.Mood.WARY ? "I'm checking the area. Something still feels wrong, so keep your eyes open."
-                            : "I'm checking the area before I settle down. I'd rather know what's nearby.",
+                    LWLang.speechKey("dialogue.social.activity.looking." + (mood == ReactiveWorldManager.Mood.WARY ? "wary" : "normal")),
                     "Talked while scouting");
             if (activity.equals("Fishing")) return new Conversation(
-                    mood == ReactiveWorldManager.Mood.IRRITATED ? "I'm trying to fish because I need some quiet. What is it?"
-                            : "I'm fishing for a bit. It's easier to think when nobody is throwing Ki blasts around.",
+                    LWLang.speechKey("dialogue.social.activity.fishing." + (mood == ReactiveWorldManager.Mood.IRRITATED ? "irritated" : "normal")),
                     "Talked while fishing");
             if (activity.equals("Stargazing")) return new Conversation(
-                    mood == ReactiveWorldManager.Mood.SOMBER ? "I'm looking at the sky because I don't really want noise around me right now."
-                            : "I'm just watching the sky for a while. It's peaceful up there.",
+                    LWLang.speechKey("dialogue.social.activity.stargazing." + (mood == ReactiveWorldManager.Mood.SOMBER ? "somber" : "normal")),
                     "Talked while stargazing");
-            if (activity.equals("Flying")) return new Conversation("I'm moving right now. Catch me when I'm back on the ground.", "Talked during a flight");
+            if (activity.equals("Flying")) return conversationKey("activity.flying", "I'm moving right now. Catch me when I'm back on the ground.", "Talked during a flight");
         }
 
         String event = ReactiveWorldManager.recentEventType(fighter, 2600L);
@@ -444,30 +440,33 @@ public final class FighterSocialManager {
         if (event.isBlank()) return null;
         return switch (event) {
             case "SPAR_LOSS" -> new Conversation(
-                    mood == ReactiveWorldManager.Mood.IRRITATED
-                            ? "Yeah, I lost that spar to " + (subject.isBlank() ? "you" : subject) + ". I'm still annoyed about it, so don't rub it in."
-                            : "I'm still replaying that spar with " + (subject.isBlank() ? "you" : subject) + " in my head. I know where I slipped.",
+                    LWLang.speechKey("dialogue.social.event.spar_loss." + (mood == ReactiveWorldManager.Mood.IRRITATED ? "irritated" : "normal"),
+                            mood == ReactiveWorldManager.Mood.IRRITATED
+                                    ? "Yeah, I lost that spar to %s. I'm still annoyed about it, so don't rub it in."
+                                    : "I'm still replaying that spar with %s in my head. I know where I slipped.",
+                            subject.isBlank() ? player.getGameProfile().getName() : subject),
                     "Talked about the recent spar loss");
             case "SPAR_WIN" -> new Conversation(
-                    fighter.getPersonality() == com.dmzlivingworld.entity.FighterPersonality.PROUD
-                            ? "That spar went the way I expected. Next time, make me work harder."
-                            : "That was a good spar. Winning doesn't mean there wasn't anything to learn from it.",
+                    LWLang.speechKey("dialogue.social.event.spar_win."
+                            + (fighter.getPersonality() == com.dmzlivingworld.entity.FighterPersonality.PROUD ? "proud" : "normal")),
                     "Talked about the recent spar win");
             case "ALLY_DIED" -> new Conversation(
-                    subject.isBlank() ? "Someone close to us went down. I'm still processing it."
-                            : "I'm still thinking about " + subject + ". Seeing them fall doesn't just disappear because the fight ended.",
+                    subject.isBlank() ? LWLang.speechKey("dialogue.social.event.ally_died.unknown")
+                            : LWLang.speechKey("dialogue.social.event.ally_died.named",
+                            "I'm still thinking about %s. Seeing them fall doesn't just disappear because the fight ended.", subject),
                     "Talked about a fallen ally");
             case "ENEMY_DIED" -> new Conversation(
-                    subject.isBlank() ? "The enemy is down, but I'm not dropping my guard yet."
-                            : subject + " is down. I'm still watching in case that wasn't the end of it.",
+                    subject.isBlank() ? LWLang.speechKey("dialogue.social.event.enemy_died.unknown")
+                            : LWLang.speechKey("dialogue.social.event.enemy_died.named",
+                            "%s is down. I'm still watching in case that wasn't the end of it.", subject),
                     "Talked about a defeated enemy");
-            case "HORN_RALLY" -> new Conversation("That horn wasn't for show. When it sounds, everyone is supposed to move together.", "Talked about the faction rally");
-            case "BOUNDARY_BROKEN" -> new Conversation("I asked for space and you kept pushing. I'm still irritated about that.", "Talked after a boundary was ignored");
-            case "TOOK_SPACE" -> new Conversation("I moved because I needed distance. I meant it.", "Talked after taking space");
-            case "MOB_SEEN" -> new Conversation(subject.isBlank() ? "I'm keeping an eye on what wandered into the area."
-                    : "I noticed that " + subject.toLowerCase(java.util.Locale.ROOT) + " nearby. I'm keeping it in mind.", "Talked about something nearby");
-            case "WORLD_CONDITION" -> new Conversation(subject.isBlank() ? "The conditions around here changed. I'm adjusting to it."
-                    : "I'm paying attention to " + subject + ". It changes how I move around here.", "Talked about the current conditions");
+            case "HORN_RALLY" -> conversationKey("event.horn_rally", "That horn wasn't for show. When it sounds, everyone is supposed to move together.", "Talked about the faction rally");
+            case "BOUNDARY_BROKEN" -> conversationKey("event.boundary_broken", "I asked for space and you kept pushing. I'm still irritated about that.", "Talked after a boundary was ignored");
+            case "TOOK_SPACE" -> conversationKey("event.took_space", "I moved because I needed distance. I meant it.", "Talked after taking space");
+            case "MOB_SEEN" -> new Conversation(subject.isBlank() ? LWLang.speechKey("dialogue.social.event.mob_seen.unknown")
+                    : LWLang.speechKey("dialogue.social.event.mob_seen.named", "I noticed that %s nearby. I'm keeping it in mind.", subject), "Talked about something nearby");
+            case "WORLD_CONDITION" -> new Conversation(subject.isBlank() ? LWLang.speechKey("dialogue.social.event.world_condition.unknown")
+                    : LWLang.speechKey("dialogue.social.event.world_condition.named", "I'm paying attention to %s. It changes how I move around here.", subject), "Talked about the current conditions");
             default -> null;
         };
     }
@@ -489,71 +488,84 @@ public final class FighterSocialManager {
 
         return switch (mood) {
             case UPBEAT -> {
-                String line = companion
-                        ? "I'm in a good mood today. Travelling with you is actually helping."
-                        : close ? "Good timing. I'm feeling good, and it's nice seeing you."
-                        : "I'm in a good mood today. Might as well enjoy it while it lasts.";
+                String state = companion ? "companion" : close ? "close" : "normal";
+                String line = LWLang.speechKey("dialogue.social.context.upbeat." + state);
                 yield new Conversation(line, "Talked while feeling upbeat");
             }
             case CONTENT -> new Conversation(
-                    familiar ? "I'm doing all right. Things feel calm for once, and I'm happy to keep it that way."
-                            : "I'm doing fine. Nothing is pressing on me right now.",
+                    LWLang.speechKey("dialogue.social.context.content." + (familiar ? "familiar" : "normal")),
                     "Talked during a calm stretch");
             case FOCUSED -> {
                 String line;
-                if (!"none".equals(goal)) line = "I'm trying to stay focused on " + lowerFirst(goal) + ". I don't want to lose that momentum.";
-                else line = "I'm focused right now because of " + cause + ". That's what has my attention.";
+                if (!"none".equals(goal)) line = LWLang.speechKey("dialogue.social.context.focused.goal",
+                        "I'm trying to stay focused on %s. I don't want to lose that momentum.", goalArgument(fighter));
+                else line = LWLang.speechKey("dialogue.social.context.focused.cause",
+                        "I'm focused right now because of %s. That's what has my attention.", cause);
                 yield new Conversation(line, "Talked while focused");
             }
             case WARY -> {
                 String line;
-                if (!eventSubject.isBlank()) line = close
-                        ? "Stay near me, but keep your eyes open. What happened around " + eventSubject + " still doesn't feel settled."
-                        : "I'm watching the area after what happened around " + eventSubject + ". I'd rather look paranoid than get surprised.";
-                else if (fighter.level().isThundering()) line = "I don't like this storm. Too much noise, too many places for something to move unnoticed.";
-                else if (!familiar) line = "Nothing personal, but I'm keeping track of everyone around me right now. You included.";
-                else line = "Something about " + cause + " has me checking the same angles twice. Stay alert.";
+                if (!eventSubject.isBlank()) line = LWLang.speechKey("dialogue.social.context.wary.subject." + (close ? "close" : "normal"),
+                        close ? "Stay near me, but keep your eyes open. What happened around %s still doesn't feel settled."
+                                : "I'm watching the area after what happened around %s. I'd rather look paranoid than get surprised.", eventSubject);
+                else if (fighter.level().isThundering()) line = LWLang.speechKey("dialogue.social.context.wary.storm");
+                else if (!familiar) line = LWLang.speechKey("dialogue.social.context.wary.unfamiliar");
+                else line = LWLang.speechKey("dialogue.social.context.wary.cause", "Something about %s has me checking the same angles twice. Stay alert.", cause);
                 yield new Conversation(line, "Talked while on guard");
             }
             case IRRITATED -> {
                 String line;
-                if (close) line = "I'm irritated about " + cause + ". I'm not angry at you; I just don't have much patience right now.";
-                else if (companion) line = "I'm irritated about " + cause + ". Give me a little space and I'll be fine.";
-                else line = "I'm irritated because of " + cause + ". I'm really not in the mood for small talk.";
+                String state = close ? "close" : companion ? "companion" : "normal";
+                line = LWLang.speechKey("dialogue.social.context.irritated." + state,
+                        state.equals("close") ? "I'm irritated about %s. I'm not angry at you; I just don't have much patience right now."
+                                : state.equals("companion") ? "I'm irritated about %s. Give me a little space and I'll be fine."
+                                : "I'm irritated because of %s. I'm really not in the mood for small talk.", cause);
                 yield new Conversation(line, "Talked while irritated");
             }
             case SOMBER -> {
                 String subject = "ALLY_DIED".equals(eventType) && !eventSubject.isBlank() ? eventSubject : "";
                 String line;
-                if (!subject.isBlank()) line = close
-                        ? "I'm still thinking about " + subject + ". Seeing them fall hit me harder than I expected."
-                        : "I'm not very talkative. " + subject + " is still on my mind.";
-                else line = close
-                        ? "I'm glad it's you. I've been quiet because of " + cause + ". I don't really want to pretend I'm fine."
-                        : "I'm not very talkative right now because of " + cause + ". It's still weighing on me.";
+                if (!subject.isBlank()) line = LWLang.speechKey("dialogue.social.context.somber.subject." + (close ? "close" : "normal"),
+                        close ? "I'm still thinking about %s. Seeing them fall hit me harder than I expected."
+                                : "I'm not very talkative. %s is still on my mind.", subject);
+                else line = LWLang.speechKey("dialogue.social.context.somber.cause." + (close ? "close" : "normal"),
+                        close ? "I'm glad it's you. I've been quiet because of %s. I don't really want to pretend I'm fine."
+                                : "I'm not very talkative right now because of %s. It's still weighing on me.", cause);
                 yield new Conversation(line, "Talked while somber");
             }
             case WEARY -> {
                 String lastOpponent = fighter.getLegacyData().getString("LastOpponent");
                 String line;
-                if (hurt) line = "I'm exhausted and I'm still hurting. I'm done pretending another fight right now would be smart.";
+                if (hurt) line = LWLang.speechKey("dialogue.social.context.weary.hurt");
                 else if (!lastOpponent.isBlank() && fighter.level().getGameTime() - fighter.getLegacyData().getLong("LastBattle") < 9000L)
-                    line = "That fight with " + lastOpponent + " took more out of me than I expected. I need to actually recover.";
-                else if (close) line = "I'm worn out. I can talk, but if I start slowing down, that's why. I need a proper rest soon.";
-                else line = "I'm low on energy. I'm keeping things short until I've had time to recover.";
+                    line = LWLang.speechKey("dialogue.social.context.weary.opponent", "That fight with %s took more out of me than I expected. I need to actually recover.", lastOpponent);
+                else if (close) line = LWLang.speechKey("dialogue.social.context.weary.close");
+                else line = LWLang.speechKey("dialogue.social.context.weary.normal");
                 yield new Conversation(line, "Talked while weary");
             }
         };
     }
 
     private static String speechCause(String raw) {
-        if (raw == null || raw.isBlank() || "recent events".equals(raw)) return "what's been happening lately";
-        if ("a quiet stretch".equals(raw)) return "things being quiet lately";
-        if ("debug mood test".equals(raw)) return "the way I'm feeling right now";
-        return raw.replace("their injuries", "my injuries")
-                .replace("their faction", "my faction")
-                .replace("the fight in front of them", "the fight in front of me")
-                .replace("their head", "my head");
+        String key = raw == null || raw.isBlank() || "recent events".equals(raw) ? "recent_events"
+                : "a quiet stretch".equals(raw) ? "quiet"
+                : "debug mood test".equals(raw) ? "current_feeling"
+                : "their injuries".equals(raw) ? "injuries"
+                : "their faction".equals(raw) ? "faction"
+                : "the fight in front of them".equals(raw) ? "fight"
+                : "their head".equals(raw) ? "thoughts" : null;
+        return key == null ? raw : LWLang.speechKey("dialogue.social.cause." + key);
+    }
+
+    private static String activityArgument(String activity) {
+        if (activity == null || activity.isBlank()) return "";
+        String key = activity.toLowerCase(java.util.Locale.ROOT).replace(' ', '_');
+        return LWLang.speechKey("dialogue.social.activity_name." + key);
+    }
+
+    private static String goalArgument(AmbientFighterEntity fighter) {
+        String type = FighterGoalManager.currentType(fighter).toLowerCase(java.util.Locale.ROOT);
+        return LWLang.speechKey("dialogue.social.goal_name." + (type.isBlank() ? "training" : type));
     }
 
     private static String lowerFirst(String value) {
@@ -564,11 +576,11 @@ public final class FighterSocialManager {
     private static String hostileLine(AmbientFighterEntity fighter) {
         if (WorldMenaceManager.isWorldMenace(fighter)) return WorldMenaceManager.hostileLine(fighter);
         return switch (fighter.getPersonality()) {
-            case HEROIC -> "Not while we're on opposite sides.";
-            case CALM -> "There isn't anything to discuss right now.";
-            case PROUD -> "You've lost the right to small talk.";
-            case AGGRESSIVE -> "Talk? Try surviving first.";
-            case CAUTIOUS -> "Keep your distance.";
+            case HEROIC -> LWLang.speechKey("dialogue.social.hostile.heroic");
+            case CALM -> LWLang.speechKey("dialogue.social.hostile.calm");
+            case PROUD -> LWLang.speechKey("dialogue.social.hostile.proud");
+            case AGGRESSIVE -> LWLang.speechKey("dialogue.social.hostile.aggressive");
+            case CAUTIOUS -> LWLang.speechKey("dialogue.social.hostile.cautious");
         };
     }
 }

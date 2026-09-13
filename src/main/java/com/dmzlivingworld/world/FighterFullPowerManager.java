@@ -26,12 +26,12 @@ public final class FighterFullPowerManager {
         if (player == null || fighter == null || fighter.level().isClientSide || WorldMenaceManager.isWorldMenace(fighter)) return false;
         int relationship = fighter.isRememberedFor(player) ? fighter.getMemoryRelationship() : 0;
         if (relationship < 35) {
-            player.displayClientMessage(Component.literal("[Living World] You need to be friends before asking for that."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.full_power.requires_friendship"), false);
             return false;
         }
         if (fighter.isDefeated() || fighter.isCaptive() || fighter.isRecovering() || fighter.isSanctionedMatchParticipant()
                 || fighter.getTarget() != null || fighter.isKaiokenActive() || fighter.isAwakening() || fighter.isRacialFormActive()) {
-            player.displayClientMessage(Component.literal("[Living World] " + fighter.getFighterName() + " can't demonstrate full power right now."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.full_power.unavailable", fighter.getFighterName()), false);
             return false;
         }
 
@@ -56,7 +56,7 @@ public final class FighterFullPowerManager {
         fighter.beginAwakening();
         fighter.setKiCharge(true);
         fighter.flareAura((int) DURATION);
-        player.displayClientMessage(Component.literal("[Living World] " + fighter.getFighterName() + " begins bringing out their full power."), false);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.full_power.started", fighter.getFighterName()), false);
         return true;
     }
 

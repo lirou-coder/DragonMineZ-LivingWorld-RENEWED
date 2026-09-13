@@ -126,7 +126,7 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
             // Use Dragon Mine Z's real Red Ribbon uniform overlay rather than mapping X-7 to an
             // unrelated human outfit slot. The experiment keeps the LW humanoid body/face below it.
             layer(model, pose, buffers, e, dmz("textures/entity/enemies/redribbon_outfit.png"), WHITE, pt, light, overlay);
-        } else if (!hasReplacementArmor(e)) {
+        } else {
             String[] pool = e.getRace() == com.dmzlivingworld.entity.FighterRace.SAIYAN ? SAIYAN_OUTFITS : HUMAN_OUTFITS;
             renderOutfit(model, pose, buffers, e, pool[Math.floorMod(e.getOutfit(), pool.length)], pt, light, overlay);
         }
@@ -152,7 +152,7 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
                 rgb(e.getBodyColor()), pt, light, overlay);
         layer(model, pose, buffers, e, dmz(face + "namekian_mouth_" + Math.floorMod(e.getMouthType(), 2) + ".png"),
                 rgb(e.getBodyColor()), pt, light, overlay);
-        if (!hasReplacementArmor(e)) {
+        {
             int outfit = Math.floorMod(e.getOutfit(), HUMAN_OUTFITS.length + SAIYAN_OUTFITS.length);
             String id = outfit < HUMAN_OUTFITS.length ? HUMAN_OUTFITS[outfit]
                     : SAIYAN_OUTFITS[outfit - HUMAN_OUTFITS.length];
@@ -194,8 +194,7 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
                 faceColor, pt, light, overlay);
         layer(majinModel, pose, buffers, e, MAJIN_MOUTHS[Math.floorMod(e.getMouthType(), MAJIN_MOUTHS.length)],
                 faceColor, pt, light, overlay);
-        if (!hasReplacementArmor(e))
-            renderOutfit(majinModel, pose, buffers, e, MAJIN_OUTFITS[Math.floorMod(e.getOutfit(), MAJIN_OUTFITS.length)], pt, light, overlay);
+        renderOutfit(majinModel, pose, buffers, e, MAJIN_OUTFITS[Math.floorMod(e.getOutfit(), MAJIN_OUTFITS.length)], pt, light, overlay);
     }
 
     private void renderFrost(PoseStack pose, AmbientFighterEntity e, BakedGeoModel model,
@@ -310,20 +309,9 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         layer(model, pose, buffers, e, dmz(face + "3.png"), rgb(e.getHairColor()), pt, light, overlay);
         layer(model, pose, buffers, e, dmz("textures/entity/races/" + raceRoot + "/faces/" + raceRoot + "_nose_" + Math.floorMod(e.getNoseType(), 6) + ".png"), body, pt, light, overlay);
         layer(model, pose, buffers, e, dmz("textures/entity/races/" + raceRoot + "/faces/" + raceRoot + "_mouth_" + Math.floorMod(e.getMouthType(), 9) + ".png"), body, pt, light, overlay);
-        if (!hasReplacementArmor(e) && e.getOutfit() >= 0) {
+        if (e.getOutfit() >= 0) {
             renderOutfit(model, pose, buffers, e, HUMAN_OUTFITS[Math.floorMod(e.getOutfit(), HUMAN_OUTFITS.length)], pt, light, overlay);
         }
-    }
-
-    /**
-     * LW's procedural outfit is the fighter's default clothing. A genuine equipped chest/leg
-     * armor set is a replacement visual rendered by DMZ's native DMZSagaArmorLayer, not a second
-     * costume to paint over the default one. Hiding the default only while replacement armor is
-     * actually equipped prevents two complete clothing textures from z-fighting/overlapping.
-     */
-    private static boolean hasReplacementArmor(AmbientFighterEntity e) {
-        return e != null && (!e.getItemBySlot(EquipmentSlot.CHEST).isEmpty()
-                || !e.getItemBySlot(EquipmentSlot.LEGS).isEmpty());
     }
 
     private static boolean shouldRenderHumanSaiyanHairBase(AmbientFighterEntity e) {

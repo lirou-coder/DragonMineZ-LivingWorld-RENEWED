@@ -257,17 +257,17 @@ public final class FighterRenderer extends GeoEntityRenderer<AmbientFighterEntit
         if (minecraft.player.distanceToSqr(entity) > max) return;
 
         Font font = minecraft.font;
-        String title = entity.isNonCombatant() ? "Resident" : entity.getFactionTitle();
+        String title = entity.isNonCombatant() ? LWLang.string("label.fighter.resident") : entity.getFactionTitle();
         String top = entity.getFighterName();
         if (!title.isBlank()) top = title + " " + top;
         String legacyTitle = entity.getLegacyTitle();
         if (!legacyTitle.isBlank()) top = legacyTitle + " " + top;
-        if (entity.isWanted()) top = "WANTED " + "★".repeat(Math.max(1, entity.getWantedLevel())) + " " + top;
+        if (entity.isWanted()) top = LWLang.string("label.fighter.wanted") + " " + "★".repeat(Math.max(1, entity.getWantedLevel())) + " " + top;
         String story = switch (entity.getStoryRole()) {
-            case AmbientFighterEntity.STORY_ALLY -> "ALLY • ";
-            case AmbientFighterEntity.STORY_ENEMY -> "ENEMY • ";
-            case AmbientFighterEntity.STORY_CAPTIVE -> "CAPTIVE • ";
-            case AmbientFighterEntity.STORY_PEACEKEEPER -> "PEACEKEEPER • ";
+            case AmbientFighterEntity.STORY_ALLY -> LWLang.string("label.fighter.story.ally") + " • ";
+            case AmbientFighterEntity.STORY_ENEMY -> LWLang.string("label.fighter.story.enemy") + " • ";
+            case AmbientFighterEntity.STORY_CAPTIVE -> LWLang.string("label.fighter.story.captive") + " • ";
+            case AmbientFighterEntity.STORY_PEACEKEEPER -> LWLang.string("label.fighter.story.peacekeeper") + " • ";
             default -> "";
         };
         top = story + top;
@@ -331,7 +331,7 @@ public final class FighterRenderer extends GeoEntityRenderer<AmbientFighterEntit
         if (minecraft.player == null || minecraft.player.distanceToSqr(entity) > (double)dialogueDistance * dialogueDistance) return;
 
         Font font = minecraft.font;
-        Component text = Component.literal(speech);
+        Component text = LWLang.speech(speech);
         float width = font.width(text);
 
         poseStack.pushPose();

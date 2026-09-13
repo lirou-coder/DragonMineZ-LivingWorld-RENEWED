@@ -1,5 +1,7 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
+
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterRank;
 import com.dmzlivingworld.entity.RacialFormProfile;
@@ -91,6 +93,85 @@ public final class FighterGoalManager {
             case "TRAIN" -> "Complete " + Math.max(1, l.getInt(TARGET_COUNT)) + " serious training sessions";
             default -> "none";
         };
+    }
+
+    public static String localizedSummary(AmbientFighterEntity fighter, boolean storedOnly) {
+        if (fighter == null) return LWLang.speechKey("label.goal.none", "none");
+        if (!storedOnly) ensureAssignedForInspection(fighter);
+        CompoundTag l = fighter.getLegacyData();
+        String target = l.getString(TARGET);
+        return switch (l.getString(TYPE)) {
+            case "DEFEAT_RIVAL" -> target.isBlank() ? LWLang.speechKey("label.goal.defeat_a_rival", "Defeat a rival") : LWLang.speechKey("label.goal.defeat_named", "Defeat %s", target);
+            case "LEARN_TECHNIQUE" -> LWLang.speechKey("label.goal.learn_technique", "Learn a new technique");
+            case "ACQUIRE_EQUIPMENT" -> target.isBlank() ? LWLang.speechKey("label.goal.acquire_equipment", "Acquire useful equipment") : LWLang.speechKey("label.goal.acquire_named", "Acquire %s", localizedTarget(target));
+            case "ADVANCE_RACIAL" -> LWLang.speechKey("label.goal.advance_racial", "Advance racial training");
+            case "LEARN_FLIGHT" -> LWLang.speechKey("label.goal.learn_flight", "Learn to fly");
+            case "WIN_FIGHTS" -> LWLang.speechKey("label.goal.win_fights", "Win %s meaningful fights", Math.max(1, l.getInt(TARGET_COUNT)));
+            case "DEFEAT_STRONGER" -> LWLang.speechKey("label.goal.defeat_stronger", "Defeat a fighter above PL %s", Math.max(1, l.getInt(TARGET_POWER)));
+            case "FUSION" -> LWLang.speechKey("label.goal.fusion", "Perform another fusion");
+            case "TRAIN" -> LWLang.speechKey("label.goal.train", "Complete %s serious training sessions", Math.max(1, l.getInt(TARGET_COUNT)));
+            default -> LWLang.speechKey("label.goal.none", "none");
+        };
+    }
+
+    private static String localizedTarget(String target) {
+        String value = target == null ? "" : target;
+        String slug = value.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        return LWLang.speechKey("label.goal_target." + slug, value);
+    }
+
+    /**
+     * Localizes goal descriptions persisted by older and current saves. Goal journals deliberately
+     * keep their factual value as plain English, so this parser must run when the biography is
+     * displayed instead of only when a new goal is assigned.
+     */
+    public static String localizedResult(String result) {
+        if (result == null || result.isBlank()) return LWLang.speechKey("label.goal.none", "none");
+        if (LWLang.isSpeechKey(result)) return result;
+
+        return switch (result) {
+            case "Defeat a rival" -> LWLang.speechKey("label.goal.defeat_a_rival", result);
+            case "Learn a new technique" -> LWLang.speechKey("label.goal.learn_technique", result);
+            case "Acquire useful equipment" -> LWLang.speechKey("label.goal.acquire_equipment", result);
+            case "Advance racial training" -> LWLang.speechKey("label.goal.advance_racial", result);
+            case "Learn to fly" -> LWLang.speechKey("label.goal.learn_flight", result);
+            case "Perform another fusion" -> LWLang.speechKey("label.goal.fusion", result);
+            case "none" -> LWLang.speechKey("label.goal.none", result);
+            default -> localizedParameterizedResult(result);
+        };
+    }
+
+    private static String localizedParameterizedResult(String result) {
+        String value;
+        if (result.startsWith("Defeated stronger fighter ")) {
+            value = result.substring("Defeated stronger fighter ".length());
+            return LWLang.speechKey("label.goal_result.defeated_stronger", "Defeated stronger fighter %s", value);
+        }
+        if (result.startsWith("Defeated rival ")) {
+            value = result.substring("Defeated rival ".length());
+            return LWLang.speechKey("label.goal_result.defeated_rival", "Defeated rival %s", value);
+        }
+        if (result.startsWith("Defeat a fighter above PL ")) {
+            value = result.substring("Defeat a fighter above PL ".length());
+            return LWLang.speechKey("label.goal.defeat_stronger", "Defeat a fighter above PL %s", value);
+        }
+        if (result.startsWith("Win ") && result.endsWith(" meaningful fights")) {
+            value = result.substring("Win ".length(), result.length() - " meaningful fights".length());
+            return LWLang.speechKey("label.goal.win_fights", "Win %s meaningful fights", value);
+        }
+        if (result.startsWith("Complete ") && result.endsWith(" serious training sessions")) {
+            value = result.substring("Complete ".length(), result.length() - " serious training sessions".length());
+            return LWLang.speechKey("label.goal.train", "Complete %s serious training sessions", value);
+        }
+        if (result.startsWith("Acquire ")) {
+            value = result.substring("Acquire ".length());
+            return LWLang.speechKey("label.goal.acquire_named", "Acquire %s", localizedTarget(value));
+        }
+        if (result.startsWith("Defeat ")) {
+            value = result.substring("Defeat ".length());
+            return LWLang.speechKey("label.goal.defeat_named", "Defeat %s", value);
+        }
+        return result;
     }
 
     /** Current stored goal type for systems that want to react to this fighter's actual life.

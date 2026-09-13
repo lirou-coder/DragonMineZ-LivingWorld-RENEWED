@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
 import com.dmzlivingworld.entity.FighterPersonality;
@@ -322,7 +323,7 @@ public final class ReactiveWorldManager {
             data.remove(DEBUG_CYCLE_INDEX);
             data.remove(DEBUG_CYCLE_NEXT);
             setMood(fighter, Mood.CONTENT, "finishing the debug mood cycle", 300, 35);
-            if (fighter.getSpeech().isEmpty()) fighter.speak("Mood cycle complete.", 55);
+if (fighter.getSpeech().isEmpty()) fighter.speakKey("dialogue.debug.mood_cycle_complete", 55);
             return true;
         }
         Mood next = moods[index];
@@ -339,13 +340,13 @@ public final class ReactiveWorldManager {
 
     private static String debugMoodLine(Mood mood) {
         return switch (mood) {
-            case UPBEAT -> "I'm in a good mood. Let's make the most of it.";
-            case CONTENT -> "I'm fine right here. Nothing pressing for once.";
-            case FOCUSED -> "I'm focused. Don't distract me unless it matters.";
-            case WARY -> "Something feels off. I'm watching everything around me.";
-            case IRRITATED -> "I'm irritated. Give me some space.";
-            case SOMBER -> "I don't really want company right now.";
-            case WEARY -> "I'm worn out. I need to slow down and recover.";
+            case UPBEAT -> LWLang.speechKey("dialogue.reactive.mood_debug.upbeat", "I'm in a good mood. Let's make the most of it.");
+            case CONTENT -> LWLang.speechKey("dialogue.reactive.mood_debug.content", "I'm fine right here. Nothing pressing for once.");
+            case FOCUSED -> LWLang.speechKey("dialogue.reactive.mood_debug.focused", "I'm focused. Don't distract me unless it matters.");
+            case WARY -> LWLang.speechKey("dialogue.reactive.mood_debug.wary", "Something feels off. I'm watching everything around me.");
+            case IRRITATED -> LWLang.speechKey("dialogue.reactive.mood_debug.irritated", "I'm irritated. Give me some space.");
+            case SOMBER -> LWLang.speechKey("dialogue.reactive.mood_debug.somber", "I don't really want company right now.");
+            case WEARY -> LWLang.speechKey("dialogue.reactive.mood_debug.weary", "I'm worn out. I need to slow down and recover.");
         };
     }
 
@@ -600,13 +601,13 @@ public final class ReactiveWorldManager {
                 && !FactionRequestMissionManager.isExclusiveFieldAssignment(fighter)
                 && fighter.getTarget() == null && fighter.getSpeech().isEmpty() && fighter.getRandom().nextFloat() < 0.18F) {
             String line = switch (mood) {
-                case UPBEAT -> "I'm feeling good. Might as well enjoy it.";
-                case CONTENT -> "That's better. I can breathe again.";
-                case FOCUSED -> "All right. Focus.";
-                case WARY -> "Something feels off. I'm keeping watch.";
-                case IRRITATED -> "I need some space before I lose my patience.";
-                case SOMBER -> "I'm not really feeling talkative.";
-                case WEARY -> "I'm running on fumes. I need to slow down.";
+                case UPBEAT -> LWLang.speechKey("dialogue.reactive.mood_change.upbeat", "I'm feeling good. Might as well enjoy it.");
+                case CONTENT -> LWLang.speechKey("dialogue.reactive.mood_change.content", "That's better. I can breathe again.");
+                case FOCUSED -> LWLang.speechKey("dialogue.reactive.mood_change.focused", "All right. Focus.");
+                case WARY -> LWLang.speechKey("dialogue.reactive.mood_change.wary", "Something feels off. I'm keeping watch.");
+                case IRRITATED -> LWLang.speechKey("dialogue.reactive.mood_change.irritated", "I need some space before I lose my patience.");
+                case SOMBER -> LWLang.speechKey("dialogue.reactive.mood_change.somber", "I'm not really feeling talkative.");
+                case WEARY -> LWLang.speechKey("dialogue.reactive.mood_change.weary", "I'm running on fumes. I need to slow down.");
             };
             fighter.speak(line, 78);
         }

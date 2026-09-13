@@ -1,5 +1,6 @@
 package com.dmzlivingworld.client.screen;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.network.SupplyItemSnapshot;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -29,7 +30,7 @@ final class SupplyInventoryClient {
     static String withLiveCounts(String base, List<SupplyItemSnapshot> lines) {
         String safeBase = base == null ? "" : base;
         String held = liveSummary(lines);
-        return held.isBlank() ? safeBase : safeBase + " • YOU HAVE: " + held;
+        return held.isBlank() ? safeBase : LWLang.string("screen.faction_request.supply_have", safeBase, held);
     }
 
     static String liveSummary(List<SupplyItemSnapshot> lines) {

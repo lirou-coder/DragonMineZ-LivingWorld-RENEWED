@@ -1,5 +1,7 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
+
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.*;
 import net.minecraft.ChatFormatting;
@@ -331,8 +333,8 @@ public final class RedRibbonExperimentManager {
 
         // This is intentionally news, not omniscient dossier knowledge. The report reaches online
         // players without exposing X-7's hidden character sheet or marking it as physically seen.
-        Component line = Component.literal("[Living World] Reports spread: Red Ribbon Experiment X-7 killed "
-                + victim.getFighterName() + ".").withStyle(ChatFormatting.DARK_RED);
+        Component line = Component.translatable("dmzlivingworld.message.x7.kill_report", victim.getFighterName())
+                .withStyle(ChatFormatting.DARK_RED);
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
             if (!player.isSpectator()) player.displayClientMessage(line, false);
         }
@@ -396,7 +398,7 @@ public final class RedRibbonExperimentManager {
         pd.putBoolean(REINFORCEMENTS_USED, true);
         if (target instanceof ServerPlayer player) {
             markSpotted(player, fighter);
-            player.displayClientMessage(Component.literal("Red Ribbon reinforcements move in around X-7.")
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.x7.reinforcements")
                     .withStyle(ChatFormatting.DARK_RED), false);
         }
     }
@@ -527,29 +529,33 @@ public final class RedRibbonExperimentManager {
         if(f==null)return 0; BlockPos safe=AmbientFighterSpawner.findSafeGroundAround(player.serverLevel(),f.blockPosition(),player.getRandom(),2,6,10); if(safe==null)safe=f.blockPosition(); player.teleportTo(player.serverLevel(),safe.getX()+0.5D,safe.getY(),safe.getZ()+0.5D,player.getYRot(),player.getXRot()); markSpotted(player,f); return 1;
     }
     public static String status(ServerPlayer player) {
-        if(player==null)return "Unknown"; RedRibbonExperimentData d=RedRibbonExperimentData.get(player.serverLevel()); if(d.active())return "Active • confirmed defeats: "+d.defeats(); if(d.returnAt()>player.serverLevel().getGameTime())return "Absent • expected to return"; return "Unconfirmed";
+        if(player==null)return LWLang.speechKey("label.menace_status.unknown", "Unknown"); RedRibbonExperimentData d=RedRibbonExperimentData.get(player.serverLevel()); if(d.active())return LWLang.speechKey("label.menace_status.active_defeats", "Active | confirmed defeats: %s", d.defeats()); if(d.returnAt()>player.serverLevel().getGameTime())return LWLang.speechKey("label.menace_status.expected_return", "Absent | expected to return"); return LWLang.speechKey("label.menace_status.unconfirmed", "Unconfirmed");
     }
 
     public static List<String> overviewLines(ServerPlayer player, AmbientFighterEntity fighter) {
         if (fighter == null || !isExperiment(fighter)) return List.of();
-        return List.of("!! WORLD MENACE • RED RIBBON EXPERIMENT X-7",
-                "~ Red Ribbon engineered combatant",
-                "## Status",
+        return List.of("!! " + menaceText("title", "WORLD MENACE | RED RIBBON EXPERIMENT X-7"),
+                "~ " + menaceText("engineered", "Red Ribbon engineered combatant"),
+                "## " + menaceText("status", "Status"),
                 "* " + status(player),
-                "## Field Pattern",
-                "* Operates as a mobile combatant rather than remaining in one location.",
-                "* Frequently trains between violent encounters.",
-                "* Red Ribbon soldiers have been observed responding when X-7 is badly wounded.",
-                "* X-7 has reappeared after confirmed defeats.");
+                "## " + menaceText("field_pattern", "Field Pattern"),
+                "* " + menaceText("mobile", "Operates as a mobile combatant rather than remaining in one location."),
+                "* " + menaceText("trains", "Frequently trains between violent encounters."),
+                "* " + menaceText("reinforcements", "Red Ribbon soldiers have been observed responding when X-7 is badly wounded."),
+                "* " + menaceText("reappeared", "X-7 has reappeared after confirmed defeats."));
     }
     public static List<String> storyLines(ServerPlayer player, AmbientFighterEntity fighter) {
         int seen = sightings(player); int defeats = fighter != null && fighter.level() instanceof ServerLevel l ? RedRibbonExperimentData.get(l).defeats() : 0;
-        return List.of("## Project X-7",
-                "* Classification: Red Ribbon enhancement experiment",
-                "* Confirmed sightings: " + seen + " • confirmed defeats: " + defeats,
-                "## Observed Record",
-                ". Later sightings have shown increasingly dangerous combat ability.",
-                ". Red Ribbon soldiers have answered X-7's calls under heavy pressure.",
-                ". X-7 behaves as a physical Red Ribbon combatant, distinct from the Herobrine anomaly.");
+        return List.of("## " + menaceText("project", "Project X-7"),
+                "* " + menaceText("classification", "Classification: Red Ribbon enhancement experiment"),
+                "* " + menaceText("record", "Confirmed sightings: %s | confirmed defeats: %s", seen, defeats),
+                "## " + menaceText("observed_record", "Observed Record"),
+                ". " + menaceText("dangerous", "Later sightings have shown increasingly dangerous combat ability."),
+                ". " + menaceText("answered_calls", "Red Ribbon soldiers have answered X-7's calls under heavy pressure."),
+                ". " + menaceText("physical", "X-7 behaves as a physical Red Ribbon combatant, distinct from the Herobrine anomaly."));
+    }
+
+    private static String menaceText(String key, String fallback, Object... args) {
+        return LWLang.speechKey("profile.menace.x7." + key, fallback, args);
     }
 }

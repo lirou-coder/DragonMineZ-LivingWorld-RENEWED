@@ -49,14 +49,11 @@ public enum FighterRace {
         List<String> configured = LivingWorldConfig.npcRaceBlacklist();
         boolean whitelist = LivingWorldConfig.treatRaceBlacklistAsWhitelist();
         for (FighterRace race : values()) {
+            // The enum retains Sairens' ids for save compatibility, but they are never valid
+            // random choices unless the provider mod is actually loaded.
+            if (race.isSairensRace() && !SairensRaceCompat.isLoaded()) continue;
             boolean listed = configured.contains(race.dmzId.toLowerCase(java.util.Locale.ROOT));
             if (whitelist == listed) allowed.add(race);
-        }
-        if (SairensRaceCompat.isLoaded()) {
-            for (FighterRace race : new FighterRace[]{ZAARAKIN, ANTORANIAN}) {
-                boolean listed = configured.contains(race.dmzId.toLowerCase(java.util.Locale.ROOT));
-                if (whitelist == listed) allowed.add(race);
-            }
         }
         if (allowed.isEmpty()) return HUMAN;
         // Preserve the established weights when no filter is active; filtered lists are

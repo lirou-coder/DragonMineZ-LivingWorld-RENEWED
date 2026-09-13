@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
@@ -72,7 +73,7 @@ public final class FighterPowerCompareManager {
         a.getPersistentData().putLong(NEXT,next); b.getPersistentData().putLong(NEXT,next+b.getRandom().nextInt(1200));
         a.setSocialLifeActivity(true); b.setSocialLifeActivity(true);
         a.getLookControl().setLookAt(b,35,35); b.getLookControl().setLookAt(a,35,35);
-        a.speak(pick(a, "Hold up. Let me feel your Ki for a second.", "You've changed. Show me where your power's at.",
+        a.speak(pick(a, "power_compare.opening", "Hold up. Let me feel your Ki for a second.", "You've changed. Show me where your power's at.",
                 "Wait. Your Ki feels different today.", "Let's compare without wrecking the place.",
                 "I want to see how far you've come.", "Power check. Just for a moment."),82);
         Session s=new Session(a,b,now); SESSIONS.put(a.getUUID(),s); SESSIONS.put(b.getUUID(),s);
@@ -88,7 +89,7 @@ public final class FighterPowerCompareManager {
             a.getLookControl().setLookAt(b,35,35); b.getLookControl().setLookAt(a,35,35);
             if (!s.openingReplySpoken && now >= s.openingReplyAt) {
                 s.openingReplySpoken = true;
-                b.speak(pick(b, "Fine. Just don't blame me if your scouter regrets it.", "All right. No punches—just power.",
+                b.speak(pick(b, "power_compare.opening_reply", "Fine. Just don't blame me if your scouter regrets it.", "All right. No punches—just power.",
                         "Deal. Keep your hands to yourself.", "Okay. One flare, then we're done.",
                         "You're curious too, huh?", "Fine. Let's get a clean reading."),82);
             }
@@ -119,7 +120,7 @@ public final class FighterPowerCompareManager {
                             Math.round(s.bBasePower * (1.04D + b.getRandom().nextDouble() * 0.08D))), s.end + 40L);
                     s.bBoosted=true;
                 }
-                a.speak(pick(a, "There. That's more like it.", "Don't hold it down now.", "That's the level I wanted to feel.",
+                a.speak(pick(a, "power_compare.charge", "There. That's more like it.", "Don't hold it down now.", "That's the level I wanted to feel.",
                         "Good. Let it breathe.", "There you are.", "Now that's an honest reading."),74);
                 continue;
             }
@@ -127,7 +128,7 @@ public final class FighterPowerCompareManager {
             a.getNavigation().stop(); b.getNavigation().stop();
             if (!s.chargeReplySpoken && now >= s.chargeReplyAt) {
                 s.chargeReplySpoken = true;
-                b.speak(pick(b, "Wasn't planning to.", "Then keep up.", "I'm not suppressing any more than I need to.",
+                b.speak(pick(b, "power_compare.charge_reply", "Wasn't planning to.", "Then keep up.", "I'm not suppressing any more than I need to.",
                         "Watch closely.", "You asked for it.", "Try not to blink."),74);
             }
             if(!s.formsTried && now-s.chargeStarted>=60L) {
@@ -157,16 +158,17 @@ public final class FighterPowerCompareManager {
         }
         if(comment&&a!=null&&b!=null) {
             AmbientFighterEntity stronger=a.getBattlePower()>=b.getBattlePower()?a:b, weaker=stronger==a?b:a;
-            stronger.speak(pick(stronger, "Heh. That felt good.", "Not bad. I had to push harder than I expected.",
+            stronger.speak(pick(stronger, "power_compare.finish.stronger", "Heh. That felt good.", "Not bad. I had to push harder than I expected.",
                     "You're closer than last time.", "That was worth checking.", "The gap isn't what it used to be.", "Good pressure."),76);
-            weaker.speak(pick(weaker, "Okay, okay. I felt that difference.", "Good. Now I know where the gap is.",
+            weaker.speak(pick(weaker, "power_compare.finish.weaker", "Okay, okay. I felt that difference.", "Good. Now I know where the gap is.",
                     "That's useful. I know what I need to work on.", "Still ahead of me. For now.",
                     "I felt where I started falling behind.", "Next time, that reading changes."),76);
         }
     }
 
-    private static String pick(AmbientFighterEntity fighter, String... lines) {
-        return lines[fighter.getRandom().nextInt(lines.length)];
+    private static String pick(AmbientFighterEntity fighter, String group, String... lines) {
+        int index = fighter.getRandom().nextInt(lines.length);
+        return LWLang.speechKey("dialogue." + group + "." + index, lines[index]);
     }
 
     private static boolean available(AmbientFighterEntity f) {

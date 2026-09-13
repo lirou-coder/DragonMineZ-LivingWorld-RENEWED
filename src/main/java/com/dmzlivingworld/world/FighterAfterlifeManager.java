@@ -35,6 +35,9 @@ import java.util.*;
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class FighterAfterlifeManager {
     public static final String DEAD_SOUL = "LWDeadSoul";
+    private static final long RECOVERY_DELAY_TICKS = 20L * 15L;
+    private static final long SOUL_RECOVERY_DELAY_TICKS = 20L * 5L;
+    private static final String SOUL_RECOVERY_AT = "LWDeadSoulRecoveryAt";
     private static final ResourceKey<Level> OTHERWORLD = ResourceKey.create(Registries.DIMENSION,
             ResourceLocation.fromNamespaceAndPath("dragonminez", "otherworld"));
     private static final ResourceKey<Level> NETHER = Level.NETHER;
@@ -43,14 +46,57 @@ public final class FighterAfterlifeManager {
 
     private FighterAfterlifeManager() {}
 
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onDeadSoulDeath(LivingDeathEvent event) {
+        if (!(event.getEntity() instanceof AmbientFighterEntity fighter)
+                || !(fighter.level() instanceof ServerLevel level)
+                || !fighter.getPersistentData().getBoolean(DEAD_SOUL)) return;
+        // An afterlife body is only a visible projection of an already archived person. Killing it
+        // must never archive the fighter again, consume lives or remove it from the wish registry.
+        event.setCanceled(true);
+        fighter.setHealth(Math.max(1.0F, fighter.getMaxHealth()));
+        fighter.setTarget(null);
+        fighter.getNavigation().stop();
+        fighter.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        fighter.setInvisible(true);
+        fighter.setInvulnerable(true);
+        fighter.setNoAi(true);
+        fighter.getPersistentData().putLong(SOUL_RECOVERY_AT, level.getGameTime() + SOUL_RECOVERY_DELAY_TICKS);
+    }
+
     public static void markAssimilated(AmbientFighterEntity fighter) {
         if (!(fighter.level() instanceof ServerLevel level)) return;
         if (WorldMenaceManager.isWorldMenace(fighter)) return;
         Data data = Data.get(level);
         UUID id = recordId(fighter);
         data.dead.remove(id);
+        data.recovering.remove(id);
         data.assimilated.add(id);
         data.setDirty();
+    }
+
+    /** Queues a non-final defeat to restore this exact fighter identity after a short delay. */
+    public static void scheduleRecovery(AmbientFighterEntity fighter) {
+        if (fighter == null || !(fighter.level() instanceof ServerLevel level)
+                || WorldMenaceManager.isWorldMenace(fighter)
+                || fighter.getPersistentData().getBoolean(NamekAssimilationCompat.ASSIMILATED)) return;
+        Data data = Data.get(level);
+        UUID id = recordId(fighter);
+        if (data.assimilated.contains(id)) return;
+        CompoundTag entry = new CompoundTag();
+        entry.putUUID("Id", id);
+        entry.put("Profile", fighter.writeMemoryProfile());
+        entry.putString("Dimension", level.dimension().location().toString());
+        entry.putInt("X", fighter.blockPosition().getX());
+        entry.putInt("Y", fighter.blockPosition().getY());
+        entry.putInt("Z", fighter.blockPosition().getZ());
+        entry.putLong("ReturnAt", level.getGameTime() + RECOVERY_DELAY_TICKS);
+        data.recovering.put(id, entry);
+        data.setDirty();
+    }
+
+    public static boolean isRecoveryQueued(ServerLevel level, UUID recordId) {
+        return level != null && recordId != null && Data.get(level).recovering.containsKey(recordId);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -77,14 +123,16 @@ public final class FighterAfterlifeManager {
         if (event.phase != TickEvent.Phase.END) return;
         MinecraftServer server = event.getServer();
         Data data = Data.get(server.overworld());
+        if (server.getTickCount() % 20 == 0) restoreRecovering(server, data);
         for (UUID forgotten : data.trimDead()) discardSoul(server, forgotten);
         boolean hellEnabled = dmzPlusHellEnabled();
         SoulSnapshot souls = scanSouls(server);
+        restoreDefeatedSouls(server);
 
         if (server.getTickCount() % 200 == 0) {
             for (CompoundTag entry : List.copyOf(data.dead.values())) {
                 FighterAlignment alignment = FighterAlignment.byId(entry.getInt("Alignment"));
-                if (alignment == FighterAlignment.BAD) continue;
+                if (alignment != FighterAlignment.GOOD) continue;
                 if (souls.visibleGood >= 5) continue;
                 if (ensureGoodSoul(server, entry, souls)) souls.visibleGood++;
             }
@@ -97,10 +145,61 @@ public final class FighterAfterlifeManager {
         }
     }
 
+    private static void restoreDefeatedSouls(MinecraftServer server) {
+        for (ServerLevel level : server.getAllLevels()) {
+            long now = level.getGameTime();
+            for (Entity entity : level.getAllEntities()) {
+                if (!(entity instanceof AmbientFighterEntity fighter) || !fighter.isDeadSoul()) continue;
+                long due = fighter.getPersistentData().getLong(SOUL_RECOVERY_AT);
+                if (due <= 0L || now < due) continue;
+                fighter.getPersistentData().remove(SOUL_RECOVERY_AT);
+                fighter.setHealth(fighter.getMaxHealth());
+                fighter.setInvisible(false);
+                fighter.setInvulnerable(false);
+                fighter.setNoAi(false);
+            }
+        }
+    }
+
+    private static void restoreRecovering(MinecraftServer server, Data data) {
+        long now = server.overworld().getGameTime();
+        for (Iterator<Map.Entry<UUID, CompoundTag>> iterator = data.recovering.entrySet().iterator(); iterator.hasNext();) {
+            Map.Entry<UUID, CompoundTag> row = iterator.next();
+            CompoundTag entry = row.getValue();
+            if (now < entry.getLong("ReturnAt")) continue;
+            if (data.assimilated.contains(row.getKey()) || FighterLegacyWorldData.get(server.overworld()).isDeadRecord(row.getKey())) {
+                iterator.remove(); data.setDirty(); continue;
+            }
+            boolean alreadyLive = false;
+            for (ServerLevel scan : server.getAllLevels()) {
+                for (Entity entity : scan.getAllEntities()) {
+                    if (entity instanceof AmbientFighterEntity fighter && !fighter.isDeadSoul()
+                            && row.getKey().equals(recordId(fighter))) { alreadyLive = true; break; }
+                }
+                if (alreadyLive) break;
+            }
+            if (alreadyLive) { iterator.remove(); data.setDirty(); continue; }
+            List<ServerPlayer> possiblePlayers = server.getPlayerList().getPlayers().stream()
+                    .filter(p -> LivingWorldDimensions.isSupported(p.serverLevel())).toList();
+            if (possiblePlayers.isEmpty()) { entry.putLong("ReturnAt", now + 200L); continue; }
+            ServerPlayer near = possiblePlayers.get(Math.floorMod(row.getKey().hashCode(), possiblePlayers.size()));
+            ServerLevel level = near.serverLevel();
+            AmbientFighterEntity fighter = LWEntities.AMBIENT_FIGHTER.get().create(level);
+            if (fighter == null) continue;
+            fighter.initializeFromMemory(entry.getCompound("Profile"));
+            BlockPos ground = AmbientFighterSpawner.findSafeGroundAroundSeparated(level, near.blockPosition(),
+                    near.getRandom(), 32, 80, 28, 12.0D);
+            if (ground == null) { entry.putLong("ReturnAt", now + 100L); continue; }
+            fighter.moveTo(ground.getX() + .5D, ground.getY(), ground.getZ() + .5D, fighter.getRandom().nextFloat() * 360F, 0F);
+            if (level.noCollision(fighter) && level.addFreshEntity(fighter)) { iterator.remove(); data.setDirty(); }
+            else entry.putLong("ReturnAt", now + 100L);
+        }
+    }
+
     private static boolean ensureGoodSoul(MinecraftServer server, CompoundTag entry, SoulSnapshot souls) {
         if (isWorldMenaceRecord(entry)) return false;
         FighterAlignment alignment = FighterAlignment.byId(entry.getInt("Alignment"));
-        if (alignment == FighterAlignment.BAD) return false;
+        if (alignment != FighterAlignment.GOOD) return false;
         ServerLevel destination = server.getLevel(OTHERWORLD);
         if (destination == null) return false;
         BlockPos center = souls.kaiosama;
@@ -157,7 +256,7 @@ public final class FighterAfterlifeManager {
 
         List<CompoundTag> candidates = data.dead.values().stream()
                 .filter(entry -> !isWorldMenaceRecord(entry))
-                .filter(entry -> FighterAlignment.byId(entry.getInt("Alignment")) == FighterAlignment.BAD)
+                .filter(FighterAfterlifeManager::isWantedRecord)
                 .filter(entry -> entry.hasUUID("Id") && !souls.ids(level).contains(entry.getUUID("Id")))
                 .toList();
         if (candidates.isEmpty()) return false;
@@ -225,7 +324,7 @@ public final class FighterAfterlifeManager {
                 && dimension != null
                 && dimension.equals(NETHER)
                 && fighter.isDeadSoul()
-                && fighter.getAlignment() == FighterAlignment.BAD
+                && fighter.isWanted()
                 && dmzPlusHellEnabled();
     }
 
@@ -258,7 +357,7 @@ public final class FighterAfterlifeManager {
             CompoundTag profile = entry.getCompound("Profile");
             String name = profile.getString("Name");
             if (name.isBlank()) name = "Unknown Fighter";
-            result.add(new DeadFighter(entry.getUUID("Id"), name, FighterAlignment.byId(entry.getInt("Alignment"))));
+            result.add(new DeadFighter(entry.getUUID("Id"), name, FighterAlignment.byId(entry.getInt("Alignment")), isWantedRecord(entry)));
         }
         result.sort(Comparator.comparing(DeadFighter::name, String.CASE_INSENSITIVE_ORDER));
         return List.copyOf(result);
@@ -271,9 +370,12 @@ public final class FighterAfterlifeManager {
         for (Map.Entry<UUID, CompoundTag> entry : data.dead.entrySet()) {
             if (isWorldMenaceRecord(entry.getValue())) continue;
             FighterAlignment alignment = FighterAlignment.byId(entry.getValue().getInt("Alignment"));
-            boolean matches = "ALL_GOOD".equals(mode) ? alignment != FighterAlignment.BAD
-                    : "ALL_EVIL".equals(mode) ? alignment == FighterAlignment.BAD
-                    : wanted != null && wanted.equals(entry.getKey());
+            boolean wantedRecord = isWantedRecord(entry.getValue());
+            boolean matches = "ALL".equals(mode)
+                    || "ALL_GOOD".equals(mode) && alignment == FighterAlignment.GOOD
+                    || "ALL_WANTED".equals(mode) && wantedRecord
+                    || "ALL_NEUTRAL".equals(mode) && alignment != FighterAlignment.GOOD && !wantedRecord
+                    || "ONE".equals(mode) && wanted != null && wanted.equals(entry.getKey());
             if (matches) selected.add(entry.getKey());
         }
         if (selected.isEmpty()) return;
@@ -285,9 +387,9 @@ public final class FighterAfterlifeManager {
         }
         data.setDirty();
         FighterWishIntegration.refresh(player.getServer());
-        player.displayClientMessage(net.minecraft.network.chat.Component.literal(selected.size() == 1
-                ? "[Living World] The fighter has returned to life."
-                : "[Living World] " + selected.size() + " fighters have returned to life."), false);
+        player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                selected.size() == 1 ? "dmzlivingworld.message.afterlife.revived.one"
+                        : "dmzlivingworld.message.afterlife.revived.many", selected.size()), false);
     }
 
     private static void spawnRevived(ServerPlayer player, CompoundTag record) {
@@ -295,7 +397,12 @@ public final class FighterAfterlifeManager {
                 ? player.serverLevel() : player.getServer().overworld();
         AmbientFighterEntity fighter = LWEntities.AMBIENT_FIGHTER.get().create(level);
         if (fighter == null) return;
-        fighter.initializeFromMemory(record.getCompound("Profile"));
+        CompoundTag profile = record.getCompound("Profile").copy();
+        CompoundTag legacy = profile.getCompound("Legacy").copy();
+        legacy.putInt("Deaths", 0);
+        legacy.putInt("LWCombatLivesUsed", 0);
+        profile.put("Legacy", legacy);
+        fighter.initializeFromMemory(profile);
         fighter.setDeadSoul(false);
         fighter.getPersistentData().remove("LWAfterlifeRecord");
         fighter.setPersistenceRequired();
@@ -325,6 +432,7 @@ public final class FighterAfterlifeManager {
         Data data = Data.get(server.overworld());
         data.dead.clear();
         data.assimilated.clear();
+        data.recovering.clear();
         data.setDirty();
         for (ServerLevel level : server.getAllLevels()) {
             for (Entity entity : level.getAllEntities()) {
@@ -337,6 +445,10 @@ public final class FighterAfterlifeManager {
         return entry != null && WorldMenaceManager.isWorldMenaceProfile(entry.getCompound("Profile"));
     }
 
+    private static boolean isWantedRecord(CompoundTag entry) {
+        return entry != null && entry.getCompound("Profile").getInt("WantedLevel") > 0;
+    }
+
     private static final class SoulSnapshot {
         private final Map<ResourceKey<Level>, Set<UUID>> idsByDimension = new HashMap<>();
         private int visibleGood;
@@ -347,11 +459,12 @@ public final class FighterAfterlifeManager {
         }
     }
 
-    public record DeadFighter(UUID id, String name, FighterAlignment alignment) {}
+    public record DeadFighter(UUID id, String name, FighterAlignment alignment, boolean wanted) {}
 
         public static final class Data extends SavedData {
         private static final String NAME = "dmzlivingworld_afterlife_v1";
         private final Map<UUID, CompoundTag> dead = new LinkedHashMap<>();
+        private final Map<UUID, CompoundTag> recovering = new LinkedHashMap<>();
         private final Set<UUID> assimilated = new HashSet<>();
 
         static Data get(ServerLevel level) {
@@ -368,6 +481,10 @@ public final class FighterAfterlifeManager {
             for (Tag raw : root.getList("Assimilated", Tag.TAG_COMPOUND)) {
                 CompoundTag entry = (CompoundTag)raw;
                 if (entry.hasUUID("Id")) data.assimilated.add(entry.getUUID("Id"));
+            }
+            for (Tag raw : root.getList("Recovering", Tag.TAG_COMPOUND)) {
+                CompoundTag entry = (CompoundTag)raw;
+                if (entry.hasUUID("Id")) data.recovering.put(entry.getUUID("Id"), entry.copy());
             }
             data.trimDead();
             return data;
@@ -390,6 +507,7 @@ public final class FighterAfterlifeManager {
             ListTag assimilatedList = new ListTag();
             for (UUID id : assimilated) { CompoundTag e = new CompoundTag(); e.putUUID("Id", id); assimilatedList.add(e); }
             root.put("Assimilated", assimilatedList);
+            ListTag recoveringList = new ListTag(); this.recovering.values().forEach(e -> recoveringList.add(e.copy())); root.put("Recovering", recoveringList);
             return root;
         }
     }

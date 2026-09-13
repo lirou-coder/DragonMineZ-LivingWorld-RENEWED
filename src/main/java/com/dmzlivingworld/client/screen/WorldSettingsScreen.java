@@ -1,5 +1,6 @@
 package com.dmzlivingworld.client.screen;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldClientConfig;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.network.LWNetwork;
@@ -22,7 +23,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     private static final int[] PRESENCE_RADII = {96, 128, 160, 192, 256, 320, 384, 512, 768, 1024, 1536, 2048, 3072, 4096, 6144, 8192};
     private static final int[] ALERT_RADII = {256, 512, 800, 1000, 1400, 1800, 2400, 3200, 4096, 6144, 8192, 12288, 16384, 24576, 32768};
     private static final int[] KI_MODE_ORDER = {0, 3, 1, 2};
-    private static final String[] TAB_NAMES = {"World", "NPC Behaviour", "Advanced NPC", "Relationships", "Display", "Meditation", "Meditation Visuals"};
+    private static final String[] TAB_KEYS = {"world", "npc_behaviour", "advanced_npc", "relationships", "display", "meditation", "meditation_visuals"};
     // Visual order is independent of the established logical tab IDs, preserving save/default/update logic.
     private static final int[] TAB_ORDER = {0, 5, 6, 1, 2, 3, 4};
 
@@ -33,10 +34,11 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     // Living World server values
     private int activityPreset, nearbyFighterCap, nearbyHostileCap, livingPresenceTargetBase,
             livingPresenceRadius, factionResidentCap, worldEventAlertRadius, talkBaseGain,
-            talkRelationshipCap, talkCooldownMinSeconds, talkCooldownMaxSeconds, npcChaosPercent, npcKiMode, npcStrengthPercent, npcGrowthPercent, npcChatFrequencyPercent, earthGuardianResponsePercent;
+            talkRelationshipCap, talkCooldownMinSeconds, talkCooldownMaxSeconds, npcChaosPercent, npcKiMode, npcStrengthPercent, npcGrowthPercent, npcChatFrequencyPercent, earthGuardianResponsePercent, wantedPressureDecayMinutes;
     private boolean factionEncounters, dynamicEncounters, recurringFighters, automaticPowerSensing,
-            worldIncidents, worldEventAlerts, socialTalk, npcSocializing, companionSagaHelp, attackMinecraftMobs, worldMenacesEnabled;
-    private int maxRememberedDeadFighters, npcDespawnProtectionRadius;
+            worldIncidents, worldEventAlerts, socialTalk, npcSocializing, companionSagaHelp, attackMinecraftMobs,
+            worldMenacesEnabled, npcsEnabledOnCreativeMode;
+    private int maxRememberedDeadFighters, npcDespawnProtectionRadius, npcCombatLives, racialSkillMinimumEra;
     private double levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier, npcPowerMultiplier;
     private boolean canMeditationProcSkillProgression, treatRaceBlacklistAsWhitelist, treatDimensionWhitelistAsBlacklist;
     private String npcRaceBlacklist, canUseClothes, dimensionWhitelist, companionDimensionBlacklist;
@@ -71,7 +73,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     private boolean dirty;
 
     private WorldSettingsScreen(WorldSettingsPacket packet) {
-        super(Component.literal("Living World — Settings"));
+        super(LWLang.text("screen.world_settings.title"));
         this.canEdit = packet.canEdit();
         loadWorld(packet.world());
         loadMeditation(packet.meditation());
@@ -83,7 +85,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         Minecraft mc = Minecraft.getInstance();
         boolean ack = mc.screen instanceof WorldSettingsScreen current && current.savePending;
         WorldSettingsScreen next = new WorldSettingsScreen(packet);
-        if (ack) { next.dirty = false; next.setStatus("Saved.", 2600L); }
+        if (ack) { next.dirty = false; next.setStatus(LWLang.string("screen.world_settings.saved"), 2600L); }
         mc.setScreen(next);
     }
 
@@ -112,9 +114,10 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         talkCooldownMaxSeconds=v.talkCooldownMaxSeconds(); npcSocializing=v.npcSocializing();
         npcChaosPercent=v.npcChaosPercent(); companionSagaHelp=v.companionSagaHelp(); npcKiMode=v.npcKiMode(); npcStrengthPercent=v.npcStrengthPercent();
         npcGrowthPercent=v.npcGrowthPercent(); attackMinecraftMobs=v.attackMinecraftMobs();
-        worldMenacesEnabled=v.worldMenacesEnabled();
+        worldMenacesEnabled=v.worldMenacesEnabled(); wantedPressureDecayMinutes=v.wantedPressureDecayMinutes();
+        npcsEnabledOnCreativeMode=v.npcsEnabledOnCreativeMode();
         npcChatFrequencyPercent=v.npcChatFrequencyPercent(); earthGuardianResponsePercent=v.earthGuardianResponsePercent();
-        maxRememberedDeadFighters=v.maxRememberedDeadFighters(); npcDespawnProtectionRadius=v.npcDespawnProtectionRadius();
+        maxRememberedDeadFighters=v.maxRememberedDeadFighters(); npcDespawnProtectionRadius=v.npcDespawnProtectionRadius(); npcCombatLives=v.npcCombatLives(); racialSkillMinimumEra=v.racialSkillMinimumEra();
         levelMultiplierPerSaga=v.levelMultiplierPerSaga(); maxDefenseMitigation=v.maxDefenseMitigation(); bpVisualMultiplier=v.bpVisualMultiplier(); npcPowerMultiplier=v.npcPowerMultiplier();
         canMeditationProcSkillProgression=v.canMeditationProcSkillProgression();
         npcRaceBlacklist=String.join(",",v.npcRaceBlacklist()); treatRaceBlacklistAsWhitelist=v.treatRaceBlacklistAsWhitelist();
@@ -162,7 +165,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 npcChatFrequencyPercent, earthGuardianResponsePercent, maxRememberedDeadFighters, npcDespawnProtectionRadius,
                 levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier, npcPowerMultiplier, canMeditationProcSkillProgression,
                 csv(npcRaceBlacklist), treatRaceBlacklistAsWhitelist, csv(canUseClothes), csv(dimensionWhitelist),
-                treatDimensionWhitelistAsBlacklist, csv(companionDimensionBlacklist), java.util.Arrays.stream(archetypeShares).boxed().toList(), worldMenacesEnabled);
+                treatDimensionWhitelistAsBlacklist, csv(companionDimensionBlacklist), java.util.Arrays.stream(archetypeShares).boxed().toList(), worldMenacesEnabled, wantedPressureDecayMinutes, npcCombatLives, racialSkillMinimumEra, npcsEnabledOnCreativeMode);
     }
 
     private LivingWorldClientConfig.Snapshot clientSnapshot() {
@@ -185,7 +188,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     }
 
     private int rowCount() {
-        return switch (tab) { case 0 -> 12; case 1 -> 6; case 2 -> 13; case 3 -> 15; case 4 -> 10; case 6 -> 33; default -> 9; };
+        return switch (tab) { case 0 -> 12; case 1 -> 6; case 2 -> 13; case 3 -> 15; case 4 -> 10; case 6 -> 35; default -> 11; };
     }
 
     private boolean serverTab() { return tab == 0 || tab == 1 || tab == 3 || tab == 5 || tab == 6; }
@@ -195,9 +198,9 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         renderBackground(g);
         LivingWorldGuiStyle.drawPanel(g, panelLeft, panelTop, panelWidth, panelHeight);
-        LivingWorldGuiStyle.drawFitted(g, font, "DRAGON MINE Z: LIVING WORLD", panelLeft + 11, panelTop + 9,
+        LivingWorldGuiStyle.drawFitted(g, font, LWLang.string("screen.world_settings.header"), panelLeft + 11, panelTop + 9,
                 Math.max(70, panelWidth - 110), LivingWorldGuiStyle.GOLD);
-        LivingWorldGuiStyle.drawFitted(g, font, "Settings • Living World + integrated Meditation", panelLeft + 11, panelTop + 24,
+        LivingWorldGuiStyle.drawFitted(g, font, LWLang.string("screen.world_settings.subtitle"), panelLeft + 11, panelTop + 24,
                 Math.max(70, panelWidth - 110), LivingWorldGuiStyle.MUTED);
         LivingWorldGuiStyle.drawButton(g, font, panelLeft + panelWidth - 35, panelTop + 8, 24, 20, "×",
                 mouseX, mouseY, true, false, false);
@@ -212,13 +215,13 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         }
 
         String access = tabContextLine();
-        if (serverTab() && !canEdit) access = "View only • " + access;
+        if (serverTab() && !canEdit) access = LWLang.string("screen.world_settings.view_only", access);
         int contextY = footerY - 25;
         LivingWorldGuiStyle.drawFitted(g, font, access, panelLeft + 11, contextY,
                 Math.max(40, panelWidth - 22), LivingWorldGuiStyle.MUTED);
         int statusY = footerY - 13;
         boolean transientStatus = !status.isBlank() && Util.getMillis() <= statusUntil;
-        String line = transientStatus ? status : (dirty ? "Unsaved changes — press Save" : "");
+        String line = transientStatus ? status : (dirty ? LWLang.string("screen.world_settings.unsaved") : "");
         if (!line.isBlank()) LivingWorldGuiStyle.drawFitted(g, font, line, panelLeft + 11, statusY,
                 Math.max(40, panelWidth - 22), transientStatus ? LivingWorldGuiStyle.GREEN : LivingWorldGuiStyle.GOLD);
 
@@ -237,14 +240,14 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             backX = panelLeft + panelWidth - 10 - bw;
             saveX = backX - gap - bw;
         }
-        LivingWorldGuiStyle.drawButton(g, font, defaultsX, footerY, defaultsW, 20, compact == 1 ? "Reset" : "Defaults",
+        LivingWorldGuiStyle.drawButton(g, font, defaultsX, footerY, defaultsW, 20, compact == 1 ? LWLang.string("button.reset") : LWLang.string("button.defaults"),
                 mouseX, mouseY, rowEditable(), false, false);
         if (tab == 0 && canEdit)
             LivingWorldGuiStyle.drawButton(g, font, defaultsX + defaultsW + gap, footerY, 130, 20,
-                    "Reset NPC Data", mouseX, mouseY, true, false, false);
-        LivingWorldGuiStyle.drawButton(g, font, saveX, footerY, bw, 20, "Save", mouseX, mouseY,
+                    LWLang.string("button.reset_npc_data"), mouseX, mouseY, true, false, false);
+        LivingWorldGuiStyle.drawButton(g, font, saveX, footerY, bw, 20, LWLang.string("button.save"), mouseX, mouseY,
                 !serverTab() || canEdit, false, true);
-        LivingWorldGuiStyle.drawButton(g, font, backX, footerY, bw, 20, "Back", mouseX, mouseY, true, false, false);
+        LivingWorldGuiStyle.drawButton(g, font, backX, footerY, bw, 20, LWLang.string("button.back"), mouseX, mouseY, true, false, false);
         super.render(g, mouseX, mouseY, partialTick);
     }
 
@@ -252,12 +255,12 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         int x = panelLeft + 8;
         int y = panelTop + 43;
         int gap = 3;
-        int total = panelWidth - 16 - gap * (TAB_NAMES.length - 1);
-        int w = Math.max(18, total / TAB_NAMES.length);
-        for (int i=0;i<TAB_NAMES.length;i++) {
+        int total = panelWidth - 16 - gap * (TAB_KEYS.length - 1);
+        int w = Math.max(18, total / TAB_KEYS.length);
+        for (int i=0;i<TAB_KEYS.length;i++) {
             int tx = x + i * (w + gap);
             int logicalTab = TAB_ORDER[i];
-            LivingWorldGuiStyle.drawButton(g, font, tx, y, w, 20, TAB_NAMES[i], mouseX, mouseY, true, logicalTab == tab, false);
+            LivingWorldGuiStyle.drawButton(g, font, tx, y, w, 20, LWLang.string("screen.world_settings.tab." + TAB_KEYS[i]), mouseX, mouseY, true, logicalTab == tab, false);
         }
     }
 
@@ -314,139 +317,98 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     }
     private int valueColor(int row) {
         String v = rowValue(row);
-        if ("On".equals(v)) return LivingWorldGuiStyle.GREEN;
-        if ("Off".equals(v)) return LivingWorldGuiStyle.NEUTRAL;
+        if (LWLang.string("value.on").equals(v)) return LivingWorldGuiStyle.GREEN;
+        if (LWLang.string("value.off").equals(v)) return LivingWorldGuiStyle.NEUTRAL;
         return LivingWorldGuiStyle.TEXT;
     }
 
     private String rowName(int r) {
-        return switch (tab) {
-            case 0 -> switch (r) {
-                case 0 -> "Nearby fighters"; case 1 -> "Hostile fighters"; case 2 -> "Known people return";
-                case 3 -> "Known people nearby"; case 4 -> "Return distance"; case 5 -> "Faction members nearby";
-                case 6 -> "Faction activity"; case 7 -> "Chance encounters"; case 8 -> "History events";
-                case 9 -> "World alerts"; case 10 -> "Alert distance"; default -> "Earth Guardian response";
-            };
-            case 1 -> switch (r) { case 0 -> "Conversation"; case 1 -> "Conversation bond"; case 2 -> "Conversation limit";
-                case 3 -> "Cooldown minimum"; case 4 -> "Cooldown maximum"; default -> "NPC social life"; };
-            case 2 -> switch (r) { case 0 -> "Name size"; case 1 -> "Dialogue size"; case 2 -> "Name height";
-                case 3 -> "Attitude badge"; case 4 -> "Faction label"; case 5 -> "Floating dialogue";
-                case 6 -> "Name distance"; case 7 -> "Faction distance"; case 8 -> "Dialogue distance";
-                case 9 -> "NPC speech output"; case 10 -> "Chat speech radius"; case 11 -> "HUD scale"; default -> "Faction quest HUD scale"; };
-            case 3 -> switch (r) { case 0 -> "Meditation"; case 1 -> "TP rewards"; case 2 -> "TP reward scale";
-                case 3 -> "Reward interval"; case 4 -> "Calm TP"; case 5 -> "Focused TP"; case 6 -> "Centered TP";
-                case 7 -> "Deep TP"; case 8 -> "Transcendent TP"; case 9 -> "NPC meditation";
-                case 10 -> "Damage interrupts"; case 11 -> "Stat breakthroughs"; case 12 -> "Breakthrough chance";
-                case 13 -> "Breakthrough stat gain"; default -> "Form mastery"; };
-            case 4 -> switch (r) { case 0 -> "Focus HUD"; case 1 -> "Session summary";
-                case 2 -> "DMZ meditation animation"; case 3 -> "HUD top offset"; case 4 -> "Effect intensity";
-                case 5 -> "Focus Seal"; case 6 -> "Seal intensity"; case 7 -> "Seal size";
-                case 8 -> "NPC meditation FX"; default -> "Stage transition FX"; };
-            case 6 -> advancedName(r);
-            default -> switch (r) { case 0 -> "World activity"; case 1 -> "Power sensing"; case 2 -> "Companion saga help";
-                case 3 -> "NPC Ki block damage"; case 4 -> "NPC strength"; case 5 -> "NPC growth speed";
-                case 6 -> "NPC chat frequency"; case 7 -> "Attack Minecraft mobs"; default -> "Enable World Menaces"; };
-        };
+        if (tab == 6) return advancedName(r);
+        String group = switch (tab) { case 0 -> "world"; case 1 -> "relationships"; case 2 -> "display"; case 3 -> "meditation"; case 4 -> "meditation_visuals"; default -> "npc_behaviour"; };
+        return LWLang.string("screen.world_settings.row." + group + "." + r);
     }
 
     private String rowHelp(int r) {
-        return switch (tab) {
-            case 0 -> worldRowHelp(r);
-            case 1 -> switch (r) { case 0 -> "Allow direct conversations"; case 1 -> "Early bond gained from a good conversation";
-                case 2 -> "Talk alone cannot pass this relationship level"; case 3 -> "Shortest wait before Talk can deepen the bond again";
-                case 4 -> "Longest Talk cooldown"; default -> "NPCs can talk, bond and spend time together"; };
-            case 2 -> switch (r) { case 0 -> "Fighter name size"; case 1 -> "Floating speech size";
-                case 2 -> "Move names above other HUD elements"; case 3 -> "Show a small attitude badge";
-                case 4 -> "Show faction under names"; case 5 -> "Show nearby NPC speech";
-                case 6 -> "Maximum name range"; case 7 -> "Maximum faction-label range"; case 8 -> "Maximum floating-speech range";
-                case 9 -> "Off, chat only, or chat + floating overhead speech"; default -> "Maximum radius for chat-mirrored NPC speech"; };
-            case 3 -> switch (r) { case 0 -> "Enable meditation"; case 1 -> "Earn TP while meditating";
-                case 2 -> "Scale meditation TP rewards (100% = intended balance)"; case 3 -> "Seconds between meditation TP reward pulses";
-                case 4,5,6,7,8 -> "How strongly this meditation depth improves TP rewards"; case 9 -> "Living World fighters can meditate with you";
-                case 10 -> "Taking damage can break focus"; case 11 -> "Allow rare permanent base-stat gains";
-                case 12 -> "Chance for each breakthrough check"; case 13 -> "Percent of the selected base stat gained on a breakthrough";
-                default -> "Deep meditation can train the active form"; };
-            case 4 -> switch (r) { case 0 -> "Meditation progress HUD"; case 1 -> "Short post-session summary";
-                case 2 -> "Use Dragon Mine Z's meditation animation"; case 3 -> "HUD distance from screen top";
-                case 4 -> "Overall meditation effect strength"; case 5 -> "Seal beneath the character";
-                case 6 -> "Seal brightness"; case 7 -> "Seal radius"; case 8 -> "NPC and shared-meditation effects";
-                default -> "Small effect when meditation deepens"; };
-            case 6 -> r >= 11 ? "Effective budget share for this archetype attribute" : "Advanced Living World server option";
-            default -> npcBehaviorRowHelp(r);
-        };
+        if (tab == 0) return worldRowHelp(r);
+        if (tab == 5) return npcBehaviorRowHelp(r);
+        if (tab == 6) return LWLang.string(r >= 14
+                ? "screen.world_settings.help.advanced.share"
+                : "screen.world_settings.help.advanced." + r);
+        String group = switch (tab) { case 1 -> "relationships"; case 2 -> "display"; case 3 -> "meditation"; default -> "meditation_visuals"; };
+        int keyRow = tab == 3 && r >= 4 && r <= 8 ? 4 : r;
+        return LWLang.string("screen.world_settings.help." + group + "." + keyRow);
     }
 
     private String worldRowHelp(int r) {
         return switch (r) {
-            case 0 -> nearbyFighterCap + " active fighters max • Performance COST: " + (nearbyFighterCap >= 512 ? "EXTREME" : nearbyFighterCap >= 128 ? "VERY HIGH" : nearbyFighterCap >= 64 ? "HIGH" : nearbyFighterCap >= 30 ? "MODERATE" : "LOW");
-            case 1 -> nearbyHostileCap + " naturally hostile fighters max nearby";
-            case 2 -> recurringFighters ? "Known people can naturally return" : "Known people stay remembered but will not be specially returned";
-            case 3 -> "Prefer up to " + livingPresenceTargetBase + " known people nearby when appropriate";
-            case 4 -> livingPresenceRadius + " blocks: maximum natural return range";
-            case 5 -> factionResidentCap + " faction members nearby max • Performance COST: " + (factionResidentCap >= 20 ? "HIGH" : "MODERATE");
-            case 6 -> factionEncounters ? "Faction patrols and local presence are enabled" : "Optional faction activity is disabled";
-            case 7 -> dynamicEncounters ? "Duels, rescues and other chance encounters are enabled" : "Chance encounters are disabled";
-            case 8 -> worldIncidents ? "History and relationships can cause world incidents" : "History-driven incidents are disabled";
-            case 9 -> worldEventAlerts ? "Important nearby events can notify you" : "World-event alerts are hidden";
-            case 10 -> worldEventAlertRadius + " blocks: maximum alert range";
-            default -> earthGuardianResponsePercent == 100 ? "100%: established Earth Guardian response frequency" : earthGuardianResponsePercent + "%: scales eligible Earth Guardian response frequency";
+            case 0 -> LWLang.string("screen.world_settings.help.world.0", nearbyFighterCap, performanceCost(nearbyFighterCap));
+            case 1 -> LWLang.string("screen.world_settings.help.world.1", nearbyHostileCap);
+            case 2 -> LWLang.string(recurringFighters ? "screen.world_settings.help.world.2.on" : "screen.world_settings.help.world.2.off");
+            case 3 -> LWLang.string("screen.world_settings.help.world.3", livingPresenceTargetBase);
+            case 4 -> LWLang.string("screen.world_settings.help.world.4", livingPresenceRadius);
+            case 5 -> LWLang.string("screen.world_settings.help.world.5", factionResidentCap, performanceCost(factionResidentCap >= 20 ? 64 : 30));
+            case 6 -> LWLang.string(factionEncounters ? "screen.world_settings.help.world.6.on" : "screen.world_settings.help.world.6.off");
+            case 7 -> LWLang.string(dynamicEncounters ? "screen.world_settings.help.world.7.on" : "screen.world_settings.help.world.7.off");
+            case 8 -> LWLang.string(worldIncidents ? "screen.world_settings.help.world.8.on" : "screen.world_settings.help.world.8.off");
+            case 9 -> LWLang.string(worldEventAlerts ? "screen.world_settings.help.world.9.on" : "screen.world_settings.help.world.9.off");
+            case 10 -> LWLang.string("screen.world_settings.help.world.10", worldEventAlertRadius);
+            default -> LWLang.string(earthGuardianResponsePercent == 100 ? "screen.world_settings.help.world.11.normal" : "screen.world_settings.help.world.11.scaled", earthGuardianResponsePercent);
         };
+    }
+
+    private String performanceCost(int value) {
+        String level = value >= 512 ? "extreme" : value >= 128 ? "very_high" : value >= 64 ? "high" : value >= 30 ? "moderate" : "low";
+        return LWLang.string("screen.world_settings.performance." + level);
     }
 
     private String npcBehaviorRowHelp(int r) {
         return switch (r) {
             case 0 -> {
-                if (npcChaosPercent <= 0) yield "0%: ambient activity and optional fights are disabled";
-                if (npcChaosPercent < 50) yield npcChaosPercent + "%: a very quiet Living World";
-                if (npcChaosPercent < 100) yield npcChaosPercent + "%: less activity and fewer optional fights";
-                if (npcChaosPercent == 100) yield "100%: normal activity and fight frequency";
-                if (npcChaosPercent <= 200) yield npcChaosPercent + "%: more activity and optional fights";
-                yield npcChaosPercent + "%: a very busy, chaotic world";
+                String state = npcChaosPercent <= 0 ? "off" : npcChaosPercent < 50 ? "quiet" : npcChaosPercent < 100 ? "reduced" : npcChaosPercent == 100 ? "normal" : npcChaosPercent <= 200 ? "increased" : "chaotic";
+                yield LWLang.string("screen.world_settings.help.npc_behaviour.activity." + state, npcChaosPercent);
             }
-            case 1 -> automaticPowerSensing ? "Nearby power can trigger sensing notices" : "Automatic power-sensing notices are off";
-            case 2 -> companionSagaHelp ? "Companions can help in Dragon Mine Z saga fights" : "Companions leave saga fights to you";
-            case 3 -> switch (npcKiMode) {
-                case 3 -> "Protect player-built blocks from NPC Ki";
-                case 2 -> "NPC Ki cannot damage blocks";
-                case 1 -> "Protect all blocks from NPC Ki";
-                default -> "Use normal NPC Ki block damage";
-            };
-            case 4 -> npcStrengthPercent == 100 ? "100%: normal Living World fighter strength" : npcStrengthPercent + "%: world-era fighter baseline";
-            case 5 -> npcGrowthPercent == 0 ? "0%: earned fighter progression is frozen" : npcGrowthPercent == 100 ? "100%: normal earned progression" : npcGrowthPercent + "%: earned training, meditation, jogging and battle growth";
-            case 6 -> npcChatFrequencyPercent == 100 ? "100%: established autonomous NPC conversation cadence" : npcChatFrequencyPercent + "%: scales autonomous NPC chatter";
-            case 7 -> attackMinecraftMobs ? "LW fighters may engage Minecraft entities under normal combat rules" : "LW fighters leave Minecraft entities alone except registered companion defense and authored conflicts";
-            default -> worldMenacesEnabled ? "World Menaces and their related content are active" : "World Menaces, their activity, spawns and related faction content are disabled";
+            case 1 -> LWLang.string("screen.world_settings.help.npc_behaviour.sensing." + (automaticPowerSensing ? "on" : "off"));
+            case 2 -> LWLang.string("screen.world_settings.help.npc_behaviour.companion." + (companionSagaHelp ? "on" : "off"));
+            case 3 -> LWLang.string("screen.world_settings.help.npc_behaviour.ki." + npcKiMode);
+            case 4 -> LWLang.string(npcStrengthPercent == 100 ? "screen.world_settings.help.npc_behaviour.strength.normal" : "screen.world_settings.help.npc_behaviour.strength.scaled", npcStrengthPercent);
+            case 5 -> LWLang.string("screen.world_settings.help.npc_behaviour.growth." + (npcGrowthPercent == 0 ? "off" : npcGrowthPercent == 100 ? "normal" : "scaled"), npcGrowthPercent);
+            case 6 -> LWLang.string(npcChatFrequencyPercent == 100 ? "screen.world_settings.help.npc_behaviour.chat.normal" : "screen.world_settings.help.npc_behaviour.chat.scaled", npcChatFrequencyPercent);
+            case 7 -> LWLang.string("screen.world_settings.help.npc_behaviour.minecraft_mobs." + (attackMinecraftMobs ? "on" : "off"));
+            case 8 -> LWLang.string("screen.world_settings.help.npc_behaviour.menaces." + (worldMenacesEnabled ? "on" : "off"));
+            case 9 -> LWLang.string(wantedPressureDecayMinutes <= 0 ? "screen.world_settings.help.npc_behaviour.wanted.off" : "screen.world_settings.help.npc_behaviour.wanted.on");
+            default -> LWLang.string("screen.world_settings.help.npc_behaviour.creative." + (npcsEnabledOnCreativeMode ? "on" : "off"));
         };
     }
 
     private String rowValue(int r) {
         return switch (tab) {
             case 0 -> switch (r) { case 0 -> ""+nearbyFighterCap; case 1 -> ""+nearbyHostileCap;
-                case 2 -> onOff(recurringFighters); case 3 -> ""+livingPresenceTargetBase; case 4 -> livingPresenceRadius+" blocks";
+                case 2 -> onOff(recurringFighters); case 3 -> ""+livingPresenceTargetBase; case 4 -> blocks(livingPresenceRadius);
                 case 5 -> ""+factionResidentCap; case 6 -> onOff(factionEncounters); case 7 -> onOff(dynamicEncounters);
-                case 8 -> onOff(worldIncidents); case 9 -> onOff(worldEventAlerts); case 10 -> worldEventAlertRadius+" blocks";
+                case 8 -> onOff(worldIncidents); case 9 -> onOff(worldEventAlerts); case 10 -> blocks(worldEventAlertRadius);
                 default -> earthGuardianResponsePercent+"%"; };
             case 1 -> switch (r) { case 0 -> onOff(socialTalk); case 1 -> "+"+talkBaseGain; case 2 -> ""+talkRelationshipCap;
-                case 3 -> talkCooldownMinSeconds+"s"; case 4 -> talkCooldownMaxSeconds+"s"; default -> onOff(npcSocializing); };
+                case 3 -> seconds(talkCooldownMinSeconds); case 4 -> seconds(talkCooldownMaxSeconds); default -> onOff(npcSocializing); };
             case 2 -> switch (r) { case 0 -> pct(nameScale); case 1 -> pct(dialogueScale); case 2 -> String.format(java.util.Locale.ROOT,"%.2f",verticalOffset);
                 case 3 -> onOff(dispositionIcon); case 4 -> onOff(factionLabel); case 5 -> onOff(dialogueVisible);
-                case 6 -> nameplateDistance+" blocks"; case 7 -> factionLabelDistance+" blocks"; case 8 -> dialogueDistance+" blocks";
-                case 9 -> chatSpeechMode(); case 10 -> speechChatRadius+" blocks";
+                case 6 -> blocks(nameplateDistance); case 7 -> blocks(factionLabelDistance); case 8 -> blocks(dialogueDistance);
+                case 9 -> chatSpeechMode(); case 10 -> blocks(speechChatRadius);
                 case 11 -> pct(hudScale); default -> pct(factionQuestHudScale); };
             case 3 -> switch (r) { case 0 -> onOff(medEnabled); case 1 -> onOff(medTpRewards); case 2 -> medTpScale+"%";
-                case 3 -> medRewardInterval+"s"; case 4 -> "x"+medCalmMultiplier; case 5 -> "x"+medFocusedMultiplier;
+                case 3 -> seconds(medRewardInterval); case 4 -> "x"+medCalmMultiplier; case 5 -> "x"+medFocusedMultiplier;
                 case 6 -> "x"+medCenteredMultiplier; case 7 -> "x"+medDeepMultiplier; case 8 -> "x"+medTranscendentMultiplier;
                 case 9 -> onOff(medNpc); case 10 -> onOff(medDamageInterrupts); case 11 -> onOff(medBreakthroughs);
                 case 12 -> formatNumber(medBreakthroughChance,2)+"%"; case 13 -> medBreakthroughPoints+"%";
                 default -> onOff(medFormMastery); };
             case 4 -> switch (r) { case 0 -> onOff(medHud); case 1 -> onOff(medSummary);
-                case 2 -> onOff(medNativeAnimation); case 3 -> medHudOffset+" px"; case 4 -> medAuraIntensity+"%";
+                case 2 -> onOff(medNativeAnimation); case 3 -> LWLang.string("value.pixels", medHudOffset); case 4 -> medAuraIntensity+"%";
                 case 5 -> onOff(medFocusSeal); case 6 -> medSealIntensity+"%"; case 7 -> medSealSize+"%";
                 case 8 -> onOff(medNpcFx); default -> onOff(medStageFx); };
             case 6 -> advancedValue(r);
             default -> switch (r) { case 0 -> npcChaosPercent+"%"; case 1 -> onOff(automaticPowerSensing);
                 case 2 -> onOff(companionSagaHelp); case 3 -> kiModeLabel(); case 4 -> npcStrengthPercent+"%";
-                case 5 -> npcGrowthPercent+"%"; case 6 -> npcChatFrequencyPercent+"%"; case 7 -> onOff(attackMinecraftMobs); default -> onOff(worldMenacesEnabled); };
+                case 5 -> npcGrowthPercent+"%"; case 6 -> npcChatFrequencyPercent+"%"; case 7 -> onOff(attackMinecraftMobs); case 8 -> onOff(worldMenacesEnabled);
+                case 9 -> LWLang.string("value.minutes", wantedPressureDecayMinutes); default -> onOff(npcsEnabledOnCreativeMode); };
         };
     }
 
@@ -459,8 +421,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         }
         // Booleans always have one useful direction; numeric bounds are clamped by changeValue.
         String v = rowValue(r);
-        if ("On".equals(v)) return d < 0;
-        if ("Off".equals(v)) return d > 0;
+        if (LWLang.string("value.on").equals(v)) return d < 0;
+        if (LWLang.string("value.off").equals(v)) return d > 0;
         return true;
     }
 
@@ -523,6 +485,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 6 -> npcChatFrequencyPercent=clamp(npcChatFrequencyPercent+stepSign*5,0,500);
                 case 7 -> attackMinecraftMobs=stepSign>0;
                 case 8 -> worldMenacesEnabled=stepSign>0;
+                case 9 -> wantedPressureDecayMinutes=clamp(wantedPressureDecayMinutes+stepSign*5,0,10080);
+                case 10 -> npcsEnabledOnCreativeMode=stepSign>0;
                 default -> {}
             } }
             case 6 -> changeAdvanced(r, stepSign);
@@ -537,8 +501,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         }
         commitNumericEditor();
         if (inside(mouseX,mouseY,panelLeft+panelWidth-35,panelTop+8,24,20)) { back(); return true; }
-        int tx=panelLeft+8, ty=panelTop+43, gap=3, total=panelWidth-16-gap*(TAB_NAMES.length-1), tw=Math.max(18,total/TAB_NAMES.length);
-        for (int i=0;i<TAB_NAMES.length;i++) if (inside(mouseX,mouseY,tx+i*(tw+gap),ty,tw,20)) { tab=TAB_ORDER[i]; scroll=0; clampScroll(); return true; }
+        int tx=panelLeft+8, ty=panelTop+43, gap=3, total=panelWidth-16-gap*(TAB_KEYS.length-1), tw=Math.max(18,total/TAB_KEYS.length);
+        for (int i=0;i<TAB_KEYS.length;i++) if (inside(mouseX,mouseY,tx+i*(tw+gap),ty,tw,20)) { tab=TAB_ORDER[i]; scroll=0; clampScroll(); return true; }
         int left=panelLeft+12,right=panelLeft+panelWidth-12;
         int controlW=Math.min(200,Math.max(108,(right-left)/3)), arrow=Math.min(26,Math.max(20,controlW/5)), gutter=4;
         int controlX=right-controlW-5, valueX=controlX+arrow+gutter, valueW=Math.max(28,controlW-arrow*2-gutter*2), rx=valueX+valueW+gutter;
@@ -613,7 +577,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 12 -> medBreakthroughChance; default -> medBreakthroughPoints; };
             case 4 -> switch (row) { case 3 -> medHudOffset; case 4 -> medAuraIntensity; case 6 -> medSealIntensity; default -> medSealSize; };
             case 6 -> row == 5 ? npcPowerMultiplier * 100.0D : advancedNumericValue(row);
-            default -> switch (row) { case 0 -> npcChaosPercent; case 4 -> npcStrengthPercent; case 5 -> npcGrowthPercent; default -> npcChatFrequencyPercent; };
+            default -> switch (row) { case 0 -> npcChaosPercent; case 4 -> npcStrengthPercent; case 5 -> npcGrowthPercent; case 9 -> wantedPressureDecayMinutes; default -> npcChatFrequencyPercent; };
         };
     }
 
@@ -638,8 +602,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 3 -> switch (row) { case 2 -> 5000.0D; case 3 -> 120.0D; case 4,5,6,7,8 -> 100.0D;
                 case 12 -> 100.0D; default -> 100.0D; };
             case 4 -> switch (row) { case 3 -> 240.0D; case 4 -> 250.0D; case 6 -> 200.0D; default -> 160.0D; };
-            case 6 -> row == 0 || row == 1 ? 4096D : row == 2 ? 1000D : row == 3 ? .99D : row == 4 ? 1_000_000D : row == 5 ? 1000D : 10D;
-            default -> switch (row) { case 0,4,5 -> 1000.0D; case 6 -> 500.0D; default -> 1000.0D; };
+            case 6 -> row == 0 || row == 1 ? 4096D : row == 2 ? 1000D : row == 3 ? .99D : row == 4 ? 1_000_000D : row == 5 ? 1000D : row == 13 ? 100D : row == 14 ? 10000D : 10D;
+            default -> switch (row) { case 0,4,5 -> 1000.0D; case 6 -> 500.0D; case 9 -> 10080.0D; default -> 1000.0D; };
         };
     }
 
@@ -703,6 +667,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 4 -> npcStrengthPercent=clamp((int)Math.round(raw/5.0D)*5,25,1000);
                 case 5 -> npcGrowthPercent=clamp((int)Math.round(raw/5.0D)*5,0,1000);
                 case 6 -> npcChatFrequencyPercent=clamp((int)Math.round(raw/5.0D)*5,0,500);
+                case 9 -> wantedPressureDecayMinutes=clamp((int)Math.round(raw/5.0D)*5,0,10080);
                 default -> {}
             } }
             case 6 -> setAdvancedNumeric(row, row == 5 ? raw / 100.0D : raw);
@@ -717,9 +682,9 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
 
     private String chatSpeechMode() {
         return switch (speechModeIndex()) {
-            case 1 -> "Chat only";
-            case 2 -> "Chat + overhead";
-            default -> "Off";
+            case 1 -> LWLang.string("value.speech.chat_only");
+            case 2 -> LWLang.string("value.speech.chat_overhead");
+            default -> LWLang.string("value.off");
         };
     }
 
@@ -771,7 +736,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             default -> { return; }
         }
         dirty = true;
-        setStatus("Defaults loaded for this tab — press Save", 2400L);
+        setStatus(LWLang.string("screen.world_settings.defaults_loaded"), 2400L);
     }
 
     private void resetWorldTabDefaults() {
@@ -810,12 +775,13 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         npcGrowthPercent = d.npcGrowthPercent();
         npcChatFrequencyPercent = d.npcChatFrequencyPercent();
         attackMinecraftMobs = d.attackMinecraftMobs();
-        worldMenacesEnabled = d.worldMenacesEnabled();
+        worldMenacesEnabled = d.worldMenacesEnabled(); wantedPressureDecayMinutes=d.wantedPressureDecayMinutes();
+        npcsEnabledOnCreativeMode = d.npcsEnabledOnCreativeMode();
     }
 
     private void resetAdvancedDefaults() {
         LivingWorldConfig.Snapshot d=LivingWorldConfig.defaults();
-        maxRememberedDeadFighters=d.maxRememberedDeadFighters(); npcDespawnProtectionRadius=d.npcDespawnProtectionRadius();
+        maxRememberedDeadFighters=d.maxRememberedDeadFighters(); npcDespawnProtectionRadius=d.npcDespawnProtectionRadius(); npcCombatLives=d.npcCombatLives();
         levelMultiplierPerSaga=d.levelMultiplierPerSaga(); maxDefenseMitigation=d.maxDefenseMitigation(); bpVisualMultiplier=d.bpVisualMultiplier();
         canMeditationProcSkillProgression=d.canMeditationProcSkillProgression(); npcRaceBlacklist=String.join(",",d.npcRaceBlacklist());
         treatRaceBlacklistAsWhitelist=d.treatRaceBlacklistAsWhitelist(); canUseClothes=String.join(",",d.canUseClothes());
@@ -864,10 +830,10 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         if (canEdit) {
             savePending=true;
             LWNetwork.updateWorldSettings(worldSnapshot(), meditationSnapshot());
-            setStatus("Saving world/server + client settings…",2200L);
+            setStatus(LWLang.string("screen.world_settings.saving_all"),2200L);
         } else {
             dirty = false;
-            setStatus("Client settings saved. Server settings are view only.",2800L);
+            setStatus(LWLang.string("screen.world_settings.client_saved"),2800L);
         }
     }
 
@@ -878,7 +844,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 2 -> row == 0 || row == 1 || row == 2 || row == 6 || row == 7 || row == 8 || row == 10 || row == 11 || row == 12;
             case 3 -> row == 2 || row == 3 || (row >= 4 && row <= 8) || row == 12 || row == 13;
             case 4 -> row == 3 || row == 4 || row == 6 || row == 7;
-            case 5 -> row == 0 || row == 4 || row == 5 || row == 6;
+            case 5 -> row == 0 || row == 4 || row == 5 || row == 6 || row == 9;
             // Advanced NPC: rows 6, 8 and 11 are boolean toggles.  Row 5 is
             // the NPC power multiplier and must remain a numeric slider.
             case 6 -> row != 6 && row != 8 && row != 11;
@@ -941,6 +907,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 4 -> Integer.toString(npcStrengthPercent);
                 case 5 -> Integer.toString(npcGrowthPercent);
                 case 6 -> Integer.toString(npcChatFrequencyPercent);
+                case 9 -> Integer.toString(wantedPressureDecayMinutes);
                 default -> "";
             };
             case 6 -> advancedRawValue(row);
@@ -1007,7 +974,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             }
             markDirty();
         } catch (NumberFormatException ignored) {
-            setStatus("Invalid number — previous value kept", 1800L);
+            setStatus(LWLang.string("screen.world_settings.invalid_number"), 1800L);
         }
     }
 
@@ -1046,6 +1013,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 4 -> npcStrengthPercent = clamp(value, 25, 1000);
             case 5 -> npcGrowthPercent = clamp(value, 0, 1000);
             case 6 -> npcChatFrequencyPercent = clamp(value, 0, 500);
+            case 9 -> wantedPressureDecayMinutes = clamp(value, 0, 10080);
             default -> throw new NumberFormatException("not numeric");
         }
     }
@@ -1098,30 +1066,28 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         return java.util.Arrays.stream(text.split(",")).map(String::trim).filter(s->!s.isBlank()).toList();
     }
     private String advancedName(int r){
-        if(r<13)return switch(r){case 0->"Remembered dead fighters";case 1->"NPC despawn protection";case 2->"Saga level multiplier";
-            case 3->"Maximum defense mitigation";case 4->"Visual BP multiplier";case 5->"NPC Power Multiplier";case 6->"Meditation skill discovery";
-            case 7->"NPC race blacklist";case 8->"Race list is whitelist";case 9->"Races that use clothes";
-            case 10->"Spawn dimensions";case 11->"Dimension list is blacklist";default->"Companion dimension blacklist";};
-        String[] archetypes={"Brawler","Martial Artist","Speed Fighter","Guardian","Ki Specialist"};
-        String[] stats={"Melee","Defense","Ki","Health"}; int i=r-13; return archetypes[i/4]+" "+stats[i%4]+" share";
+        if(r<15)return LWLang.string("screen.world_settings.row.advanced." + r);
+        int i=r-15;
+        return LWLang.string("screen.world_settings.row.advanced.share",
+                LWLang.string("archetype." + (i / 4)), LWLang.string("stat." + (i % 4)));
     }
     private String advancedValue(int r){
-        if(r>=13)return pct(archetypeShares[r-13]);
-        return switch(r){case 0->Integer.toString(maxRememberedDeadFighters);case 1->npcDespawnProtectionRadius+" blocks";
+        if(r>=15)return pct(archetypeShares[r-15]);
+        return switch(r){case 0->Integer.toString(maxRememberedDeadFighters);case 1->blocks(npcDespawnProtectionRadius);
             case 2->"x"+formatNumber(levelMultiplierPerSaga,2);case 3->pct(maxDefenseMitigation);case 4->"x"+formatNumber(bpVisualMultiplier,2);
-            case 5->pct(npcPowerMultiplier);case 6->onOff(canMeditationProcSkillProgression);case 7->npcRaceBlacklist.isBlank()?"(empty)":npcRaceBlacklist;
+            case 5->pct(npcPowerMultiplier);case 6->onOff(canMeditationProcSkillProgression);case 7->npcRaceBlacklist.isBlank()?LWLang.string("value.empty"):npcRaceBlacklist;
             case 8->onOff(treatRaceBlacklistAsWhitelist);case 9->canUseClothes;case 10->dimensionWhitelist;
-            case 11->onOff(treatDimensionWhitelistAsBlacklist);default->companionDimensionBlacklist;};
+            case 11->onOff(treatDimensionWhitelistAsBlacklist);case 12->companionDimensionBlacklist;case 13->Integer.toString(npcCombatLives);default->Integer.toString(racialSkillMinimumEra);};
     }
     private String advancedRawValue(int r){if(isTextRow(6,r))return r==7?npcRaceBlacklist:r==9?canUseClothes:r==10?dimensionWhitelist:companionDimensionBlacklist;
         return formatNumber(r == 5 ? npcPowerMultiplier * 100.0D : advancedNumericValue(r),4);}
-    private double advancedNumericValue(int r){if(r>=13)return archetypeShares[r-13];return switch(r){case 0->maxRememberedDeadFighters;
-        case 1->npcDespawnProtectionRadius;case 2->levelMultiplierPerSaga;case 3->maxDefenseMitigation;case 4->bpVisualMultiplier;case 5->npcPowerMultiplier;default->0D;};}
+    private double advancedNumericValue(int r){if(r>=15)return archetypeShares[r-15];return switch(r){case 0->maxRememberedDeadFighters;
+        case 1->npcDespawnProtectionRadius;case 2->levelMultiplierPerSaga;case 3->maxDefenseMitigation;case 4->bpVisualMultiplier;case 5->npcPowerMultiplier;case 13->npcCombatLives;case 14->racialSkillMinimumEra;default->0D;};}
     private void changeAdvanced(int r,int d){if(r==6)canMeditationProcSkillProgression=d>0;else if(r==8)treatRaceBlacklistAsWhitelist=d>0;
-        else if(r==11)treatDimensionWhitelistAsBlacklist=d>0;else if(!isTextRow(6,r))setAdvancedNumeric(r,advancedNumericValue(r)+d*(r>=13?.01D:r==3?.01D:r==2?.1D:r==5?.01D:1D));}
-    private void setAdvancedNumeric(int r,double v){if(r>=13)archetypeShares[r-13]=clamp(v,0D,10D);else switch(r){case 0->maxRememberedDeadFighters=clamp((int)Math.round(v),0,4096);
+        else if(r==11)treatDimensionWhitelistAsBlacklist=d>0;else if(!isTextRow(6,r))setAdvancedNumeric(r,advancedNumericValue(r)+d*(r>=15?.01D:r==3?.01D:r==2?.1D:r==5?.01D:1D));}
+    private void setAdvancedNumeric(int r,double v){if(r>=15)archetypeShares[r-15]=clamp(v,0D,10D);else switch(r){case 0->maxRememberedDeadFighters=clamp((int)Math.round(v),0,4096);
         case 1->npcDespawnProtectionRadius=clamp((int)Math.round(v),96,4096);case 2->levelMultiplierPerSaga=clamp(v,.1D,1000D);
-        case 3->maxDefenseMitigation=clamp(v,0D,.99D);case 4->bpVisualMultiplier=clamp(v,0D,1_000_000D);case 5->npcPowerMultiplier=clamp(v,0D,1_000_000D);default->{}}}
+        case 3->maxDefenseMitigation=clamp(v,0D,.99D);case 4->bpVisualMultiplier=clamp(v,0D,1_000_000D);case 5->npcPowerMultiplier=clamp(v,0D,1_000_000D);case 13->npcCombatLives=clamp((int)Math.round(v),1,100);case 14->racialSkillMinimumEra=clamp((int)Math.round(v),0,10000);default->{}}}
     private void commitAdvanced(int r,String raw){if(r==7)npcRaceBlacklist=raw;else if(r==9)canUseClothes=raw;else if(r==10)dimensionWhitelist=raw;else if(r==12)companionDimensionBlacklist=raw;
         else setAdvancedNumeric(r,r == 5 ? Double.parseDouble(raw) / 100.0D : Double.parseDouble(raw));}
 
@@ -1146,19 +1112,16 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     private void setStatus(String s,long ms){status=s;statusUntil=Util.getMillis()+ms;}
     private void markDirty(){ dirty=true; status=""; statusUntil=0L; }
     private int settingsBodyBottom(){ return footerY - 30; }
-    private String tabContextLine(){ return switch(tab){
-        case 0 -> "World • population, presence, incidents and faction response • sliders also support exact typing";
-        case 1 -> "Relationships • conversations and bonds • sliders also support exact typing";
-        case 2 -> "Display • local readability • sliders also support exact typing";
-        case 3 -> "Meditation • progression • sliders also support exact typing";
-        case 4 -> "Meditation visuals • local effects • sliders also support exact typing";
-        case 6 -> "Advanced NPC • data limits, scaling, race lists and archetype shares";
-        default -> "NPC Behaviour • activity, sensing and combat policy • sliders also support exact typing";
-    };}
-    private String activityLabel(){return switch(activityPreset){case 0->"Off";case 1->"Low";case 3->"High";default->"Normal";};}
-    private String kiModeLabel(){return switch(npcKiMode){case 0->"Normal";case 3->"Player Blocks";case 2->"Ki Off";default->"Player + World";};}
+    private String tabContextLine(){
+        String key = switch(tab){case 0->"world";case 1->"relationships";case 2->"display";case 3->"meditation";case 4->"meditation_visuals";case 6->"advanced_npc";default->"npc_behaviour";};
+        return LWLang.string("screen.world_settings.context." + key);
+    }
+    private String activityLabel(){return LWLang.string("value.activity." + switch(activityPreset){case 0->"off";case 1->"low";case 3->"high";default->"normal";});}
+    private String kiModeLabel(){return LWLang.string("value.ki_mode." + switch(npcKiMode){case 0->"normal";case 3->"player_blocks";case 2->"off";default->"player_world";});}
     private int kiModeIndex(){for(int i=0;i<KI_MODE_ORDER.length;i++)if(KI_MODE_ORDER[i]==npcKiMode)return i;return 2;}
-    private static String onOff(boolean v){return v?"On":"Off";}
+    private static String onOff(boolean v){return LWLang.string(v ? "value.on" : "value.off");}
+    private static String blocks(int value){return LWLang.string("value.blocks", value);}
+    private static String seconds(int value){return LWLang.string("value.seconds_short", value);}
     private static String pct(double v){return formatNumber(v*100.0D,2)+"%";}
     private static int step(int[] values,int current,int dir){int best=current;if(dir>0){for(int v:values)if(v>current){best=v;break;}}else{for(int v:values)if(v<current)best=v;}return best;}
     private static int clamp(int v,int a,int b){return Math.max(a,Math.min(b,v));}

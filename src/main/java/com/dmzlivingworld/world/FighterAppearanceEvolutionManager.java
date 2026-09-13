@@ -71,7 +71,7 @@ public final class FighterAppearanceEvolutionManager {
             fighter.setHairIdForLivingWorld(next);
             fighter.recordLegacyEvent("Changed hairstyle");
             ReactiveWorldManager.rememberEvent(fighter, "APPEARANCE", fighter.getFighterName(), "changed hairstyle");
-            if (debug) fighter.speak("Trying something different with my hair.", 78);
+        if (debug) fighter.speakKey("dialogue.appearance.hair_changed", 78);
         } else {
             int variants = switch (race) {
                 case HUMAN, SAIYAN -> 22;
@@ -86,7 +86,7 @@ public final class FighterAppearanceEvolutionManager {
             fighter.setOutfitForLivingWorld(next);
             fighter.recordLegacyEvent("Changed outfit");
             ReactiveWorldManager.rememberEvent(fighter, "APPEARANCE", fighter.getFighterName(), "changed outfit");
-            if (debug) fighter.speak("Felt like changing the outfit for once.", 78);
+        if (debug) fighter.speakKey("dialogue.appearance.outfit_changed", 78);
         }
         FighterMemoryManager.refreshLoadedProfile(fighter);
         return true;
@@ -102,10 +102,10 @@ public final class FighterAppearanceEvolutionManager {
                     com.dmzlivingworld.entity.FighterRank.TRAINED, true);
         }
         if (fighter != null && change(fighter, true)) {
-            player.displayClientMessage(Component.literal("[Living World] Forced a valid persistent appearance change on " + fighter.getFighterName() + "."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.debug.appearance_changed", fighter.getFighterName()), false);
             return 1;
         }
-        player.displayClientMessage(Component.literal("[Living World] No nearby fighter had an applicable cosmetic change."), false);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.debug.no_appearance_change"), false);
         return 0;
     }
 }

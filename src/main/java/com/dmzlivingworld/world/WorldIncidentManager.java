@@ -2,6 +2,7 @@ package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.compat.MeditationCompat;
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
@@ -129,7 +130,9 @@ public final class WorldIncidentManager {
         b.startDuel(a);
         active = new ActiveIncident(type, a.getUUID(), b.getUUID(), a.getFighterName(), b.getFighterName(),
                 host.getServer().overworld().getGameTime());
-        String line = type + ": " + a.getFighterName() + " vs " + b.getFighterName();
+        String incidentKey = type.toLowerCase(java.util.Locale.ROOT).replace(' ', '_');
+        String line = LWLang.speechKey("message.incident.v2.type." + incidentKey,
+                type + ": %s vs %s", a.getFighterName(), b.getFighterName());
         data.record(line);
         announce(host, a.blockPosition(), line);
         return true;
@@ -158,7 +161,9 @@ public final class WorldIncidentManager {
         if (winner == null) return;
 
         WorldIncidentData data = WorldIncidentData.get(server.overworld());
-        String line = incident.type + " resolved: " + winner.getFighterName() + " defeated " + loser.getFighterName();
+        String incidentKey = incident.type.toLowerCase(java.util.Locale.ROOT).replace(' ', '_');
+        String line = LWLang.speechKey("message.incident.v2.resolved." + incidentKey,
+                incident.type + " resolved: %s defeated %s", winner.getFighterName(), loser.getFighterName());
         data.record(line);
         winner.recordLegacyEvent("Won " + incident.type.toLowerCase() + " against " + loser.getFighterName());
         FighterGoalManager.focusOnRival(loser, winner.getFighterName());
@@ -182,7 +187,8 @@ public final class WorldIncidentManager {
     }
 
     private static void announce(ServerPlayer host, net.minecraft.core.BlockPos pos, String line) {
-        WorldEventNotifier.announce(host.serverLevel(), pos, "WORLD INCIDENT", line);
+        WorldEventNotifier.announce(host.serverLevel(), pos,
+                LWLang.speechKey("message.incident.world_incident", "WORLD INCIDENT"), line);
     }
 
     @SubscribeEvent
@@ -197,16 +203,17 @@ public final class WorldIncidentManager {
     private static int status(ServerPlayer player) {
         WorldIncidentData data = WorldIncidentData.get(player.serverLevel());
         long now = player.getServer().overworld().getGameTime();
-        String state = active == null ? "idle" : active.type + ": " + active.firstName + " / " + active.secondName;
-        player.displayClientMessage(Component.literal("[Living World] Incidents " + state + " • next window in ~"
-                + Math.max(1L, Math.max(0L, data.nextIncidentAt() - now) / 24_000L) + " MC day(s)."), false);
+        Component state = active == null ? Component.translatable("dmzlivingworld.message.incident.idle")
+                : Component.translatable("dmzlivingworld.message.incident.active", active.type, active.firstName, active.secondName);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.incident.status", state,
+                Math.max(1L, Math.max(0L, data.nextIncidentAt() - now) / 24_000L)), false);
         return Command.SINGLE_SUCCESS;
     }
 
     private static int history(ServerPlayer player) {
-        player.displayClientMessage(Component.literal("[Living World] Recent world incidents").withStyle(ChatFormatting.GOLD), false);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.incident.history").withStyle(ChatFormatting.GOLD), false);
         for (String line : WorldIncidentData.get(player.serverLevel()).recent(8))
-            player.displayClientMessage(Component.literal("• " + line).withStyle(ChatFormatting.GRAY), false);
+            player.displayClientMessage(Component.literal("• ").append(LWLang.speechEmbedded(line)).withStyle(ChatFormatting.GRAY), false);
         return Command.SINGLE_SUCCESS;
     }
 

@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterPersonality;
 import net.minecraft.core.BlockPos;
@@ -150,7 +151,7 @@ public final class ReactiveInteractionManager {
                     "the player ignored repeated requests for distance");
             FighterMemoryManager.strengthenRelationship(nearest, fighter, -2,
                     FighterRelationshipManager.BondEvent.GENERIC, "Ignored their request for space");
-            if (fighter.getSpeech().isEmpty()) fighter.speak("I told you to back off!", 82);
+            if (fighter.getSpeech().isEmpty()) fighter.speakKey("dialogue.reactive.boundary_ignored", 82);
         } else {
             boolean flew = fighter.beginReactiveEscapeFrom(nearest);
             if (!flew) moveAwayOnGround(fighter, nearest, level);
@@ -181,8 +182,8 @@ public final class ReactiveInteractionManager {
             ReactiveWorldManager.rememberEvent(fighter, "TALK_SPAM", player.getGameProfile().getName(), "kept trying to talk without giving space");
             if (fighter.level() instanceof ServerLevel level) moveAwayOnGround(fighter, player, level);
             return spam >= 5
-                    ? pick(fighter, "I heard you. Stop asking.", "Enough. I don't want to talk.", "You're making me want to leave. Give it a rest.", "No. Repeating yourself isn't changing my answer.")
-                    : pick(fighter, "You just asked me. Give me a second.", "Seriously? Let me breathe for a minute.", "I don't have a different answer because you asked again.", "Give me some space before you try that again.");
+                    ? pick(fighter, "talk_spam.hard", "I heard you. Stop asking.", "Enough. I don't want to talk.", "You're making me want to leave. Give it a rest.", "No. Repeating yourself isn't changing my answer.")
+                    : pick(fighter, "talk_spam.soft", "You just asked me. Give me a second.", "Seriously? Let me breathe for a minute.", "I don't have a different answer because you asked again.", "Give me some space before you try that again.");
         }
         int strength = ReactiveWorldManager.moodStrength(fighter);
         if (strength < 66) return null;
@@ -200,16 +201,16 @@ public final class ReactiveInteractionManager {
         if (fighter.getRandom().nextFloat() >= chance) return null;
         return switch (mood) {
             case IRRITATED -> relationship >= 60
-                    ? pick(fighter, "Not right now. I'm wound up and I don't want to take it out on you.", "I like you. That's exactly why I need a minute before we talk.", "Give me a little time to cool down first.")
-                    : pick(fighter, "I said I need space. I don't want to talk.", "Not now. I'm already irritated.", "Please don't push me into a conversation right now.", "I need distance, not small talk.");
+                    ? pick(fighter, "talk.irritated.friend", "Not right now. I'm wound up and I don't want to take it out on you.", "I like you. That's exactly why I need a minute before we talk.", "Give me a little time to cool down first.")
+                    : pick(fighter, "talk.irritated.normal", "I said I need space. I don't want to talk.", "Not now. I'm already irritated.", "Please don't push me into a conversation right now.", "I need distance, not small talk.");
             case SOMBER -> relationship >= 60
-                    ? pick(fighter, "Can we just sit with the quiet for a bit? I don't have much to say.", "I'm glad you're here. I just don't have the words right now.", "Maybe later. Quiet is easier at the moment.")
-                    : pick(fighter, "Sorry. I really don't want to talk right now.", "I want to be alone for a bit.", "Not today. I don't have much in me for conversation.");
-            case WEARY -> pick(fighter, "I'm exhausted. Give me a little time before we talk.", "Can this wait? I'm running on fumes.", "I need to recover before I can be good company.", "Give me a minute. Even talking feels like work right now.");
+                    ? pick(fighter, "talk.somber.friend", "Can we just sit with the quiet for a bit? I don't have much to say.", "I'm glad you're here. I just don't have the words right now.", "Maybe later. Quiet is easier at the moment.")
+                    : pick(fighter, "talk.somber.normal", "Sorry. I really don't want to talk right now.", "I want to be alone for a bit.", "Not today. I don't have much in me for conversation.");
+            case WEARY -> pick(fighter, "talk.weary", "I'm exhausted. Give me a little time before we talk.", "Can this wait? I'm running on fumes.", "I need to recover before I can be good company.", "Give me a minute. Even talking feels like work right now.");
             case WARY -> relationship >= 45
-                    ? pick(fighter, "Give me a minute. I'm trying to listen to what's around us.", "Stay nearby if you want, but let me focus on the area.", "Something has my attention. We'll talk after I settle.")
-                    : pick(fighter, "Not now. I'm keeping my attention on the area.", "Don't distract me. I'm watching what's around us.", "Later. Something feels off and I'm not ignoring it.");
-            case FOCUSED -> pick(fighter, "Later. I'm trying not to break my focus.", "Give me a little longer. I'm in the middle of something mentally.", "Not yet. I finally have my thoughts lined up.");
+                    ? pick(fighter, "talk.wary.friend", "Give me a minute. I'm trying to listen to what's around us.", "Stay nearby if you want, but let me focus on the area.", "Something has my attention. We'll talk after I settle.")
+                    : pick(fighter, "talk.wary.normal", "Not now. I'm keeping my attention on the area.", "Don't distract me. I'm watching what's around us.", "Later. Something feels off and I'm not ignoring it.");
+            case FOCUSED -> pick(fighter, "talk.focused", "Later. I'm trying not to break my focus.", "Give me a little longer. I'm in the middle of something mentally.", "Not yet. I finally have my thoughts lined up.");
             case UPBEAT, CONTENT -> null;
         };
     }
@@ -249,31 +250,31 @@ public final class ReactiveInteractionManager {
             else if (relationship >= 60) chance *= 0.65F;
             if (fighter.getRandom().nextFloat() >= chance) return null;
             return switch (mood) {
-                case IRRITATED -> "Not this time. I need a little space first.";
-                case WARY -> "Not right now. I want to keep my senses on the area.";
-                case WEARY -> "Maybe later. I need to rest on my own for a bit.";
-                case SOMBER -> "I'd rather have the quiet to myself this time.";
-                case FOCUSED -> "Not yet. I want to finish this focus alone.";
-                case UPBEAT, CONTENT -> "Maybe another time. I want a solo session right now.";
+                case IRRITATED -> refusal("action.meditate.irritated", "Not this time. I need a little space first.");
+                case WARY -> refusal("action.meditate.wary", "Not right now. I want to keep my senses on the area.");
+                case WEARY -> refusal("action.meditate.weary", "Maybe later. I need to rest on my own for a bit.");
+                case SOMBER -> refusal("action.meditate.somber", "I'd rather have the quiet to myself this time.");
+                case FOCUSED -> refusal("action.meditate.focused", "Not yet. I want to finish this focus alone.");
+                case UPBEAT, CONTENT -> refusal("action.meditate.solo", "Maybe another time. I want a solo session right now.");
             };
         }
 
         if (strength < 68) return null;
         if ("fusion".equals(key)) {
             return switch (mood) {
-                case WEARY -> strength >= 72 ? "I'm too drained to fuse safely right now." : null;
-                case SOMBER -> strength >= 78 ? "No. My head isn't in the right place for that." : null;
-                case IRRITATED -> strength >= 76 ? "Absolutely not while I'm this wound up." : null;
-                case WARY -> strength >= 84 && !close ? "Not until I trust what's happening around us." : null;
+                case WEARY -> strength >= 72 ? refusal("action.fusion.weary", "I'm too drained to fuse safely right now.") : null;
+                case SOMBER -> strength >= 78 ? refusal("action.fusion.somber", "No. My head isn't in the right place for that.") : null;
+                case IRRITATED -> strength >= 76 ? refusal("action.fusion.irritated", "Absolutely not while I'm this wound up.") : null;
+                case WARY -> strength >= 84 && !close ? refusal("action.fusion.wary", "Not until I trust what's happening around us.") : null;
                 default -> null;
             };
         }
         if ("join".equals(key) || "companion".equals(key)) {
             return switch (mood) {
-                case IRRITATED -> strength >= 74 && !close ? "I'm trying to get away from people right now, not travel with them." : null;
-                case SOMBER -> strength >= 76 && !close ? "I need some time on my own before I commit to anything." : null;
-                case WEARY -> strength >= 82 && !close ? "I need to recover before I start going anywhere with someone." : null;
-                case WARY -> strength >= 86 && relationship < 45 ? "I don't trust the situation enough to go with you right now." : null;
+                case IRRITATED -> strength >= 74 && !close ? refusal("action.join.irritated", "I'm trying to get away from people right now, not travel with them.") : null;
+                case SOMBER -> strength >= 76 && !close ? refusal("action.join.somber", "I need some time on my own before I commit to anything.") : null;
+                case WEARY -> strength >= 82 && !close ? refusal("action.join.weary", "I need to recover before I start going anywhere with someone.") : null;
+                case WARY -> strength >= 86 && relationship < 45 ? refusal("action.join.wary", "I don't trust the situation enough to go with you right now.") : null;
                 default -> null;
             };
         }
@@ -288,25 +289,25 @@ public final class ReactiveInteractionManager {
         ReactiveWorldManager.Mood mood = ReactiveWorldManager.mood(fighter);
         boolean volatileType = fighter.getPersonality() == FighterPersonality.AGGRESSIVE || fighter.getPersonality() == FighterPersonality.PROUD;
         return switch (mood) {
-            case WEARY -> strength >= 66 ? "No spar. I'm worn out and I need to recover." : null;
+            case WEARY -> strength >= 66 ? sparLine("refusal.weary", "No spar. I'm worn out and I need to recover.") : null;
             case SOMBER -> strength >= 70 && fighter.getRandom().nextFloat() < (relationship >= 60 ? 0.42F : 0.78F)
-                    ? "Not today. My head isn't in a fight." : null;
+                    ? sparLine("refusal.somber", "Not today. My head isn't in a fight.") : null;
             case WARY -> strength >= 75 && relationship < 50 && fighter.getRandom().nextFloat() < 0.68F
-                    ? "No. I'm not spending energy on a spar while something feels off." : null;
+                    ? sparLine("refusal.wary", "No. I'm not spending energy on a spar while something feels off.") : null;
             case IRRITATED -> strength >= 76 && (!volatileType || fighter.getRandom().nextFloat() < 0.66F)
-                    ? (volatileType ? "No. Not while I'm this angry. Ask me when I can keep it friendly."
-                    : "I'm too irritated for a friendly spar. It wouldn't stay friendly.") : null;
-            case FOCUSED -> strength >= 88 && relationship < 35 ? "Not now. I'm working on something specific." : null;
+                    ? (volatileType ? sparLine("refusal.angry", "No. Not while I'm this angry. Ask me when I can keep it friendly.")
+                    : sparLine("refusal.irritated", "I'm too irritated for a friendly spar. It wouldn't stay friendly.")) : null;
+            case FOCUSED -> strength >= 88 && relationship < 35 ? sparLine("refusal.focused", "Not now. I'm working on something specific.") : null;
             case UPBEAT, CONTENT -> null;
         };
     }
 
     public static String sparOutcome(AmbientFighterEntity fighter, ServerPlayer player, boolean playerWon, boolean decisive) {
-        if (fighter == null || player == null) return "Good round.";
+        if (fighter == null || player == null) return sparLine("outcome.default", "Good round.");
         if (!decisive) {
             ReactiveWorldManager.react(fighter, ReactiveWorldManager.Mood.WEARY, "a long spar without a clean finish", 850);
             ReactiveWorldManager.rememberEvent(fighter, "SPAR_DRAW", player.getGameProfile().getName(), "the spar ended without a winner");
-            return pick(fighter, "Enough. We're both just burning energy now.", "Call it there. Neither of us is getting a clean finish.", "That was a marathon, not a spar. Let's stop before we get sloppy.", "Draw. I need a drink before we turn this into an endurance contest.");
+            return sparPick(fighter, "outcome.draw", "Enough. We're both just burning energy now.", "Call it there. Neither of us is getting a clean finish.", "That was a marathon, not a spar. Let's stop before we get sloppy.", "Draw. I need a drink before we turn this into an endurance contest.");
         }
         if (playerWon) {
             ReactiveWorldManager.rememberEvent(fighter, "SPAR_LOSS", player.getGameProfile().getName(), "lost a friendly spar to the player");
@@ -318,17 +319,17 @@ public final class ReactiveInteractionManager {
                         "losing the spar to " + player.getGameProfile().getName(), 1500);
                 fighter.flareAura(38);
                 return switch (fighter.getPersonality()) {
-                    case PROUD -> pick(fighter, "Tch... don't look so pleased. Next round is mine.", "Enjoy that win. I'm already thinking about the rematch.", "You caught me. It won't happen the same way twice.", "Fine. You earned that one. I'm still taking the next.");
-                    case AGGRESSIVE -> pick(fighter, "Damn it! Again. I know I can beat you.", "No way I'm ending on that. I want another round later.", "You got me and I hate how clean that was.", "Fine! You won. Now I know exactly what I want to fix.");
-                    default -> pick(fighter, "Yeah, yeah. You won. Don't make a thing out of it.", "All right, that's yours. Don't get smug.", "You got the better round. Leave it there.", "Fine. Score one for you.");
+                    case PROUD -> sparPick(fighter, "outcome.loss.proud", "Tch... don't look so pleased. Next round is mine.", "Enjoy that win. I'm already thinking about the rematch.", "You caught me. It won't happen the same way twice.", "Fine. You earned that one. I'm still taking the next.");
+                    case AGGRESSIVE -> sparPick(fighter, "outcome.loss.aggressive", "Damn it! Again. I know I can beat you.", "No way I'm ending on that. I want another round later.", "You got me and I hate how clean that was.", "Fine! You won. Now I know exactly what I want to fix.");
+                    default -> sparPick(fighter, "outcome.loss.blunt", "Yeah, yeah. You won. Don't make a thing out of it.", "All right, that's yours. Don't get smug.", "You got the better round. Leave it there.", "Fine. Score one for you.");
                 };
             }
             ReactiveWorldManager.react(fighter, fighter.getHealth() < fighter.getMaxHealth() * 0.45F
                             ? ReactiveWorldManager.Mood.WEARY : ReactiveWorldManager.Mood.FOCUSED,
                     "thinking about what went wrong in the spar", 1200);
             return fighter.getPersonality() == FighterPersonality.HEROIC
-                    ? pick(fighter, "Good hit. I lost that one fair. I know what I need to work on.", "That was clean. You earned it—now I know where I slipped.", "Nice round. I learned more from losing that than from an easy win.", "You got me fair. Next session I want to work on that opening.")
-                    : pick(fighter, "You got me. Give me a minute—I want to think through that round.", "Good fight. I can already see two mistakes I made.", "That's your round. I need to replay the last exchange in my head.", "Fair win. I know exactly which moment turned it.");
+                    ? sparPick(fighter, "outcome.loss.heroic", "Good hit. I lost that one fair. I know what I need to work on.", "That was clean. You earned it—now I know where I slipped.", "Nice round. I learned more from losing that than from an easy win.", "You got me fair. Next session I want to work on that opening.")
+                    : sparPick(fighter, "outcome.loss.normal", "You got me. Give me a minute—I want to think through that round.", "Good fight. I can already see two mistakes I made.", "That's your round. I need to replay the last exchange in my head.", "Fair win. I know exactly which moment turned it.");
         }
 
         ReactiveWorldManager.rememberEvent(fighter, "SPAR_WIN", player.getGameProfile().getName(), "won a friendly spar against the player");
@@ -337,35 +338,53 @@ public final class ReactiveInteractionManager {
                         ? ReactiveWorldManager.Mood.UPBEAT : ReactiveWorldManager.Mood.CONTENT,
                 "winning the spar", 1050);
         return switch (fighter.getPersonality()) {
-            case PROUD -> pick(fighter, "That's more like it. Come back when you've closed the gap.", "Good effort. Next time make me work even harder for it.", "I had control of that round, but you made me pay attention.", "Keep improving. I want the rematch to be closer.");
-            case AGGRESSIVE -> pick(fighter, "Ha! That's the pace I wanted. Again when you're ready.", "Good! You kept it interesting. Let's do that again sometime.", "That's a proper warm-up. Next time push harder.", "Now that was fun. Get stronger and come find me again.");
-            case HEROIC -> pick(fighter, "Good round. You pushed me harder than I expected.", "You made me earn it. That's exactly what a spar should do.", "Nice work. I saw a couple of moments where you almost turned it.", "Good fight. Keep building on what you did right.");
-            case CALM -> pick(fighter, "Good spar. There were a few moments where you nearly had me.", "Clean round. Your timing is getting better.", "That was useful. You forced me to adjust more than once.", "Good session. Neither of us wasted the time.");
-            case CAUTIOUS -> pick(fighter, "Good round. I had to stay careful the whole time.", "You kept giving me reasons not to relax. Good spar.", "I won, but there were enough close moments to remember.", "That was controlled and useful. I'd do that again.");
+            case PROUD -> sparPick(fighter, "outcome.win.proud", "That's more like it. Come back when you've closed the gap.", "Good effort. Next time make me work even harder for it.", "I had control of that round, but you made me pay attention.", "Keep improving. I want the rematch to be closer.");
+            case AGGRESSIVE -> sparPick(fighter, "outcome.win.aggressive", "Ha! That's the pace I wanted. Again when you're ready.", "Good! You kept it interesting. Let's do that again sometime.", "That's a proper warm-up. Next time push harder.", "Now that was fun. Get stronger and come find me again.");
+            case HEROIC -> sparPick(fighter, "outcome.win.heroic", "Good round. You pushed me harder than I expected.", "You made me earn it. That's exactly what a spar should do.", "Nice work. I saw a couple of moments where you almost turned it.", "Good fight. Keep building on what you did right.");
+            case CALM -> sparPick(fighter, "outcome.win.calm", "Good spar. There were a few moments where you nearly had me.", "Clean round. Your timing is getting better.", "That was useful. You forced me to adjust more than once.", "Good session. Neither of us wasted the time.");
+            case CAUTIOUS -> sparPick(fighter, "outcome.win.cautious", "Good round. I had to stay careful the whole time.", "You kept giving me reasons not to relax. Good spar.", "I won, but there were enough close moments to remember.", "That was controlled and useful. I'd do that again.");
         };
     }
 
-    private static String pick(AmbientFighterEntity fighter, String... lines) {
-        return lines[fighter.getRandom().nextInt(lines.length)];
+    private static String pick(AmbientFighterEntity fighter, String group, String... lines) {
+        int index = fighter.getRandom().nextInt(lines.length);
+        return LWLang.speechKey("dialogue.reactive.refusal." + group + "." + index, lines[index]);
+    }
+
+    private static String refusal(String key, String fallback) {
+        return LWLang.speechKey("dialogue.reactive.refusal." + key, fallback);
+    }
+
+    private static String sparLine(String key, String fallback) {
+        return LWLang.speechKey("dialogue.spar.reactive." + key, fallback);
+    }
+
+    private static String sparPick(AmbientFighterEntity fighter, String group, String... lines) {
+        int index = fighter.getRandom().nextInt(lines.length);
+        return sparLine(group + "." + index, lines[index]);
     }
 
     private static String boundaryWarning(AmbientFighterEntity fighter, ReactiveWorldManager.Mood mood, int relationship) {
         return switch (mood) {
-            case IRRITATED -> relationship >= 60 ? "I like you, but I need some space right now." : "Back up. I'm not in the mood to be crowded.";
-            case SOMBER -> relationship >= 60 ? "Can you give me a minute alone?" : "Please... I want to be by myself right now.";
-            case WEARY -> "You're a little close. I just need room to breathe.";
-            case WARY -> "Don't crowd me. I need to see what's around us.";
-            default -> "Give me a little room.";
+            case IRRITATED -> relationship >= 60
+                    ? LWLang.speechKey("dialogue.boundary.irritated_friend", "I like you, but I need some space right now.")
+                    : LWLang.speechKey("dialogue.boundary.irritated", "Back up. I'm not in the mood to be crowded.");
+            case SOMBER -> relationship >= 60
+                    ? LWLang.speechKey("dialogue.boundary.somber_friend", "Can you give me a minute alone?")
+                    : LWLang.speechKey("dialogue.boundary.somber", "Please... I want to be by myself right now.");
+            case WEARY -> LWLang.speechKey("dialogue.boundary.weary", "You're a little close. I just need room to breathe.");
+            case WARY -> LWLang.speechKey("dialogue.boundary.wary", "Don't crowd me. I need to see what's around us.");
+            default -> LWLang.speechKey("dialogue.boundary.default", "Give me a little room.");
         };
     }
 
     private static String escapeLine(ReactiveWorldManager.Mood mood) {
         return switch (mood) {
-            case IRRITATED -> "Fine. If you won't give me space, I'll take it myself.";
-            case SOMBER -> "I'm going somewhere quieter.";
-            case WEARY -> "I need somewhere I can actually rest.";
-            case WARY -> "I'm changing position. This is too exposed.";
-            default -> "I'm moving on.";
+            case IRRITATED -> LWLang.speechKey("dialogue.boundary.escape.irritated", "Fine. If you won't give me space, I'll take it myself.");
+            case SOMBER -> LWLang.speechKey("dialogue.boundary.escape.somber", "I'm going somewhere quieter.");
+            case WEARY -> LWLang.speechKey("dialogue.boundary.escape.weary", "I need somewhere I can actually rest.");
+            case WARY -> LWLang.speechKey("dialogue.boundary.escape.wary", "I'm changing position. This is too exposed.");
+            default -> LWLang.speechKey("dialogue.boundary.escape.default", "I'm moving on.");
         };
     }
 

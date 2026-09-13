@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.entity.AmbientFighterEntity;
+import com.dmzlivingworld.client.LWLang;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
@@ -116,35 +117,23 @@ public final class FactionHornManager {
     private static String rallyResponse(AmbientFighterEntity fighter) {
         int roll = fighter.getRandom().nextInt(6);
         if (fighter.getAlignment() == com.dmzlivingworld.entity.FighterAlignment.BAD) {
-            return switch (roll) {
-                case 0 -> "RAAAH!";
-                case 1 -> "CRUSH THEM!";
-                case 2 -> "CHARGE!";
-                case 3 -> "NO MERCY!";
-                default -> "WITH YOU!";
-            };
+            int variant = Math.min(4, roll);
+            String[] fallback = {"RAAAH!", "CRUSH THEM!", "CHARGE!", "NO MERCY!", "WITH YOU!"};
+            return LWLang.speechKey("dialogue.faction.rally.response.bad." + variant, fallback[variant]);
         }
-        return switch (roll) {
-            case 0 -> "CHARGE!";
-            case 1 -> "RAAAH!";
-            case 2 -> "WITH YOU!";
-            case 3 -> "LET'S MOVE!";
-            case 4 -> "TOGETHER!";
-            default -> "LET'S GO!";
-        };
+        String[] fallback = {"CHARGE!", "RAAAH!", "WITH YOU!", "LET'S MOVE!", "TOGETHER!", "LET'S GO!"};
+        return LWLang.speechKey("dialogue.faction.rally.response.default." + roll, fallback[roll]);
     }
 
     private static String rallyLine(AmbientFighterEntity fighter, boolean desperate) {
-        if (desperate) return switch (fighter.getAlignment()) {
-            case GOOD -> "Together! Nobody falls here!";
-            case BAD -> "Stand your ground! Crush them!";
+        String alignment = fighter.getAlignment().name().toLowerCase(java.util.Locale.ROOT);
+        String fallback = desperate ? switch (fighter.getAlignment()) {
+            case GOOD -> "Together! Nobody falls here!"; case BAD -> "Stand your ground! Crush them!";
             default -> "Hold the line! We're not done!";
+        } : switch (fighter.getAlignment()) {
+            case GOOD -> "With me!"; case BAD -> "Show them who we are!"; default -> "Move together!";
         };
-        return switch (fighter.getAlignment()) {
-            case GOOD -> "With me!";
-            case BAD -> "Show them who we are!";
-            default -> "Move together!";
-        };
+        return LWLang.speechKey("dialogue.faction.rally." + (desperate ? "desperate." : "normal.") + alignment, fallback);
     }
 
     /** Debug: put a real role horn on the nearest chosen fighter and blow it immediately. */

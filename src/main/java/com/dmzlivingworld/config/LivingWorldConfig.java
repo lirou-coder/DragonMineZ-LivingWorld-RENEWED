@@ -36,6 +36,10 @@ public final class LivingWorldConfig {
     public static final ForgeConfigSpec.DoubleValue NPC_POWER_MULTIPLIER;
     public static final ForgeConfigSpec.BooleanValue CAN_MEDITATION_PROC_SKILL_PROGRESSION;
     public static final ForgeConfigSpec.BooleanValue ENABLE_WORLD_MENACES;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_NPCS_ON_CREATIVE_MODE;
+    public static final ForgeConfigSpec.IntValue WANTED_PRESSURE_DECAY_MINUTES;
+    public static final ForgeConfigSpec.IntValue NPC_COMBAT_LIVES;
+    public static final ForgeConfigSpec.IntValue RACIAL_SKILL_MINIMUM_ERA;
     public static final ForgeConfigSpec.DoubleValue BRAWLER_MELEE_SHARE, BRAWLER_DEFENSE_SHARE, BRAWLER_KI_SHARE, BRAWLER_HEALTH_SHARE;
     public static final ForgeConfigSpec.DoubleValue MARTIAL_ARTIST_MELEE_SHARE, MARTIAL_ARTIST_DEFENSE_SHARE, MARTIAL_ARTIST_KI_SHARE, MARTIAL_ARTIST_HEALTH_SHARE;
     public static final ForgeConfigSpec.DoubleValue SPEED_FIGHTER_MELEE_SHARE, SPEED_FIGHTER_DEFENSE_SHARE, SPEED_FIGHTER_KI_SHARE, SPEED_FIGHTER_HEALTH_SHARE;
@@ -178,6 +182,20 @@ public final class LivingWorldConfig {
                 .define("canMeditationProcSkillProgression", true);
         ENABLE_WORLD_MENACES = builder.comment("Enable World Menace spawning, activity and related faction content.")
                 .define("enableWorldMenaces", true);
+        ENABLE_NPCS_ON_CREATIVE_MODE = builder.comment(
+                        "Allow natural Living World NPC spawning around players in Creative mode.",
+                        "Disabled by default; spectator players never trigger natural NPC spawning.")
+                .define("enableNpcsOnCreativeMode", false);
+        WANTED_PRESSURE_DECAY_MINUTES = builder.comment(
+                        "Minutes without a new unlawful action before player Wanted pressure falls by one star.",
+                        "Set to 0 to disable natural Wanted decay.")
+                .defineInRange("wantedPressureDecayMinutes", 60, 0, 10080);
+        NPC_COMBAT_LIVES = builder.comment("How many combat defeats an ordinary NPC may survive before permanent death.")
+                .defineInRange("npcCombatLives", 3, 1, 100);
+        RACIAL_SKILL_MINIMUM_ERA = builder.comment(
+                        "Minimum numeric world era required for newly spawned NPCs to have a racial skill above zero.",
+                        "Era 0 means no saga is complete; default 1 unlocks racial skills after the first completed saga.")
+                .defineInRange("racialSkillMinimumEra", 1, 0, 10000);
         builder.push("archetypeStatDistribution");
         builder.comment(
                 "Fraction of the effective stat budget assigned to each real combat attribute.",
@@ -313,6 +331,10 @@ public final class LivingWorldConfig {
     public static int maxRememberedDeadFighters() { return MAX_REMEMBERED_DEAD_FIGHTERS.get(); }
     public static boolean canMeditationProcSkillProgression() { return CAN_MEDITATION_PROC_SKILL_PROGRESSION.get(); }
     public static boolean worldMenacesEnabled() { return ENABLE_WORLD_MENACES.get(); }
+    public static boolean npcsEnabledOnCreativeMode() { return ENABLE_NPCS_ON_CREATIVE_MODE.get(); }
+    public static int wantedPressureDecayMinutes() { return WANTED_PRESSURE_DECAY_MINUTES.get(); }
+    public static int npcCombatLives() { return NPC_COMBAT_LIVES.get(); }
+    public static int racialSkillMinimumEra() { return RACIAL_SKILL_MINIMUM_ERA.get(); }
     public static double npcStrengthScale() { return npcStrengthPercent() / 100.0D; }
     public static int npcGrowthPercent() { return NPC_GROWTH_PERCENT.get(); }
     public static double npcGrowthScale() { return npcGrowthPercent() / 100.0D; }
@@ -373,7 +395,7 @@ public final class LivingWorldConfig {
                 npcChatFrequencyPercent(), earthGuardianResponsePercent(), maxRememberedDeadFighters(), npcDespawnProtectionRadius(),
                 levelMultiplierPerSaga(), maxDefenseMitigation(), bpVisualMultiplier(), npcPowerMultiplier(), canMeditationProcSkillProgression(),
                 npcRaceBlacklist(), treatRaceBlacklistAsWhitelist(), canUseClothes(), dimensionWhitelist(), treatDimensionWhitelistAsBlacklist(), companionDimensionBlacklist(),
-                archetypeShares(), worldMenacesEnabled());
+                archetypeShares(), worldMenacesEnabled(), wantedPressureDecayMinutes(), npcCombatLives(), racialSkillMinimumEra(), npcsEnabledOnCreativeMode());
     }
 
     public static void apply(Snapshot value) {
@@ -414,6 +436,10 @@ public final class LivingWorldConfig {
         NPC_POWER_MULTIPLIER.set(clamp(value.npcPowerMultiplier(), 0D, 1_000_000D));
         CAN_MEDITATION_PROC_SKILL_PROGRESSION.set(value.canMeditationProcSkillProgression());
         ENABLE_WORLD_MENACES.set(value.worldMenacesEnabled());
+        ENABLE_NPCS_ON_CREATIVE_MODE.set(value.npcsEnabledOnCreativeMode());
+        WANTED_PRESSURE_DECAY_MINUTES.set(clamp(value.wantedPressureDecayMinutes(), 0, 10080));
+        NPC_COMBAT_LIVES.set(clamp(value.npcCombatLives(), 1, 100));
+        RACIAL_SKILL_MINIMUM_ERA.set(clamp(value.racialSkillMinimumEra(), 0, 10000));
         NPC_RACE_BLACKLIST.set(List.copyOf(value.npcRaceBlacklist()));
         TREAT_RACE_BLACKLIST_AS_WHITELIST.set(value.treatRaceBlacklistAsWhitelist());
         CAN_USE_CLOTHES.set(List.copyOf(value.canUseClothes()));
@@ -432,7 +458,7 @@ public final class LivingWorldConfig {
                 20, 288, 5D, .7D, 1D, 1D, true, List.of(), false,
                 List.of("human", "saiyan", "namekian", "majin"), List.of("minecraft:overworld", "dragonminez:namek"), false,
                 List.of("dmzplus:cereal_orbit", "dmzplus:earth_orbit", "dmzplus:hell_planet_orbit", "dmzplus:namek_orbit", "dmzplus:vampa_orbit", "dmzplus:vegeta_orbit", "dmzplus:yardrat_orbit", "dmzplus:otherworld_space", "dmzplus:universe_7_deep_space", "dragonminez:otherworld"),
-                List.of(.20,.10,.06,.64, .17,.14,.17,.52, .15,.08,.15,.62, .10,.20,.10,.60, .06,.10,.20,.64), true);
+                List.of(.20,.10,.06,.64, .17,.14,.17,.52, .15,.08,.15,.62, .10,.20,.10,.60, .06,.10,.20,.64), true, 60, 3, 1, false);
     }
 
     private static List<Double> archetypeShares() {
@@ -471,5 +497,6 @@ public final class LivingWorldConfig {
                            boolean canMeditationProcSkillProgression, List<String> npcRaceBlacklist,
                            boolean treatRaceBlacklistAsWhitelist, List<String> canUseClothes,
                            List<String> dimensionWhitelist, boolean treatDimensionWhitelistAsBlacklist, List<String> companionDimensionBlacklist,
-                           List<Double> archetypeShares, boolean worldMenacesEnabled) {}
+                           List<Double> archetypeShares, boolean worldMenacesEnabled, int wantedPressureDecayMinutes, int npcCombatLives,
+                           int racialSkillMinimumEra, boolean npcsEnabledOnCreativeMode) {}
 }

@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
 import com.dmzlivingworld.entity.FighterRank;
@@ -59,17 +60,17 @@ public final class FighterLifeJoinManager {
     public static boolean request(ServerPlayer player, AmbientFighterEntity fighter) {
         if (player == null || fighter == null || !fighter.isAlive()) return false;
         if (activeSession(player) != null) {
-            message(player, "You're already accompanying someone.", ChatFormatting.GRAY);
+            messageKey(player, "already_accompanying", ChatFormatting.GRAY);
             return false;
         }
         if (!available(player, fighter)) {
-            message(player, fighter.getFighterName() + " can't head out with you right now.", ChatFormatting.GRAY);
+            messageKey(player, "unavailable", ChatFormatting.GRAY, fighter.getFighterName());
             return false;
         }
         Opportunity opportunity = findOpportunity(fighter);
         if (opportunity == null) {
             fighter.speak(nothingToDo(fighter), 74);
-            message(player, "Nothing in " + fighter.getFighterName() + "'s life needs your help right now.", ChatFormatting.GRAY);
+            messageKey(player, "nothing_to_help", ChatFormatting.GRAY, fighter.getFighterName());
             return false;
         }
 
@@ -80,8 +81,8 @@ public final class FighterLifeJoinManager {
         fighter.speak(opening(fighter, player, opportunity, target), 120);
         SESSIONS.put(player.getUUID(), new Session(player.getUUID(), fighter.getUUID(), target.getUUID(),
                 opportunity.kind(), player.serverLevel().getGameTime()));
-        message(player, fighter.getFighterName() + " agreed to go with you. " + opportunity.label(), ChatFormatting.GREEN);
-        message(player, "Stay close until the situation is finished.", ChatFormatting.GRAY);
+        messageKey(player, "agreed", ChatFormatting.GREEN, fighter.getFighterName(), opportunity.label());
+        messageKey(player, "stay_close", ChatFormatting.GRAY);
         return true;
     }
 
@@ -114,11 +115,11 @@ public final class FighterLifeJoinManager {
         for (Session s : SESSIONS.values()) {
             if (s.fighterId.equals(fighter.getUUID())) {
                 return switch (s.kind) {
-                    case RIVAL -> "Facing a rival";
-                    case EQUIPMENT -> "Recovering equipment";
-                    case THREAT -> "Responding to trouble";
-                    case FRIEND -> "Visiting a friend";
-                    case FACTION -> "Checking in with their faction";
+                    case RIVAL -> LWLang.speechKey("activity.facing_a_rival", "Facing a rival");
+                    case EQUIPMENT -> LWLang.speechKey("activity.recovering_equipment", "Recovering equipment");
+                    case THREAT -> LWLang.speechKey("activity.responding_to_trouble", "Responding to trouble");
+                    case FRIEND -> LWLang.speechKey("activity.visiting_a_friend", "Visiting a friend");
+                    case FACTION -> LWLang.speechKey("activity.checking_in_with_their_faction", "Checking in with their faction");
                 };
             }
         }
@@ -135,7 +136,7 @@ public final class FighterLifeJoinManager {
     public static String opportunityLabel(ServerPlayer player, AmbientFighterEntity fighter) {
         if (player == null || fighter == null || !available(player, fighter)) return "";
         Opportunity o = findOpportunity(fighter);
-        return o == null ? "Nothing they want company for right now" : o.label();
+        return o == null ? LWLang.speechKey("life.opportunity.none", "Nothing they want company for right now") : o.label();
     }
 
     @SubscribeEvent
@@ -152,12 +153,12 @@ public final class FighterLifeJoinManager {
         Entity target = fighter == null ? null : ((ServerLevel) fighter.level()).getEntity(session.targetId);
 
         if (player == null || fighter == null || !fighter.isAlive()) {
-            cancel(session, player, fighter, "That outing can no longer continue.");
+            cancel(session, player, fighter, LWLang.speechKey("message.go_along.cancel.unavailable", "That outing can no longer continue."));
             return;
         }
         if (now - session.started > MAX_TICKS || player.level() != fighter.level()
                 || player.distanceToSqr(fighter) > 32.0D * 32.0D) {
-            cancel(session, player, fighter, "You got separated, so they carried on without you.");
+            cancel(session, player, fighter, LWLang.speechKey("message.go_along.cancel.separated", "You got separated, so they carried on without you."));
             return;
         }
 
@@ -172,11 +173,11 @@ public final class FighterLifeJoinManager {
         }
 
         if (target == null || !target.isAlive() || target.level() != fighter.level()) {
-            cancel(session, player, fighter, "The situation changed before you got there.");
+            cancel(session, player, fighter, LWLang.speechKey("message.go_along.cancel.changed", "The situation changed before you got there."));
             return;
         }
         if (fighter.isDefeated() || fighter.isCaptive() || fighter.isMeditating() || fighter.hurtTime > 0) {
-            cancel(session, player, fighter, "Something interrupted the outing.");
+            cancel(session, player, fighter, LWLang.speechKey("message.go_along.cancel.interrupted", "Something interrupted the outing."));
             return;
         }
 
@@ -199,9 +200,9 @@ public final class FighterLifeJoinManager {
         // the destination enters a radius.
         if ((session.kind == Kind.FRIEND || session.kind == Kind.FACTION) && now - session.phaseStarted >= 110L) {
             AmbientFighterEntity friend = target instanceof AmbientFighterEntity f ? f : null;
-            if (friend == null) { cancel(session, player, fighter, "The visit was interrupted."); return; }
-            if (now - session.phaseStarted >= 50L && friend.getSpeech().isEmpty()) friend.speak(
-                    session.kind == Kind.FACTION ? "Good. I wanted to catch up on what's happening here." : "It's good to catch up properly.", 62);
+            if (friend == null) { cancel(session, player, fighter, LWLang.speechKey("message.go_along.cancel.visit", "The visit was interrupted.")); return; }
+            if (now - session.phaseStarted >= 50L && friend.getSpeech().isEmpty()) friend.speakKey(
+                    session.kind == Kind.FACTION ? "dialogue.life.visit.reply.faction" : "dialogue.life.visit.reply.friend", 62);
             if (session.kind == Kind.FACTION) fighter.getLegacyData().putLong("NextFactionJoin", fighter.level().getGameTime() + 16000L);
             else fighter.getLegacyData().putLong("NextFriendJoin", fighter.level().getGameTime() + 12000L);
             finishMeaningful(session, player, fighter, session.kind == Kind.FACTION
@@ -215,10 +216,10 @@ public final class FighterLifeJoinManager {
             case RIVAL -> {
                 AmbientFighterEntity rival = target instanceof AmbientFighterEntity f ? f : null;
                 if (rival == null || rival.isDefeated() || rival.isCaptive() || rival.getTarget() != null) {
-                    cancel(session, player, fighter, "The rivalry could not be settled right now."); return;
+                    cancel(session, player, fighter, LWLang.speechKey("message.go_along.cancel.rivalry", "The rivalry could not be settled right now.")); return;
                 }
-                fighter.speak("There you are. This is between us.", 72);
-                rival.speak("Took you long enough.", 72);
+                fighter.speakKey("dialogue.life.rival.found", 72);
+                rival.speakKey("dialogue.life.rival.reply", 72);
                 fighter.setSocialLifeActivity(false);
                 fighter.startDuel(rival);
                 rival.startDuel(fighter);
@@ -226,33 +227,33 @@ public final class FighterLifeJoinManager {
             }
             case EQUIPMENT -> {
                 boolean picked = FighterArsenalManager.tryPickupNearby(fighter);
-                if (!picked) { cancel(session, player, fighter, "Someone moved the equipment before you reached it."); return; }
-                fighter.speak("Good eye. I can actually use this.", 72);
+                if (!picked) { cancel(session, player, fighter, LWLang.speechKey("message.go_along.cancel.equipment", "Someone moved the equipment before you reached it.")); return; }
+                fighter.speakKey("dialogue.life.equipment.found", 72);
                 finishMeaningful(session, player, fighter, "Helped them recover useful equipment");
             }
             case THREAT -> {
                 AmbientFighterEntity threat = target instanceof AmbientFighterEntity f ? f : null;
                 if (threat == null || !threat.isAlive() || threat.isDefeated()) {
-                    cancel(session, player, fighter, "The trouble was already over when you arrived."); return;
+                    cancel(session, player, fighter, LWLang.speechKey("message.go_along.cancel.threat", "The trouble was already over when you arrived.")); return;
                 }
-                fighter.speak("That's the problem. I'm stepping in.", 82);
+                fighter.speakKey("dialogue.life.intervention.start", 82);
                 fighter.setSocialLifeActivity(false);
                 fighter.setTarget(threat);
                 session.engaged = true;
             }
             case FRIEND, FACTION -> {
                 AmbientFighterEntity friend = target instanceof AmbientFighterEntity f ? f : null;
-                if (friend == null) { cancel(session, player, fighter, "The visit was interrupted."); return; }
+                if (friend == null) { cancel(session, player, fighter, LWLang.speechKey("message.go_along.cancel.visit", "The visit was interrupted.")); return; }
                 friend.setSocialLifeActivity(true);
                 friend.getNavigation().stop();
                 fighter.getLookControl().setLookAt(friend, 35.0F, 35.0F);
                 friend.getLookControl().setLookAt(fighter, 35.0F, 35.0F);
                 if (session.kind == Kind.FACTION) {
-                    fighter.speak("I wanted to check in before I head off again.", 78);
-                    friend.speak("Good timing. There are a couple things worth knowing.", 82);
+                    fighter.speakKey("dialogue.life.visit.faction", 78);
+                    friend.speakKey("dialogue.life.visit.faction_answer", 82);
                 } else {
-                    fighter.speak("There you are. I wanted to check in.", 78);
-                    friend.speak("Good to see you. And you brought company.", 82);
+                    fighter.speakKey("dialogue.life.visit.friend", 78);
+                    friend.speakKey("dialogue.life.visit.friend_answer", 82);
                 }
             }
         }
@@ -271,7 +272,7 @@ public final class FighterLifeJoinManager {
         PlayerAlignmentManager.rewardGoodAct(player);
         fighter.recordLegacyEvent(outcome + " with " + player.getGameProfile().getName());
         FighterMemoryManager.refreshLoadedProfile(fighter);
-        message(player, "You stayed with " + fighter.getFighterName() + " and saw it through.", ChatFormatting.GOLD);
+        messageKey(player, "completed", ChatFormatting.GOLD, fighter.getFighterName());
     }
 
     private static Opportunity findOpportunity(AmbientFighterEntity fighter) {
@@ -280,12 +281,12 @@ public final class FighterLifeJoinManager {
         if ("DEFEAT_RIVAL".equals(goal) && !fighter.getRivalName().isBlank()) {
             AmbientFighterEntity rival = findNamed(level, fighter, fighter.getRivalName(), 80.0D);
             if (rival != null && rival.getTarget() == null && fighter.distanceToSqr(rival) > 7.0D * 7.0D)
-                return new Opportunity(Kind.RIVAL, rival.getUUID(), "Go face rival " + rival.getFighterName() + ".");
+                return new Opportunity(Kind.RIVAL, rival.getUUID(), LWLang.speechKey("life.opportunity.rival", "Go face rival %s.", rival.getFighterName()));
         }
         if ("ACQUIRE_EQUIPMENT".equals(goal)) {
             ItemEntity item = FighterArsenalManager.findUsefulDroppedItem(fighter, 64.0D);
             if (item != null && fighter.distanceToSqr(item) > 3.0D * 3.0D)
-                return new Opportunity(Kind.EQUIPMENT, item.getUUID(), "Recover a useful piece of equipment.");
+                return new Opportunity(Kind.EQUIPMENT, item.getUUID(), LWLang.speechKey("life.opportunity.equipment", "Recover a useful piece of equipment."));
         }
 
         if (fighter.getAlignment() != FighterAlignment.BAD) {
@@ -295,13 +296,13 @@ public final class FighterLifeJoinManager {
                                     && other.getTarget() != null && other.getTarget().isAlive())
                     .stream().min(Comparator.comparingDouble(fighter::distanceToSqr)).orElse(null);
             if (threat != null && fighter.distanceToSqr(threat) > 8.0D * 8.0D)
-                return new Opportunity(Kind.THREAT, threat.getUUID(), "Respond to trouble involving " + threat.getFighterName() + ".");
+                return new Opportunity(Kind.THREAT, threat.getUUID(), LWLang.speechKey("life.opportunity.threat", "Respond to trouble involving %s.", threat.getFighterName()));
         }
 
         AmbientFighterEntity friend = fighter.level().getGameTime() >= fighter.getLegacyData().getLong("NextFriendJoin")
                 ? FighterNpcSocialManager.closestMeaningfulBond(fighter, 72.0D) : null;
         if (friend != null && fighter.distanceToSqr(friend) > 10.0D * 10.0D)
-            return new Opportunity(Kind.FRIEND, friend.getUUID(), "Go check in with " + friend.getFighterName() + ".");
+            return new Opportunity(Kind.FRIEND, friend.getUUID(), LWLang.speechKey("life.opportunity.friend", "Go check in with %s.", friend.getFighterName()));
 
         if (fighter.isFactionMember() && fighter.level().getGameTime() >= fighter.getLegacyData().getLong("NextFactionJoin")) {
             AmbientFighterEntity member = level.getEntitiesOfClass(AmbientFighterEntity.class, fighter.getBoundingBox().inflate(72.0D),
@@ -309,7 +310,7 @@ public final class FighterLifeJoinManager {
                                     && other.isFactionMember() && fighter.getFactionId().equals(other.getFactionId())
                                     && other.getTarget() == null && fighter.distanceToSqr(other) > 10.0D * 10.0D)
                     .stream().max(Comparator.comparingInt(other -> other.getFactionRole().id())).orElse(null);
-            if (member != null) return new Opportunity(Kind.FACTION, member.getUUID(), "Check in with " + member.getFighterName() + " from " + fighter.getFactionDisplayName() + ".");
+            if (member != null) return new Opportunity(Kind.FACTION, member.getUUID(), LWLang.speechKey("life.opportunity.faction", "Check in with %s from %s.", member.getFighterName(), fighter.getFactionDisplayName()));
         }
         return null;
     }
@@ -327,7 +328,7 @@ public final class FighterLifeJoinManager {
         if (opportunity == null) {
             AmbientFighterEntity friend = AmbientFighterSpawner.spawnNearPlayer(player, FighterAlignment.GOOD, FighterRank.TRAINED, true);
             if (friend == null || friend == fighter) return 0;
-            opportunity = new Opportunity(Kind.FRIEND, friend.getUUID(), "Go check in with " + friend.getFighterName() + ".");
+            opportunity = new Opportunity(Kind.FRIEND, friend.getUUID(), LWLang.speechKey("life.opportunity.friend", "Go check in with %s.", friend.getFighterName()));
         }
         Entity target = level.getEntity(opportunity.targetId());
         if (target == null || !target.isAlive()) return 0;
@@ -336,7 +337,7 @@ public final class FighterLifeJoinManager {
         fighter.speak(opening(fighter, player, opportunity, target), 120);
         SESSIONS.put(player.getUUID(), new Session(player.getUUID(), fighter.getUUID(), target.getUUID(),
                 opportunity.kind(), level.getServer().overworld().getGameTime()));
-        message(player, "Go Along test started: " + opportunity.label(), ChatFormatting.AQUA);
+        message(player, LWLang.speechKey("message.go_along.debug_started", "Go Along test started: %s", opportunity.label()), ChatFormatting.AQUA);
         return 1;
     }
 
@@ -365,14 +366,12 @@ public final class FighterLifeJoinManager {
     }
 
     private static String opening(AmbientFighterEntity fighter, ServerPlayer player, Opportunity opportunity, Entity target) {
-        String action = switch (opportunity.kind()) {
-            case RIVAL -> "settle things with " + ((AmbientFighterEntity) target).getFighterName();
-            case EQUIPMENT -> "grab some gear nearby";
-            case THREAT -> "deal with some trouble nearby";
-            case FRIEND -> "check in with " + ((AmbientFighterEntity) target).getFighterName();
-            case FACTION -> "check in with " + ((AmbientFighterEntity) target).getFighterName();
+        return switch (opportunity.kind()) {
+            case RIVAL -> LWLang.speechKey("dialogue.life.opening.rival", "I'm going to settle things with %s. Stay close.", ((AmbientFighterEntity) target).getFighterName());
+            case EQUIPMENT -> LWLang.speechKey("dialogue.life.opening.equipment", "I'm going to grab some gear nearby. Stay close.");
+            case THREAT -> LWLang.speechKey("dialogue.life.opening.threat", "I'm going to deal with some trouble nearby. Stay close.");
+            case FRIEND, FACTION -> LWLang.speechKey("dialogue.life.opening.visit", "I'm going to check in with %s. Stay close.", ((AmbientFighterEntity) target).getFighterName());
         };
-        return "I'm going to " + action + ". Stay close.";
     }
 
     private static void moveTowardOpportunity(AmbientFighterEntity fighter, Entity target, boolean refreshGroundPath) {
@@ -399,11 +398,11 @@ public final class FighterLifeJoinManager {
 
     private static String nothingToDo(AmbientFighterEntity fighter) {
         return switch (fighter.getPersonality()) {
-            case PROUD -> "I've got nothing that needs company right now.";
-            case AGGRESSIVE -> "Nothing worth dragging you into right now.";
-            case CALM -> "Nothing pressing. Maybe another time.";
-            case CAUTIOUS -> "Not right now. There's nothing I need help with.";
-            case HEROIC -> "Nothing urgent on my end. Enjoy the quiet while it lasts.";
+            case PROUD -> LWLang.speechKey("dialogue.life.nothing.proud", "I've got nothing that needs company right now.");
+            case AGGRESSIVE -> LWLang.speechKey("dialogue.life.nothing.aggressive", "Nothing worth dragging you into right now.");
+            case CALM -> LWLang.speechKey("dialogue.life.nothing.calm", "Nothing pressing. Maybe another time.");
+            case CAUTIOUS -> LWLang.speechKey("dialogue.life.nothing.cautious", "Not right now. There's nothing I need help with.");
+            case HEROIC -> LWLang.speechKey("dialogue.life.nothing.heroic", "Nothing urgent on my end. Enjoy the quiet while it lasts.");
         };
     }
 
@@ -437,8 +436,12 @@ public final class FighterLifeJoinManager {
     }
 
     private static void message(ServerPlayer player, String text, ChatFormatting color) {
-        if (player != null) player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                .append(Component.literal(text).withStyle(color)), false);
+        if (player != null) player.displayClientMessage(Component.translatable("dmzlivingworld.message.prefix").withStyle(ChatFormatting.GOLD)
+                .append(LWLang.speech(text).copy().withStyle(color)), false);
+    }
+    private static void messageKey(ServerPlayer player, String key, ChatFormatting color, Object... args) {
+        if (player != null) player.displayClientMessage(Component.translatable("dmzlivingworld.message.go_along." + key, args)
+                .withStyle(color), false);
     }
 
     public static int runtimeEntries() { return SESSIONS.size(); }

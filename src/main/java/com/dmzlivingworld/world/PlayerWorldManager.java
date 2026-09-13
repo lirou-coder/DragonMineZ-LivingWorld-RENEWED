@@ -222,7 +222,7 @@ public final class PlayerWorldManager {
                     : "Rumor: " + history.get(history.size() - 1);
         }
         addRumor(player, rumor);
-        if (source.getSpeech().isEmpty()) source.speak("I heard something you might want to know.", 64);
+        if (source.getSpeech().isEmpty()) source.speakKey("dialogue.rumor.introduction", 64);
     }
 
     private static void addRumor(ServerPlayer player, String rumor) {

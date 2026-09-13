@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dragonminez.common.stats.StatsCapability;
 import com.dragonminez.common.stats.StatsData;
 import com.dmzlivingworld.LivingWorldMod;
@@ -103,20 +104,20 @@ public final class FighterTransformationReactionManager {
         int relationship = FighterRelationshipManager.relationshipOrUnknown(player, fighter);
         if (relationship >= 60 && fighter.getRandom().nextFloat() < 0.55F) {
             return switch (fighter.getPersonality()) {
-                case PROUD -> "There it is. I knew you were still holding something back.";
-                case HEROIC -> "You've come a long way. That power feels completely different.";
-                case CALM -> "I can feel how much steadier your power is now.";
-                case CAUTIOUS -> "I know it's you, and that still made me take a step back.";
-                case AGGRESSIVE -> "Now that's more like it. I was waiting to see that again.";
+                case PROUD -> LWLang.speechKey("dialogue.transformation.friend.proud", "There it is. I knew you were still holding something back.");
+                case HEROIC -> LWLang.speechKey("dialogue.transformation.friend.heroic", "You've come a long way. That power feels completely different.");
+                case CALM -> LWLang.speechKey("dialogue.transformation.friend.calm", "I can feel how much steadier your power is now.");
+                case CAUTIOUS -> LWLang.speechKey("dialogue.transformation.friend.cautious", "I know it's you, and that still made me take a step back.");
+                case AGGRESSIVE -> LWLang.speechKey("dialogue.transformation.friend.aggressive", "Now that's more like it. I was waiting to see that again.");
             };
         }
         FighterPersonality personality = fighter.getPersonality();
         return switch (personality) {
-            case PROUD -> "So that's the power you've been holding back.";
-            case HEROIC -> "That jump in power... impressive.";
-            case CALM -> "Your energy changed completely.";
-            case CAUTIOUS -> "I felt that from here. That's a lot of power.";
-            case AGGRESSIVE -> "Heh. Now that looks interesting.";
+            case PROUD -> LWLang.speechKey("dialogue.transformation.default.proud", "So that's the power you've been holding back.");
+            case HEROIC -> LWLang.speechKey("dialogue.transformation.default.heroic", "That jump in power... impressive.");
+            case CALM -> LWLang.speechKey("dialogue.transformation.default.calm", "Your energy changed completely.");
+            case CAUTIOUS -> LWLang.speechKey("dialogue.transformation.default.cautious", "I felt that from here. That's a lot of power.");
+            case AGGRESSIVE -> LWLang.speechKey("dialogue.transformation.default.aggressive", "Heh. Now that looks interesting.");
         };
     }
 

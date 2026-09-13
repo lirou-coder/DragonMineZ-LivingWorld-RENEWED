@@ -47,7 +47,7 @@ public record WorldSettingsPacket(LivingWorldConfig.Snapshot world,
         b.writeBoolean(v.canMeditationProcSkillProgression()); writeStrings(b, v.npcRaceBlacklist());
         b.writeBoolean(v.treatRaceBlacklistAsWhitelist()); writeStrings(b, v.canUseClothes()); writeStrings(b, v.dimensionWhitelist());
         b.writeBoolean(v.treatDimensionWhitelistAsBlacklist()); writeStrings(b, v.companionDimensionBlacklist()); b.writeVarInt(v.archetypeShares().size());
-        for (double share : v.archetypeShares()) b.writeDouble(share); b.writeBoolean(v.worldMenacesEnabled());
+        for (double share : v.archetypeShares()) b.writeDouble(share); b.writeBoolean(v.worldMenacesEnabled()); b.writeVarInt(v.wantedPressureDecayMinutes()); b.writeVarInt(v.npcCombatLives()); b.writeVarInt(v.racialSkillMinimumEra()); b.writeBoolean(v.npcsEnabledOnCreativeMode());
     }
 
     static LivingWorldConfig.Snapshot readWorld(FriendlyByteBuf b) {
@@ -55,7 +55,7 @@ public record WorldSettingsPacket(LivingWorldConfig.Snapshot world,
                 b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readVarInt(),
                 b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readVarInt(), b.readBoolean(), b.readVarInt(),
                 b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readVarInt(),
-                b.readVarInt(), b.readVarInt(), b.readDouble(), b.readDouble(), b.readDouble(), b.readDouble(), b.readBoolean(), readStrings(b), b.readBoolean(), readStrings(b), readStrings(b), b.readBoolean(), readStrings(b), readDoubles(b), b.readBoolean());
+                b.readVarInt(), b.readVarInt(), b.readDouble(), b.readDouble(), b.readDouble(), b.readDouble(), b.readBoolean(), readStrings(b), b.readBoolean(), readStrings(b), readStrings(b), b.readBoolean(), readStrings(b), readDoubles(b), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean());
     }
 
     private static void writeStrings(FriendlyByteBuf b, java.util.List<String> values) {

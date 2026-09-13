@@ -25,6 +25,7 @@
     "GeoItemRendererAccessor",
     "KiSenseVisualBattlePowerMixin",
     "ScouterVisualBattlePowerMixin"
+    ,"WishesScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

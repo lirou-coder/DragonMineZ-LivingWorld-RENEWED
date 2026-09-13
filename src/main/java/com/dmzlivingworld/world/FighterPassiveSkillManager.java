@@ -82,7 +82,7 @@ public final class FighterPassiveSkillManager {
             legacy.remove(STUDY_PROGRESS);
             fighter.recordLegacyEvent("Understood the theory behind " + target.label());
             FighterBattleAdaptationManager.onTheoryUnderstood(fighter, target);
-            if (fighter.getSpeech().isEmpty()) fighter.speak("I think I understand " + target.label() + ". Now I need to make it work in practice.", 84);
+            if (fighter.getSpeech().isEmpty()) fighter.speakKey("dialogue.passive.understood", "I think I understand %s. Now I need to make it work in practice.", 84, target.label());
         } else {
             legacy.putInt(STUDY_PROGRESS, progress);
         }
@@ -114,7 +114,7 @@ public final class FighterPassiveSkillManager {
         fighter.getLegacyData().put(ROOT, states);
         CompoundTag p = practice(fighter); p.remove(skill.name()); fighter.getLegacyData().put(PRACTICE, p);
         fighter.recordLegacyEvent("Unlocked passive skill: " + skill.label());
-        if (fighter.getSpeech().isEmpty()) fighter.speak(skill.label() + " finally feels natural.", 78);
+        if (fighter.getSpeech().isEmpty()) fighter.speakKey("dialogue.passive.mastered", "%s finally feels natural.", 78, skill.label());
         // Passive physical benefits are composed into the normal BP-backed profile; no parallel stat layer.
         fighter.refreshCombatStatsFromPower();
     }

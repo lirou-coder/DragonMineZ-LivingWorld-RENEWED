@@ -1,6 +1,7 @@
 package com.dmzlivingworld.command;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.network.FactionDossierPacket;
 import com.dmzlivingworld.network.LWNetwork;
 import com.dmzlivingworld.network.WorldSettingsUpdatePacket;
@@ -86,6 +87,16 @@ import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class LivingWorldCommands {
+    private static String dossierText(String key, String fallback, Object... args) {
+        return LWLang.speechKey("screen.dossier.content." + key, fallback, args);
+    }
+
+    private static String labelText(String category, String fallback) {
+        if ("faction_name".equals(category)) return fallback == null ? "" : fallback;
+        String slug = fallback == null ? "unknown" : fallback.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        return LWLang.speechKey("label." + category + "." + slug, fallback == null ? "" : fallback);
+    }
     private LivingWorldCommands() {}
 
     @SubscribeEvent
@@ -456,37 +467,39 @@ public final class LivingWorldCommands {
         if (player == null) return 0;
         java.util.List<String> lines = new java.util.ArrayList<>();
         java.util.List<FactionDossierPacket.Portrait> portraits = new java.util.ArrayList<>();
-        lines.add("## World Menaces");
+        lines.add("## " + dossierText("menace.heading", "World Menaces"));
 
         boolean herobrineKnown = WorldMenaceManager.hasSpotted(player);
         boolean experimentKnown = RedRibbonExperimentManager.hasSpotted(player);
         if (!herobrineKnown && !experimentKnown) {
-            lines.add(". No unique world menace has been identified yet.");
-            lines.add("~ Persistent threats become dossier entries only after you actually encounter them in-world.");
-            LWNetwork.sendFactionDossier(player, new FactionDossierPacket("menace", 0, "Living World — World Menaces",
-                    "No confirmed sighting", lines, "", portraits));
+            lines.add(". " + dossierText("menace.none", "No unique world menace has been identified yet."));
+            lines.add("~ " + dossierText("menace.discovery_hint", "Persistent threats become dossier entries only after you actually encounter them in-world."));
+            LWNetwork.sendFactionDossier(player, new FactionDossierPacket("menace", 0, dossierText("menace.title", "Living World — World Menaces"),
+                    dossierText("menace.no_sighting", "No confirmed sighting"), lines, "", portraits));
             return Command.SINGLE_SUCCESS;
         }
 
         if (herobrineKnown) {
             WorldMenaceData data = WorldMenaceData.get(player.serverLevel());
             java.util.UUID menaceId = WorldMenaceManager.dossierRecordId();
-            lines.add("@person:" + menaceId + "|!! Herobrine  •  WORLD MENACE  •  " + WorldMenaceManager.status(player));
-            lines.add("* Confirmed sightings: " + WorldMenaceManager.sightingCount(player));
+            lines.add("@person:" + menaceId + "|!! " + dossierText("menace.entry", "%s  •  WORLD MENACE  •  %s",
+                    "Herobrine", WorldMenaceManager.status(player)));
+            lines.add("* " + dossierText("menace.sightings", "Confirmed sightings: %s", WorldMenaceManager.sightingCount(player)));
             net.minecraft.nbt.CompoundTag spotted = WorldMenaceManager.knownProfile(player);
             if (!spotted.isEmpty()) portraits.add(new FactionDossierPacket.Portrait(menaceId, spotted));
         }
 
         if (experimentKnown) {
             java.util.UUID id = RedRibbonExperimentManager.dossierRecordId();
-            lines.add("@person:" + id + "|!! Red Ribbon Experiment X-7  •  WORLD MENACE  •  " + RedRibbonExperimentManager.status(player));
-            lines.add("* Confirmed sightings: " + RedRibbonExperimentManager.sightings(player));
+            lines.add("@person:" + id + "|!! " + dossierText("menace.entry", "%s  •  WORLD MENACE  •  %s",
+                    "Red Ribbon Experiment X-7", RedRibbonExperimentManager.status(player)));
+            lines.add("* " + dossierText("menace.sightings", "Confirmed sightings: %s", RedRibbonExperimentManager.sightings(player)));
             net.minecraft.nbt.CompoundTag spotted = RedRibbonExperimentManager.knownProfile(player);
             if (!spotted.isEmpty()) portraits.add(new FactionDossierPacket.Portrait(id, spotted));
         }
 
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("menace", 0, "Living World — World Menaces",
-                "Confirmed persistent threats", lines, "", portraits));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("menace", 0, dossierText("menace.title", "Living World — World Menaces"),
+                dossierText("menace.confirmed", "Confirmed persistent threats"), lines, "", portraits));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -517,8 +530,8 @@ public final class LivingWorldCommands {
     }
 
     public static int openGuide(ServerPlayer player) {
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("guide", 0, "Living World — Guide",
-                "Player guide", java.util.List.of()));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("guide", 0,
+                dossierText("guide.title", "Living World — Guide"), dossierText("guide.subtitle", "Player guide"), java.util.List.of()));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -531,21 +544,21 @@ public final class LivingWorldCommands {
     public static int openMeditationInfo(ServerPlayer player) {
         if (player == null) return 0;
         List<String> lines = new java.util.ArrayList<>();
-        lines.add("## Meditation");
-        lines.add("* Meditation TP follows your current Dragon Mine Z training progression instead of using a flat reward.");
-        lines.add("* Calm starts with a small TP pulse; deeper stages gradually improve the reward while keeping meditation below active training.");
-        lines.add("* Deep/Transcendent meditation can slowly train the active Dragon Mine Z form when enabled.");
-        lines.add("* A Meditative Breakthrough increases one base stat by the percentage set in World Settings.");
-        lines.add("* Deeper stages strengthen the aura/Focus Seal beneath the character and improve configured rewards.");
-        lines.add("## Living World");
-        lines.add("* Shift + Right-click a fighter you know → Meditate to train beside them.");
-        lines.add("* You can invite several nearby friendly fighters into the same meditation session; adding another partner does not restart your meditation.");
+        lines.add("## " + dossierText("meditation.heading", "Meditation"));
+        lines.add("* " + dossierText("meditation.tp", "Meditation TP follows your current Dragon Mine Z training progression instead of using a flat reward."));
+        lines.add("* " + dossierText("meditation.stages", "Calm starts with a small TP pulse; deeper stages gradually improve the reward while keeping meditation below active training."));
+        lines.add("* " + dossierText("meditation.mastery", "Deep/Transcendent meditation can slowly train the active Dragon Mine Z form when enabled."));
+        lines.add("* " + dossierText("meditation.breakthrough", "A Meditative Breakthrough increases one base stat by the percentage set in World Settings."));
+        lines.add("* " + dossierText("meditation.focus", "Deeper stages strengthen the aura/Focus Seal beneath the character and improve configured rewards."));
+        lines.add("## " + dossierText("meditation.living_world", "Living World"));
+        lines.add("* " + dossierText("meditation.interact", "Fighter Interact + Right-click a fighter you know → Meditate to train beside them."));
+        lines.add("* " + dossierText("meditation.invite_help", "You can invite several nearby friendly fighters into the same meditation session; adding another partner does not restart your meditation."));
         int partners = LivingBondManager.meditationPartnerCount(player);
-        lines.add("~ Meditation circle: " + partners + "/4 nearby fighters");
-        lines.add("@meditation:invite|Invite nearby friend");
-        lines.add(". Staying in shared meditation can gradually strengthen your relationship with each fighter.");
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("meditation", 0, "Living World • Meditation",
-                "Press M to start or stop meditation", lines));
+        lines.add("~ " + dossierText("meditation.circle", "Meditation circle: %s/4 nearby fighters", partners));
+        lines.add("@meditation:invite|" + dossierText("meditation.invite", "Invite nearby friend"));
+        lines.add(". " + dossierText("meditation.relationship", "Staying in shared meditation can gradually strengthen your relationship with each fighter."));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("meditation", 0, dossierText("meditation.title", "Living World • Meditation"),
+                dossierText("meditation.toggle", "Press M to start or stop meditation"), lines));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -558,26 +571,27 @@ public final class LivingWorldCommands {
 
         List<String> lines = new java.util.ArrayList<>();
         FactionRequestManager.ActiveQuestView quest = FactionRequestManager.activeQuestView(player);
-        lines.add("## Active Quest");
+        lines.add("## " + dossierText("world.active_quest", "Active Quest"));
         if (quest.active()) {
-            lines.add("+ " + quest.title() + " • " + quest.factionName());
+            // Keep the nested request title out of another encoded row so every client resolves
+            // the request type directly in its own language.
+            lines.add("+ " + quest.title());
+            lines.add("~ " + dossierText("world.quest_issuer", "Issued by %s", quest.factionName()));
             if (!quest.progress().isBlank()) lines.add("* " + quest.progress());
             if (!quest.note().isBlank()) lines.add(". " + quest.note());
-        } else lines.add(". No active faction request.");
+        } else lines.add(". " + dossierText("world.no_active_quest", "No active faction request."));
 
-        lines.add("## World");
+        lines.add("## " + dossierText("world.heading", "World"));
         lines.add("* " + LivingWorldDimensions.realm(level).displayName() + " • " + WorldEraData.get(level).displayName());
 
         // R40 restores the useful pre-declutter world-power snapshot without restoring the old
         // prose-heavy presentation. These two institutions are public knowledge and remain clickable.
-        lines.add("## Major World Powers");
+        lines.add("## " + dossierText("world.major_powers", "Major World Powers"));
         WorldFaction guardians = data.earthGuardians(), blackSun = data.blackSun();
-        if (guardians != null) lines.add("+ #" + guardians.slot() + " " + guardians.name() + " • Peacekeepers • "
-                + data.fighterPopulation(guardians) + " fighters • momentum x"
-                + String.format(java.util.Locale.ROOT, "%.2f", data.momentum(guardians)));
-        if (blackSun != null) lines.add("!! #" + blackSun.slot() + " " + blackSun.name() + " • Hostile power • "
-                + data.fighterPopulation(blackSun) + " fighters • momentum x"
-                + String.format(java.util.Locale.ROOT, "%.2f", data.momentum(blackSun)));
+        if (guardians != null) lines.add("+ • " + LWLang.speechKey("world.power_entry", "#%s %s | Peacekeepers | %s fighters | momentum x%s",
+                guardians.slot(), labelText("faction_name", guardians.name()), data.fighterPopulation(guardians), String.format(java.util.Locale.ROOT, "%.2f", data.momentum(guardians))));
+        if (blackSun != null) lines.add("!! • " + LWLang.speechKey("world.hostile_power_entry", "#%s %s | Hostile power | %s fighters | momentum x%s",
+                blackSun.slot(), labelText("faction_name", blackSun.name()), data.fighterPopulation(blackSun), String.format(java.util.Locale.ROOT, "%.2f", data.momentum(blackSun))));
 
         long now = level.getServer().overworld().getGameTime();
         java.util.Set<String> wars = new java.util.LinkedHashSet<>();
@@ -587,10 +601,10 @@ public final class LivingWorldCommands {
                 if (enemy == null) continue;
                 String key = faction.slot() < enemy.slot() ? faction.id() + ":" + enemy.id() : enemy.id() + ":" + faction.id();
                 if (wars.stream().noneMatch(line -> line.startsWith(key + "|")))
-                    wars.add(key + "|" + faction.name() + " ↔ " + enemy.name());
+                wars.add(key + "|" + dossierText("world.war_pair", "%s vs %s", labelText("faction_name", faction.name()), labelText("faction_name", enemy.name())));
             }
         }
-        if (wars.isEmpty()) lines.add(". No known faction war on this world.");
+        if (wars.isEmpty()) lines.add(". " + dossierText("world.no_war", "No known faction war on this world."));
         else {
             int shown = 0;
             for (String war : wars) {
@@ -603,13 +617,13 @@ public final class LivingWorldCommands {
         java.util.List<String> recentIncidents = WorldIncidentData.get(level).recent(1);
         List<String> rumors = PlayerWorldManager.rumors(player);
         if (!recentIncidents.isEmpty() || !rumors.isEmpty()) {
-            lines.add("## Recent");
+            lines.add("## " + dossierText("world.recent", "Recent"));
             if (!recentIncidents.isEmpty()) lines.add("* " + recentIncidents.get(0));
             if (!rumors.isEmpty()) lines.add("~ " + rumors.get(0));
         }
 
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("world", 0, "DragonMine Z: Living World",
-                "Overview", lines));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("world", 0, dossierText("world.title", "Dragon Mine Z: Living World"),
+                dossierText("world.overview", "Overview"), lines));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -621,7 +635,7 @@ public final class LivingWorldCommands {
         List<String> lines = new java.util.ArrayList<>();
         int known = 0, unknown = 0;
         for (FactionRealm realm : new FactionRealm[]{FactionRealm.EARTH, FactionRealm.NAMEK}) {
-            lines.add("## " + realm.displayName());
+            lines.add("## " + labelText("faction_realm", realm.displayName()));
             boolean any = false;
             for (WorldFaction faction : data.activeFactions()) {
                 if (faction.realm() != realm) continue;
@@ -629,13 +643,15 @@ public final class LivingWorldCommands {
                 any = true; known++;
                 int rep = FactionManager.getReputation(player, faction);
                 String state = data.publicState(faction, level.getServer().overworld().getGameTime());
-                lines.add((state.equals("AT WAR") ? "!! " : "* ") + "#" + faction.slot() + "  " + faction.name()
-                        + " — " + faction.structure().displayName() + " • " + state + " • " + FactionManager.reputationLabel(rep));
+                lines.add((state.equals("AT WAR") ? "!! • " : "* ") + dossierText("factions.entry_v2", "#%s %s | %s | %s | %s",
+                        faction.slot(), labelText("faction_name", faction.name()), labelText("faction_structure", faction.structure().displayName()),
+                        labelText("faction_state", state), labelText("reputation", FactionManager.reputationLabel(rep))));
             }
-            if (!any) lines.add(". No organization from this world has reached your knowledge yet.");
+            if (!any) lines.add(". " + dossierText("factions.none_known", "No organization from this world has reached your knowledge yet."));
         }
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("factions", 0, "Living World — Factions",
-                known + " known organizations • " + unknown + " still unknown", lines));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("factions", 0,
+                dossierText("factions.title", "Living World — Factions"),
+                dossierText("factions.subtitle", "%s known organizations • %s still unknown", known, unknown), lines));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -643,25 +659,28 @@ public final class LivingWorldCommands {
         FactionRequestManager.ActiveQuestView view = FactionRequestManager.activeQuestView(player);
         List<String> lines = new java.util.ArrayList<>();
         if (!view.active()) {
-            lines.add("## Active Quest");
+            lines.add("## " + dossierText("active_quest.heading", "Active Quest"));
             lines.add(". " + view.description());
             if (!view.note().isBlank()) lines.add("~ " + view.note());
         } else {
-            lines.add("## Issuing faction");
-            lines.add("+ #" + view.factionSlot() + "  " + view.factionName());
+            lines.add("## " + dossierText("active_quest.issuer", "Issuing faction"));
+        lines.add("+ #" + view.factionSlot() + "  " + labelText("faction_name", view.factionName()));
             if (!view.targetFactionName().isBlank() && !view.targetFactionName().equals(view.factionName()))
-                lines.add("!! Opposing faction • " + view.targetFactionName());
+                lines.add("!! " + dossierText("active_quest.opposing", "Opposing faction • %s",
+                        labelText("faction_name", view.targetFactionName())));
             lines.add("## " + view.title());
             if (!view.description().isBlank()) lines.add("* " + view.description());
-            if (!view.difficulty().isBlank()) lines.add("~ Difficulty: " + view.difficulty());
-            if (!view.reward().isBlank()) lines.add("+ Reward: " + view.reward());
+            if (!view.difficulty().isBlank()) lines.add("~ " + dossierText("active_quest.difficulty", "Difficulty: %s", view.difficulty()));
+            if (!view.reward().isBlank()) lines.add("+ " + dossierText("active_quest.reward", "Reward: %s", view.reward()));
             if (!view.progress().isBlank()) lines.add("~ " + view.progress());
             if (!view.note().isBlank()) lines.add(". " + view.note());
-            lines.add("@activequest:open|Open Request Board");
-            lines.add("@activequest:travel|Travel / Contacts");
+            lines.add("@activequest:open|" + dossierText("active_quest.open_board", "Open Request Board"));
+            lines.add("@activequest:travel|" + dossierText("active_quest.travel", "Travel / Contacts"));
         }
         LWNetwork.sendFactionDossier(player, new FactionDossierPacket("faction_active", view.active() ? view.factionSlot() : 0,
-                "Living World — Active Quest", view.active() ? "Issued by " + view.factionName() : "No accepted faction request", lines));
+                dossierText("active_quest.title", "Living World — Active Quest"),
+                view.active() ? dossierText("active_quest.issued_by", "Issued by %s", labelText("faction_name", view.factionName()))
+                        : dossierText("active_quest.none", "No accepted faction request"), lines));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -670,10 +689,11 @@ public final class LivingWorldCommands {
         WorldFaction faction = FactionManager.bySlot(level, slot);
         if (faction == null) return missingFaction(player, slot);
         if (!PlayerWorldManager.knowsFaction(player, faction)) {
-            LWNetwork.sendFactionDossier(player, new FactionDossierPacket("faction", slot, "Unknown Organization",
-                    "You have not learned enough about faction #" + slot, List.of(
-                    ". Find their members, enter their rally region, or learn about them through another faction.",
-                    ". Learn more by meeting members and hearing about them in the world.")));
+            LWNetwork.sendFactionDossier(player, new FactionDossierPacket("faction", slot,
+                    dossierText("faction_unknown.title", "Unknown Organization"),
+                    dossierText("faction_unknown.subtitle", "You have not learned enough about faction #%s", slot), List.of(
+                    ". " + dossierText("faction_unknown.find", "Find their members, enter their rally region, or learn about them through another faction."),
+                    ". " + dossierText("faction_unknown.learn", "Learn more by meeting members and hearing about them in the world."))));
             return Command.SINGLE_SUCCESS;
         }
         return factionInspect(player, slot);
@@ -720,10 +740,11 @@ public final class LivingWorldCommands {
         // Faction people use the same remembered portrait cards as People/Wanted. The appearance
         // payload is SeenProfile, so a person's dossier avatar is the last appearance the player
         // actually witnessed rather than silently updating to their current unloaded simulation state.
-        lines.add("## Leadership");
+        lines.add("## " + dossierText("faction_roster.leadership", "Leadership"));
         String leaderName = data.currentLeaderName(faction);
-        String leaderStatus = data.isLeaderKilled(faction) ? "fallen • succession pending"
-                : data.isLeaderSpawned(faction) ? "currently present" : "currently away";
+        String leaderStatus = data.isLeaderKilled(faction) ? dossierText("faction_roster.leader_fallen", "fallen • succession pending")
+                : data.isLeaderSpawned(faction) ? dossierText("faction_roster.leader_present", "currently present")
+                : dossierText("faction_roster.leader_away", "currently away");
         FighterMemoryManager.KnownFactionPerson knownLeader = known.stream()
                 .filter(person -> leaderName.equals(person.name())).findFirst().orElse(null);
         String leaderText = (data.isLeaderKilled(faction) ? "!! " : "+ ") + faction.roleTitle(FactionRole.LEADER)
@@ -734,29 +755,32 @@ public final class LivingWorldCommands {
         } else lines.add(leaderText);
         shownNames.add(leaderName);
 
-        lines.add("## Members you know");
+        lines.add("## " + dossierText("faction_roster.known_members", "Members you know"));
         int knownOthers = 0;
         for (FighterMemoryManager.KnownFactionPerson person : known) {
             if (!shownNames.add(person.name())) continue;
             knownOthers++;
             String activity = person.activity() == null || person.activity().isBlank() ? "last seen away" : person.activity();
-            lines.add("@person:" + person.recordId() + "|* " + faction.roleTitle(person.role()) + " • " + person.name()
-                    + " — " + person.rank().displayName() + " • "
-                    + FighterRelationshipManager.relationshipStage(person.relationship()) + " • " + activity);
+            lines.add("@person:" + person.recordId() + "|* " + dossierText("faction_roster.member_line", "%s • %s — %s • %s • %s",
+                    labelText("faction_role", faction.roleTitle(person.role())), person.name(),
+                    labelText("fighter_rank", person.rank().displayName()),
+                    labelText("relationship", FighterRelationshipManager.relationshipStage(person.relationship())),
+                    labelText("activity", activity)));
             portraits.add(new FactionDossierPacket.Portrait(person.recordId(), person.appearance().copy()));
         }
-        if (knownOthers == 0) lines.add(". You have not personally identified any other members yet.");
+        if (knownOthers == 0) lines.add(". " + dossierText("faction_roster.no_other_members", "You have not personally identified any other members yet."));
 
         int knownNamed = knownOthers + 1;
         int estimate = Math.max(knownNamed, data.population(faction));
-        lines.add("## Membership");
-        lines.add("* " + knownNamed + " named member" + (knownNamed == 1 ? "" : "s")
-                + " known to you • about " + estimate + " members in the faction");
-        if (estimate > knownNamed) lines.add(". You have not identified everyone in this faction yet.");
-        else lines.add(". You currently know the named members represented here.");
+        lines.add("## " + dossierText("faction_roster.membership", "Membership"));
+        lines.add("* " + dossierText("faction_roster.membership_count",
+                "%s named member(s) known to you • about %s members in the faction", knownNamed, estimate));
+        if (estimate > knownNamed) lines.add(". " + dossierText("faction_roster.unidentified", "You have not identified everyone in this faction yet."));
+        else lines.add(". " + dossierText("faction_roster.all_known", "You currently know the named members represented here."));
 
         LWNetwork.sendFactionDossier(player, new FactionDossierPacket("faction_roster", slot,
-                "#" + slot + "  " + faction.name(), faction.realm().displayName() + " • Members", lines, "", portraits));
+                "#" + slot + "  " + labelText("faction_name", faction.name()),
+                dossierText("faction_roster.subtitle", "%s | Members", labelText("faction_realm", faction.realm().displayName())), lines, "", portraits));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -764,40 +788,41 @@ public final class LivingWorldCommands {
         List<String> lines = new java.util.ArrayList<>();
                 java.util.List<String> companions = LivingBondManager.companionNames(player);
                 if (!companions.isEmpty()) {
-                        lines.add("## Companions");
-                        for (String companion : companions) lines.add("+ " + companion + " is travelling with you");
-                        lines.add("@travel:recall|Regroup companions");
-                        lines.add("@travel:end|End travel with all companions");
+                        lines.add("## " + dossierText("people.companions", "Companions"));
+                        for (String companion : companions) lines.add("+ " + dossierText("people.companion_line", "%s is travelling with you", companion));
+                        lines.add("@travel:recall|" + dossierText("people.regroup", "Regroup companions"));
+                        lines.add("@travel:end|" + dossierText("people.end_all", "End travel with all companions"));
         }
         // Instant Transmission status belongs to the selected remembered fighter, not the
         // directory itself. People remains an index; open a person to see live lock/cooldown state.
-        lines.add("@sort:people|Sort: " + FighterMemoryManager.peopleSortLabel(player));
-        lines.add("## Remembered people");
+        lines.add("@sort:people|" + dossierText("people.sort", "Sort: %s",
+                labelText("people_sort", FighterMemoryManager.peopleSortLabel(player))));
+        lines.add("## " + dossierText("people.remembered", "Remembered people"));
         lines.addAll(FighterMemoryManager.peopleLines(player));
-        if (FighterMemoryManager.count(player) > 0) lines.add("@clear:known|Forget all remembered people");
+        if (FighterMemoryManager.count(player) > 0) lines.add("@clear:known|" + dossierText("people.forget_all", "Forget all remembered people"));
         java.util.List<FighterLegacyWorldData.FallenEntry> fallenEntries = java.util.List.of();
         if (player.level() instanceof ServerLevel level) {
             fallenEntries = FighterLegacyWorldData.get(level).recentEntriesSince(5, FighterMemoryManager.fallenViewSince(player));
             if (!fallenEntries.isEmpty()) {
-                lines.add("## Recently fallen");
+                lines.add("## " + dossierText("people.recently_fallen", "Recently fallen"));
                 for (int fallenIndex = 0; fallenIndex < fallenEntries.size(); fallenIndex++) {
                     FighterLegacyWorldData.FallenEntry fallen = fallenEntries.get(fallenIndex);
                     if (fallen.recordId() != null && !fallen.appearance().isEmpty())
                         lines.add("@fallen:" + fallen.recordId() + "|#" + (fallenIndex + 1) + " " + fallen.line());
                     else lines.add(". " + fallen.line());
                 }
-                lines.add("@clear:fallen|Clear fallen history from this view");
+                lines.add("@clear:fallen|" + dossierText("people.clear_fallen", "Clear fallen history from this view"));
             }
         }
-        lines.add(". Strong bonds come from shared history: rescues, fights, travel, training, equipment and meditation.");
+        lines.add(". " + dossierText("people.bond_hint", "Strong bonds come from shared history: rescues, fights, travel, training, equipment and meditation."));
         java.util.List<FactionDossierPacket.Portrait> portraits = new java.util.ArrayList<>();
         FighterMemoryManager.peoplePortraitSnapshots(player).forEach((id, appearance) ->
                 portraits.add(new FactionDossierPacket.Portrait(id, appearance)));
         for (FighterLegacyWorldData.FallenEntry fallen : fallenEntries)
             if (fallen.recordId() != null && !fallen.appearance().isEmpty())
                 portraits.add(new FactionDossierPacket.Portrait(fallen.recordId(), fallen.appearance()));
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("people", 0, "Living World — People",
-                "Click a person to view what you last remember about them", lines, "", portraits));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("people", 0, dossierText("people.title", "Living World — People"),
+                dossierText("people.subtitle", "Click a person to view what you last remember about them"), lines, "", portraits));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -825,18 +850,18 @@ public final class LivingWorldCommands {
     public static int openTravel(ServerPlayer player) {
         List<String> lines = new java.util.ArrayList<>();
                 java.util.List<String> companions = LivingBondManager.companionNames(player);
-                lines.add("## Companions");
+                lines.add("## " + dossierText("people.companions", "Companions"));
                 if (companions.isEmpty()) {
-            lines.add(". Nobody is travelling with you right now.");
-            lines.add(". A fighter who trusts you can sometimes agree to come along from their profile.");
+            lines.add(". " + dossierText("travel.none", "Nobody is travelling with you right now."));
+            lines.add(". " + dossierText("travel.recruit_hint", "A fighter who trusts you can sometimes agree to come along from their profile."));
         } else {
-                        for (String companion : companions) lines.add("+ " + companion + " is travelling with you");
-            lines.add(". If they fall behind, change dimensions, or their chunk unloads, Living World now attempts to regroup them automatically.");
-            lines.add("@travel:recall|Regroup companion");
-            lines.add("@travel:end|End travel");
+                        for (String companion : companions) lines.add("+ " + dossierText("people.companion_line", "%s is travelling with you", companion));
+            lines.add(". " + dossierText("travel.regroup_hint", "If they fall behind, change dimensions, or their chunk unloads, Living World attempts to regroup them automatically."));
+            lines.add("@travel:recall|" + dossierText("travel.regroup", "Regroup companion"));
+            lines.add("@travel:end|" + dossierText("travel.end", "End travel"));
         }
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("travel", 0, "Living World — Companion",
-                "Manage the fighter currently travelling with you", lines));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("travel", 0, dossierText("travel.title", "Living World — Companion"),
+                dossierText("travel.subtitle", "Manage the fighters currently travelling with you"), lines));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -869,32 +894,32 @@ public final class LivingWorldCommands {
         int knownOrganizations = 0;
         int hiddenOrganizations = 0;
 
-        lines.add("## Organizations");
+        lines.add("## " + dossierText("antagonists.organizations", "Organizations"));
         for (WorldFaction faction : data.activeFactions()) {
             if (!antagonists.isAntagonistFaction(faction.id())) continue;
             if (!PlayerWorldManager.knowsFaction(player, faction)) { hiddenOrganizations++; continue; }
             knownOrganizations++;
             int rep = FactionManager.getReputation(player, faction);
             String state = data.publicState(faction, level.getServer().overworld().getGameTime());
-            lines.add("!! #" + faction.slot() + "  " + faction.name() + " — " + state
-                    + " • " + FactionManager.reputationLabel(rep));
+            lines.add("!! • " + dossierText("antagonists.faction_entry_v2", "#%s %s | %s | %s", faction.slot(), labelText("faction_name", faction.name()),
+                    labelText("faction_state", state), labelText("faction_reputation", FactionManager.reputationLabel(rep))));
             int knownPeople = FighterMemoryManager.knownFactionPeople(player, faction.id()).size();
-            if (knownPeople == 0) lines.add(". You know the organization, but have not personally learned much about its members yet.");
-            else lines.add(". " + knownPeople + " member" + (knownPeople == 1 ? "" : "s") + " personally known to you.");
+            if (knownPeople == 0) lines.add(". " + dossierText("antagonists.no_members", "You know the organization, but have not personally learned much about its members yet."));
+            else lines.add(". " + dossierText("antagonists.known_members", "%s member(s) personally known to you.", knownPeople));
         }
-        if (knownOrganizations == 0) lines.add(". You have not identified any major hostile organization yet.");
+        if (knownOrganizations == 0) lines.add(". " + dossierText("antagonists.none", "You have not identified any major hostile organization yet."));
 
-        lines.add("## People");
+        lines.add("## " + dossierText("antagonists.people", "People"));
         List<String> people = FighterMemoryManager.antagonistLines(player);
-        if (people.isEmpty()) lines.add(". No recurring individual antagonist has become part of your remembered history yet.");
+        if (people.isEmpty()) lines.add(". " + dossierText("antagonists.no_people", "No recurring individual antagonist has become part of your remembered history yet."));
         else lines.addAll(people);
 
-        if (hiddenOrganizations > 0) lines.add(". Some hostile organizations remain unidentified.");
+        if (hiddenOrganizations > 0) lines.add(". " + dossierText("antagonists.hidden", "Some hostile organizations remain unidentified."));
         java.util.List<FactionDossierPacket.Portrait> portraits = new java.util.ArrayList<>();
         FighterMemoryManager.peoplePortraitSnapshots(player).forEach((id, appearance) ->
                 portraits.add(new FactionDossierPacket.Portrait(id, appearance)));
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("antagonists", 0, "Living World — Antagonists",
-                "Recurring opposition known to you", lines, "", portraits));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("antagonists", 0, dossierText("antagonists.title", "Living World — Antagonists"),
+                dossierText("antagonists.subtitle", "Recurring opposition known to you"), lines, "", portraits));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -1669,24 +1694,26 @@ public final class LivingWorldCommands {
         long earth = all.stream().filter(f -> f.realm() == FactionRealm.EARTH && !data.isExtinct(f)).count();
         long namek = all.stream().filter(f -> f.realm() == FactionRealm.NAMEK && !data.isExtinct(f)).count();
         List<String> lines = new java.util.ArrayList<>();
-        lines.add(". These totals describe the wider faction; you will meet only the people who are currently nearby.");
+        lines.add(". " + dossierText("faction_list.scope", "These totals describe the wider faction; you will meet only the people who are currently nearby."));
         for (FactionRealm realm : new FactionRealm[]{FactionRealm.EARTH, FactionRealm.NAMEK}) {
-            lines.add("## " + realm.displayName());
+            lines.add("## " + labelText("realm", realm.displayName()));
             for (WorldFaction faction : all) {
                 if (faction.realm() != realm || data.isExtinct(faction)) continue;
                 int rep = FactionManager.getReputation(player, faction);
                 String state = data.publicState(faction, now);
                 boolean antagonist = AntagonistWorldData.get(level).isAntagonistFaction(faction.id());
                 String prefix = antagonist || state.equals("AT WAR") ? "!! " : state.equals("ASCENDANT") || state.equals("RISING") ? "+ " : "* ";
-                lines.add(prefix + "#" + faction.slot() + "  " + faction.name() + "  —  " + faction.structure().displayName()
-                        + (antagonist ? "  •  ANTAGONIST" : "")
-                        + "  •  Pop " + data.population(faction) + "  •  " + state
-                        + "  •  Rep " + rep + " " + FactionManager.reputationLabel(rep));
+                lines.add(prefix + dossierText("faction_list.entry", "#%s  %s — %s%s • Pop %s • %s • Rep %s %s",
+                        faction.slot(), faction.name(), labelText("faction_structure", faction.structure().displayName()),
+                        antagonist ? dossierText("faction_list.antagonist_suffix", " • ANTAGONIST") : "",
+                        data.population(faction), labelText("faction_state", state), rep,
+                        labelText("faction_reputation", FactionManager.reputationLabel(rep))));
             }
         }
-        if (extinct > 0) lines.add(". " + extinct + " extinct organization" + (extinct == 1 ? " remains" : "s remain") + " in world history.");
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("factions", 0, "Living World — Factions",
-                active + " active organizations • Earth " + earth + " • Namek " + namek, lines));
+        if (extinct > 0) lines.add(". " + dossierText("faction_list.extinct", "%s extinct organization(s) remain in world history.", extinct));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("factions", 0,
+                dossierText("factions.title", "Living World — Factions"),
+                dossierText("faction_list.summary", "%s active organizations • Earth %s • Namek %s", active, earth, namek), lines));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -1724,70 +1751,75 @@ public final class LivingWorldCommands {
         // Hidden presentation metadata: the dossier renders the same center-zero relationship bar
         // used by individual fighter profiles, while the existing standing text stays accessible.
         lines.add("@factionbond|" + rep + "|" + FactionManager.reputationLabel(rep));
-        lines.add((state.equals("AT WAR") ? "!! " : "~ ") + "STATE  " + state);
+        lines.add((state.equals("AT WAR") ? "!! " : "~ ") + dossierText("faction.state", "STATE  %s", labelText("faction_state", state)));
         AntagonistWorldData antagonistData = AntagonistWorldData.get(level);
         if (antagonistData.isAntagonistFaction(faction.id())) {
-            lines.add("!! ANTAGONIST ORGANIZATION • " + antagonistData.reason(faction.id()));
+            lines.add("!! " + dossierText("faction.antagonist", "ANTAGONIST ORGANIZATION • %s", antagonistData.reason(faction.id())));
         }
         if (data.earthGuardians() != null && data.earthGuardians().id().equals(faction.id()))
-            lines.add("+ Public peacekeepers and crisis responders.");
+            lines.add("+ " + dossierText("faction.peacekeepers", "Public peacekeepers and crisis responders."));
         if (data.blackSun() != null && data.blackSun().id().equals(faction.id()))
-            lines.add("!! Hostile underworld organization.");
-        lines.add("* " + faction.realm().displayName() + " • " + faction.structure().displayName() + " • "
-                + faction.ethos().displayName() + " • " + faction.alignment().displayName());
-        if (FighterArsenalManager.isSwordFaction(faction)) lines.add("+ Weapon tradition: swordsmen • combat members carry DMZ swords.");
-        lines.add("* Your standing: " + rep + " — " + FactionManager.reputationLabel(rep));
-        lines.add("## Society");
-        lines.add("* Population: " + data.population(faction) + "  (fighters " + data.fighterPopulation(faction)
-                + ", civilians " + data.civilianPopulation(faction) + ", youth " + data.youthPopulation(faction) + ")");
-        lines.add("* Supplies: " + data.supplies(faction) + "/120 — " + data.supplyLabel(faction));
-        lines.add("## Leadership");
+            lines.add("!! " + dossierText("faction.underworld", "Hostile underworld organization."));
+        lines.add("* " + dossierText("faction.identity", "%s • %s • %s • %s",
+                labelText("realm", faction.realm().displayName()), labelText("faction_structure", faction.structure().displayName()),
+                labelText("faction_ethos", faction.ethos().displayName()), labelText("alignment", faction.alignment().displayName())));
+        if (FighterArsenalManager.isSwordFaction(faction)) lines.add("+ " + dossierText("faction.swords", "Weapon tradition: swordsmen • combat members carry DMZ swords."));
+        lines.add("* " + dossierText("faction.standing", "Your standing: %s — %s", rep, labelText("faction_reputation", FactionManager.reputationLabel(rep))));
+        lines.add("## " + dossierText("faction.society", "Society"));
+        lines.add("* " + dossierText("faction.population", "Population: %s (fighters %s, civilians %s, youth %s)",
+                data.population(faction), data.fighterPopulation(faction), data.civilianPopulation(faction), data.youthPopulation(faction)));
+        lines.add("* " + dossierText("faction.supplies", "Supplies: %s/120 — %s", data.supplies(faction), labelText("supply", data.supplyLabel(faction))));
+        lines.add("## " + dossierText("faction.leadership", "Leadership"));
         String leaderState;
         if (data.isLeaderKilled(faction)) {
             long remain = Math.max(0L, data.successionAt(faction) - now);
-            leaderState = "FALLEN • succession in " + String.format(java.util.Locale.ROOT, "%.1f", remain / 24000.0D) + " days";
-        } else leaderState = data.isLeaderSpawned(faction) ? "active in world" : "not currently nearby";
-        lines.add("* " + faction.roleTitle(FactionRole.LEADER) + " " + data.currentLeaderName(faction) + " — " + leaderState);
-        lines.add(". Rank ladder: " + faction.roleTitle(FactionRole.RECRUIT) + " → " + faction.roleTitle(FactionRole.MEMBER)
-                + " → " + faction.roleTitle(FactionRole.ENFORCER) + " → " + faction.roleTitle(FactionRole.LIEUTENANT)
-                + " → " + faction.roleTitle(FactionRole.LEADER));
+            leaderState = dossierText("faction.leader_fallen", "FALLEN • succession in %s days", String.format(java.util.Locale.ROOT, "%.1f", remain / 24000.0D));
+        } else leaderState = data.isLeaderSpawned(faction) ? dossierText("faction.leader_active", "active in world") : dossierText("faction.leader_away", "not currently nearby");
+        lines.add("* " + dossierText("faction.leader", "%s %s — %s", faction.roleTitle(FactionRole.LEADER), data.currentLeaderName(faction), leaderState));
+        lines.add(". " + dossierText("faction.rank_ladder", "Rank ladder: %s → %s → %s → %s → %s",
+                faction.roleTitle(FactionRole.RECRUIT), faction.roleTitle(FactionRole.MEMBER), faction.roleTitle(FactionRole.ENFORCER),
+                faction.roleTitle(FactionRole.LIEUTENANT), faction.roleTitle(FactionRole.LEADER)));
         if (antagonistData.isAntagonistFaction(faction.id())) {
-            lines.add("## Antagonist core");
+            lines.add("## " + dossierText("faction.antagonist_core", "Antagonist core"));
             java.util.List<AntagonistWorldData.CoreMember> core = antagonistData.coreMembers(faction.id());
-            if (core.isEmpty()) lines.add(". No recurring core members have emerged yet.");
+            if (core.isEmpty()) lines.add(". " + dossierText("faction.no_core", "No recurring core members have emerged yet."));
             else for (AntagonistWorldData.CoreMember member : core) {
-                lines.add((member.fallen() ? "x " : "!! ") + member.name() + (member.fallen() ? " — fallen" : " — recurring core"));
+                lines.add((member.fallen() ? "x " : "!! ") + dossierText(member.fallen() ? "faction.core_fallen" : "faction.core_recurring",
+                        member.fallen() ? "%s — fallen" : "%s — recurring core", member.name()));
             }
         }
-        lines.add("## Territory & activity");
-        lines.add("* Natural rally territory: X " + faction.roamX() + " Z " + faction.roamZ() + " • radius ~" + faction.roamRadius());
+        lines.add("## " + dossierText("faction.territory_activity", "Territory & activity"));
+        lines.add("* " + dossierText("faction.territory", "Natural rally territory: X %s Z %s • radius ~%s", faction.roamX(), faction.roamZ(), faction.roamRadius()));
         List<WorldFaction> wars = data.warEnemies(faction, now);
-        if (!wars.isEmpty()) lines.add("!! WAR: " + wars.stream().map(WorldFaction::name).collect(java.util.stream.Collectors.joining(", ")));
+        if (!wars.isEmpty()) lines.add("!! " + dossierText("faction.war", "WAR: %s", wars.stream().map(WorldFaction::name).collect(java.util.stream.Collectors.joining(", "))));
         List<PrisonerWorldData.Prisoner> missing = PrisonerWorldData.get(level).active().stream().filter(p -> p.victimFactionId.equals(faction.id())).toList();
         List<PrisonerWorldData.Prisoner> held = PrisonerWorldData.get(level).active().stream().filter(p -> p.captorFactionId.equals(faction.id())).toList();
         if (!missing.isEmpty() || !held.isEmpty()) {
-            lines.add("## Captivity");
-            for (PrisonerWorldData.Prisoner prisoner : missing) lines.add("!! Missing: " + prisoner.name + " — held by "
-                    + java.util.Optional.ofNullable(data.byId(prisoner.captorFactionId)).map(WorldFaction::name).orElse("an enemy faction"));
-            if (!held.isEmpty()) lines.add("* Prisoners currently held: " + held.size());
+            lines.add("## " + dossierText("faction.captivity", "Captivity"));
+            for (PrisonerWorldData.Prisoner prisoner : missing) lines.add("!! " + dossierText("faction.missing_prisoner", "Missing: %s — held by %s",
+                    prisoner.name, java.util.Optional.ofNullable(data.byId(prisoner.captorFactionId)).map(WorldFaction::name)
+                            .orElse(dossierText("faction.enemy_faction", "an enemy faction"))));
+            if (!held.isEmpty()) lines.add("* " + dossierText("faction.prisoners_held", "Prisoners currently held: %s", held.size()));
         }
-        lines.add("## Notable relations");
+        lines.add("## " + dossierText("faction.notable_relations", "Notable relations"));
         int shown = 0;
         for (WorldFaction other : data.activeFactions()) {
             if (other.id().equals(faction.id()) || other.realm() != faction.realm()) continue;
             var relation = FactionManager.relation(level.getServer().overworld(), faction, other);
             if (relation == com.dmzlivingworld.world.FactionRelation.NEUTRAL) continue;
-            lines.add((relation.hostile() ? "!! " : relation.allied() ? "+ " : "* ") + other.name() + " — " + relation.displayName());
+            lines.add((relation.hostile() ? "!! " : relation.allied() ? "+ " : "* ")
+                    + dossierText("faction.relation", "%s — %s", other.name(), labelText("faction_relation", relation.displayName())));
             if (++shown >= 6) break;
         }
-        if (shown == 0) lines.add(". No notable current relationships.");
-        lines.add("## Recent history");
+        if (shown == 0) lines.add(". " + dossierText("faction.no_relations", "No notable current relationships."));
+        lines.add("## " + dossierText("faction.recent_history", "Recent history"));
         List<String> history = data.history(faction);
-        if (history.isEmpty()) lines.add(". No major recorded events yet.");
+        if (history.isEmpty()) lines.add(". " + dossierText("faction.no_history", "No major recorded events yet."));
         else for (int i = Math.max(0, history.size() - 7); i < history.size(); i++) lines.add("* " + history.get(i));
 
         LWNetwork.sendFactionDossier(player, new FactionDossierPacket("faction", slot, "#" + slot + "  " + faction.name(),
-                faction.realm().displayName() + " • " + faction.structure().displayName() + " • " + state, lines));
+                dossierText("faction.subtitle", "%s • %s • %s", labelText("realm", faction.realm().displayName()),
+                        labelText("faction_structure", faction.structure().displayName()), labelText("faction_state", state)), lines));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -2046,12 +2078,14 @@ public final class LivingWorldCommands {
         if (faction == null) return missingFaction(player, slot);
         List<String> history = FactionWorldData.get(level).history(faction);
         List<String> lines = new java.util.ArrayList<>();
-        lines.add(". Only consequential events are recorded here; everyday life is not listed individually.");
-        lines.add("## Major events");
-        if (history.isEmpty()) lines.add(". No major recorded events yet.");
+        lines.add(". " + dossierText("faction_history.scope", "Only consequential events are recorded here; everyday life is not listed individually."));
+        lines.add("## " + dossierText("faction_history.heading", "Major events"));
+        if (history.isEmpty()) lines.add(". " + dossierText("faction.no_history", "No major recorded events yet."));
         else for (String line : history) lines.add("* " + line);
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("faction", slot, faction.name() + " — History",
-                faction.realm().displayName() + " • " + faction.structure().displayName(), lines));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("faction", slot,
+                dossierText("faction_history.title", "%s — History", faction.name()),
+                dossierText("faction_history.subtitle", "%s • %s", labelText("realm", faction.realm().displayName()),
+                        labelText("faction_structure", faction.structure().displayName())), lines));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -2095,7 +2129,7 @@ public final class LivingWorldCommands {
         FactionRole role = member.isNonCombatant() ? FactionRole.RECRUIT
                 : member.getFactionRole() == FactionRole.LIEUTENANT ? FactionRole.ENFORCER : member.getFactionRole();
         member.assignFaction(to, role, null, false, member.isRegionalPresence());
-        member.speak("I answer to " + to.name() + " now.", 70);
+        member.speak(LWLang.speechKey("dialogue.faction.defection", "I answer to %s now.", to.name()), 70);
         player.displayClientMessage(Component.literal("[Living World] Forced defection: " + member.getFighterName()
                 + " • " + from.name() + " → " + to.name()).withStyle(ChatFormatting.GOLD), false);
         return Command.SINGLE_SUCCESS;
@@ -2107,30 +2141,33 @@ public final class LivingWorldCommands {
         List<String> lines = new java.util.ArrayList<>();
         java.util.List<FactionDossierPacket.Portrait> portraits = new java.util.ArrayList<>();
         if (WantedManager.isPlayerWanted(player)) {
-            lines.add("!! YOU ARE WANTED • " + "★".repeat(WantedManager.playerWantedSeverity(player)) + " • "
-                    + WantedManager.playerWantedCrime(player) + " • guard-aligned factions may pursue you");
+            lines.add("!! " + dossierText("wanted.player_wanted", "YOU ARE WANTED • %s • %s • guard-aligned factions may pursue you",
+                    "★".repeat(WantedManager.playerWantedSeverity(player)), WantedManager.localizedCrime(WantedManager.playerWantedCrime(player))));
         } else {
             int unlawful = WantedManager.playerUnlawfulKills(player);
-            if (unlawful > 0) lines.add(". Recent unlawful kills: " + unlawful);
+            if (unlawful > 0) lines.add(". " + dossierText("wanted.unlawful_kills", "Recent unlawful kills: %s", unlawful));
         }
         for (FactionRealm realm : new FactionRealm[]{FactionRealm.EARTH, FactionRealm.NAMEK}) {
-            lines.add("## " + realm.displayName());
+            lines.add("## " + labelText("faction_realm", realm.displayName()));
             boolean any = false;
             for (WantedWorldData.WantedProfile p : data.profiles()) {
                 if (p.realm != realm) continue;
                 any = true;
                 java.util.UUID cardId = java.util.UUID.nameUUIDFromBytes(("dmzlivingworld:wanted:" + p.id)
                         .getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                String status = p.eliminated ? "ELIMINATED" : p.spawned ? "last known in world" : "whereabouts unknown";
-                lines.add("@person:" + cardId + "|" + (p.eliminated ? ". " : "!! ") + "#" + p.slot + "  " + p.name
-                        + "  •  " + "★".repeat(Math.max(1, p.severity)) + "  •  " + p.crime + "  •  " + status);
+                String status = p.eliminated ? dossierText("wanted.status.eliminated", "ELIMINATED")
+                        : p.spawned ? dossierText("wanted.status.last_known", "last known in world")
+                        : dossierText("wanted.status.unknown", "whereabouts unknown");
+                lines.add("@person:" + cardId + "|" + (p.eliminated ? ". " : "!! ")
+                        + dossierText("wanted.entry", "#%s  %s  •  %s  •  %s  •  %s", p.slot, p.name,
+                        "★".repeat(Math.max(1, p.severity)), WantedManager.localizedCrime(p.crime), status));
                 if (p.profile != null && !p.profile.isEmpty())
                     portraits.add(new FactionDossierPacket.Portrait(cardId, p.profile));
             }
-            if (!any) lines.add(". No known wanted fighters here.");
+            if (!any) lines.add(". " + dossierText("wanted.none", "No known wanted fighters here."));
         }
-        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("wanted", 0, "Living World — Wanted",
-                "Known wanted fighters", lines, "", portraits));
+        LWNetwork.sendFactionDossier(player, new FactionDossierPacket("wanted", 0, dossierText("wanted.title", "Living World — Wanted"),
+                dossierText("wanted.subtitle", "Known wanted fighters"), lines, "", portraits));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -2264,8 +2301,8 @@ public final class LivingWorldCommands {
     }
 
     private static int sense(ServerPlayer player) {
-        player.displayClientMessage(Component.literal("[Living World] " + PowerSensingManager.senseNow(player))
-                .withStyle(ChatFormatting.AQUA), false);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.power_sense.command_prefix")
+                .append(PowerSensingManager.senseNow(player)).withStyle(ChatFormatting.AQUA), false);
         return Command.SINGLE_SUCCESS;
     }
 

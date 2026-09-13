@@ -3,6 +3,7 @@ package com.dmzlivingworld.client.screen;
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.network.FactionRequestTrackerPacket;
 import com.dmzlivingworld.client.ClientModEvents;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldClientConfig;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
@@ -48,12 +49,12 @@ public final class FactionRequestTrackerOverlay {
         FactionRequestTrackerPacket data = current;
         Minecraft mc = Minecraft.getInstance();
         if (data == null || !data.active() || mc.player == null) {
-            cachedLiveProgress = data == null ? "" : data.progress();
+            cachedLiveProgress = data == null ? "" : LWLang.speech(data.progress()).getString();
             return;
         }
         long tick = mc.level == null ? 0L : mc.level.getGameTime();
         if (!force && tick - cachedLiveProgressTick < 5L) return;
-        cachedLiveProgress = SupplyInventoryClient.withLiveCounts(data.progress(), data.supplyItems());
+        cachedLiveProgress = SupplyInventoryClient.withLiveCounts(LWLang.speech(data.progress()).getString(), data.supplyItems());
         cachedLiveProgressTick = tick;
     }
 
@@ -79,7 +80,7 @@ public final class FactionRequestTrackerOverlay {
         g.pose().translate(-screenW, -screenH, 0.0F);
         String key = ClientModEvents.TOGGLE_FACTION_QUEST.getTranslatedKeyMessage().getString();
         if (hiddenByPlayer) {
-            String prompt = "Press " + key + " to open faction quest";
+            String prompt = LWLang.string("hud.faction_request.open", key);
             int w = mc.font.width(prompt) + 20, h = 30, x = screenW - w - 10, y = Math.max(8, screenH - h - 10);
             g.fill(x - 1, y - 1, x + w + 1, y + h + 1, LivingWorldGuiStyle.GOLD_DARK);
             g.fill(x, y, x + w, y + h, 0xE80A1018);
@@ -98,13 +99,13 @@ public final class FactionRequestTrackerOverlay {
         g.fill(x, y, x + w, y + h, 0xE80A1018);
         g.fill(x, y, x + 4, y + h, LivingWorldGuiStyle.GOLD);
 
-        g.drawString(mc.font, "FACTION REQUEST", x + 10, y + 7, LivingWorldGuiStyle.GOLD, false);
-        String close = "Press " + key + " To Close";
+        g.drawString(mc.font, LWLang.string("hud.faction_request.title"), x + 10, y + 7, LivingWorldGuiStyle.GOLD, false);
+        String close = LWLang.string("hud.faction_request.close", key);
         g.drawString(mc.font, close, x + w - 10 - mc.font.width(close), y + 7, LivingWorldGuiStyle.MUTED, false);
-        drawWrappedLimited(g, mc, data.title(), x + 10, y + 19, textWidth, LivingWorldGuiStyle.TEXT, 2);
+        drawWrappedLimited(g, mc, LWLang.speech(data.title()).getString(), x + 10, y + 19, textWidth, LivingWorldGuiStyle.TEXT, 2);
 
-        g.drawString(mc.font, "CURRENT OBJECTIVE", x + 10, y + 43, LivingWorldGuiStyle.BLUE, false);
-        drawWrappedLimited(g, mc, data.stepLabel(), x + 10, y + 55, textWidth, LivingWorldGuiStyle.TEXT, 2);
+        g.drawString(mc.font, LWLang.string("hud.faction_request.current_objective"), x + 10, y + 43, LivingWorldGuiStyle.BLUE, false);
+        drawWrappedLimited(g, mc, LWLang.speech(data.stepLabel()).getString(), x + 10, y + 55, textWidth, LivingWorldGuiStyle.TEXT, 2);
 
         String liveProgress = cachedLiveProgress;
         if (!liveProgress.isBlank())
@@ -119,14 +120,14 @@ public final class FactionRequestTrackerOverlay {
         String nav;
         if (arrived) {
             if (data.secondsRemaining() >= 0)
-                nav = "IN POSITION • " + data.secondsRemaining() + "s remaining";
+                nav = LWLang.string("hud.faction_request.in_position.seconds", data.secondsRemaining());
             else if (!data.actionPrompt().isBlank())
-                nav = "IN POSITION • " + data.actionPrompt();
-            else nav = "IN POSITION • objective ready";
+                nav = LWLang.string("hud.faction_request.in_position.action", LWLang.speech(data.actionPrompt()));
+            else nav = LWLang.string("hud.faction_request.in_position.ready");
         } else {
-            nav = liveDirection + " • " + liveDistance + " blocks";
-            if (radius <= 6) nav += " • get within " + radius;
-            else nav += " • objective range " + radius;
+            nav = LWLang.string("hud.faction_request.distance", liveDirection, liveDistance);
+            if (radius <= 6) nav += LWLang.string("hud.faction_request.get_within", radius);
+            else nav += LWLang.string("hud.faction_request.objective_range", radius);
         }
         drawWrappedLimited(g, mc, nav, x + 10, y + h - 14, textWidth, arrived ? LivingWorldGuiStyle.GREEN : LivingWorldGuiStyle.BLUE, 1);
 
@@ -140,7 +141,7 @@ public final class FactionRequestTrackerOverlay {
         g.fill(x - 1, y, x + w + 1, y + h + 1, LivingWorldGuiStyle.GOLD_DARK);
         g.fill(x, y, x + w, y + h, 0xE80A1018);
         g.fill(x, y, x + 4, y + h, LivingWorldGuiStyle.BLUE);
-        g.drawString(mc.font, "MISSION PROGRESS", x + 10, y + 6, LivingWorldGuiStyle.GOLD, false);
+        g.drawString(mc.font, LWLang.string("hud.faction_request.mission_progress"), x + 10, y + 6, LivingWorldGuiStyle.GOLD, false);
         String counter = data.stepIndex() + " / " + data.stepTotal();
         g.drawString(mc.font, counter, x + w - 10 - mc.font.width(counter), y + 6, LivingWorldGuiStyle.BLUE, false);
 
@@ -160,10 +161,10 @@ public final class FactionRequestTrackerOverlay {
 
         int textX = x + Math.min(155, w / 2);
         int textW = w - (textX - x) - 10;
-        String currentAction = data.actionPrompt().isBlank() ? data.stepLabel() : data.actionPrompt();
+        String currentAction = LWLang.speech(data.actionPrompt().isBlank() ? data.stepLabel() : data.actionPrompt()).getString();
         drawWrappedLimited(g, mc, currentAction, textX, y + 20, textW, LivingWorldGuiStyle.TEXT, 2);
         if (!data.nextStep().isBlank())
-            drawWrappedLimited(g, mc, data.nextStep(), textX, y + 45, textW, LivingWorldGuiStyle.MUTED, 2);
+            drawWrappedLimited(g, mc, LWLang.speech(data.nextStep()).getString(), textX, y + 45, textW, LivingWorldGuiStyle.MUTED, 2);
     }
 
     private static void drawWrappedLimited(GuiGraphics g, Minecraft mc, String text, int x, int y, int width, int color, int maxLines) {
@@ -197,7 +198,8 @@ public final class FactionRequestTrackerOverlay {
         if (distance <= Math.max(1, arrivalRadius)) {
             g.fill(cx - 5, cy - 5, cx + 6, cy + 6, LivingWorldGuiStyle.GREEN);
             g.fill(cx - 2, cy - 2, cx + 3, cy + 3, 0xE80A1018);
-            g.drawString(mc.font, "READY", cx - 15, cy + 11, LivingWorldGuiStyle.GREEN, false);
+            String ready = LWLang.string("hud.faction_request.ready");
+            g.drawString(mc.font, ready, cx - mc.font.width(ready) / 2, cy + 11, LivingWorldGuiStyle.GREEN, false);
             return;
         }
 

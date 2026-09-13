@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.compat.MeditationCompat;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
@@ -491,10 +492,10 @@ public final class FighterNpcSocialManager {
             if (!c.midWalkLineDone && now >= c.nextWalkLineAt && pairDistance <= 6.0D * 6.0D) {
                 AmbientFighterEntity speaker = a.getRandom().nextBoolean() ? a : b;
                 String line = switch (a.getRandom().nextInt(4)) {
-                    case 0 -> "Nice change of pace.";
-                    case 1 -> "Good to get moving for a bit.";
-                    case 2 -> "It's quieter out here.";
-                    default -> "This beats standing around.";
+                    case 0 -> LWLang.speechKey("dialogue.npc_social.walk.mid.0", "Nice change of pace.");
+                    case 1 -> LWLang.speechKey("dialogue.npc_social.walk.mid.1", "Good to get moving for a bit.");
+                    case 2 -> LWLang.speechKey("dialogue.npc_social.walk.mid.2", "It's quieter out here.");
+                    default -> LWLang.speechKey("dialogue.npc_social.walk.mid.3", "This beats standing around.");
                 };
                 speaker.speak(line, 58);
                 c.midWalkLineDone = true;
@@ -645,9 +646,9 @@ public final class FighterNpcSocialManager {
     private static List<Beat> buildMeetingConversation(AmbientFighterEntity a, AmbientFighterEntity b, Topic topic, ServerLevel level) {
         List<Beat> beats = new ArrayList<>();
         beats.add(new Beat(a.getUUID(), pick(a,
-                "There you are.", "Good, I caught up with you.", "Glad I found you.", "Hey. I wanted to see you."), Tone.WARM));
+                LWLang.speechKey("dialogue.npc_social.meeting.opening.0", "There you are."), LWLang.speechKey("dialogue.npc_social.meeting.opening.1", "Good, I caught up with you."), LWLang.speechKey("dialogue.npc_social.meeting.opening.2", "Glad I found you."), LWLang.speechKey("dialogue.npc_social.meeting.opening.3", "Hey. I wanted to see you.")), Tone.WARM));
         beats.add(new Beat(b.getUUID(), replyByTemperament(b,
-                "Good to see you too.", "Yeah. What's up?", "You came all this way for me?"), Tone.NEUTRAL));
+                LWLang.speechKey("dialogue.npc_social.meeting.reply.warm", "Good to see you too."), LWLang.speechKey("dialogue.npc_social.meeting.reply.neutral", "Yeah. What's up?"), LWLang.speechKey("dialogue.npc_social.meeting.reply.sharp", "You came all this way for me?")), Tone.NEUTRAL));
         List<Beat> context = buildConversation(a, b, topic, level);
         for (int i = 0; i < Math.min(2, context.size()); i++) beats.add(context.get(i));
         return List.copyOf(beats);
@@ -670,8 +671,8 @@ public final class FighterNpcSocialManager {
         if ((FighterScientistManager.isScientist(a) || FighterScientistManager.isScientist(b)) && a.getRandom().nextFloat() < 0.52F) return Topic.ACTIVITY;
         if (FighterIntentManager.isConcernedAbout(a, b) || FighterIntentManager.isConcernedAbout(b, a)) return Topic.RECOVERY;
         if (a.getHealth() < a.getMaxHealth() * 0.55F || b.getHealth() < b.getMaxHealth() * 0.55F) return Topic.RECOVERY;
-        if ((!ReactiveWorldManager.recentEventType(a, 2600L).isBlank()
-                || !ReactiveWorldManager.recentEventType(b, 2600L).isBlank())
+        if ((isConversationalRecentEvent(ReactiveWorldManager.recentEventType(a, 2600L))
+                || isConversationalRecentEvent(ReactiveWorldManager.recentEventType(b, 2600L)))
                 && a.getRandom().nextFloat() < 0.72F) return Topic.RECENT_EVENT;
         int currentBond = bond(a, b);
         ReactiveWorldManager.Mood am = ReactiveWorldManager.mood(a), bm = ReactiveWorldManager.mood(b);
@@ -721,13 +722,17 @@ public final class FighterNpcSocialManager {
     private static List<Beat> buildWalkOpening(AmbientFighterEntity a, AmbientFighterEntity b, ServerLevel level) {
         int variant = Math.floorMod(a.getUUID().hashCode() ^ b.getUUID().hashCode() ^ (int)level.getGameTime(), 3);
         String invite = switch (variant) {
-            case 0 -> "Want to walk for a bit?";
-            case 1 -> "Come on, let's take a walk.";
-            default -> "Feel like stretching your legs?";
+            case 0 -> LWLang.speechKey("dialogue.npc_social.walk.invite.0", "Want to walk for a bit?");
+            case 1 -> LWLang.speechKey("dialogue.npc_social.walk.invite.1", "Come on, let's take a walk.");
+            default -> LWLang.speechKey("dialogue.npc_social.walk.invite.2", "Feel like stretching your legs?");
         };
         String reply;
-        if (bond(a, b) >= 6) reply = variant == 1 ? "Yeah. Let's go." : "Sure. Lead the way.";
-        else reply = variant == 2 ? "Alright. A short walk sounds good." : "Sure. Why not?";
+        if (bond(a, b) >= 6) reply = variant == 1
+                ? LWLang.speechKey("dialogue.npc_social.walk.reply.friend.0", "Yeah. Let's go.")
+                : LWLang.speechKey("dialogue.npc_social.walk.reply.friend.1", "Sure. Lead the way.");
+        else reply = variant == 2
+                ? LWLang.speechKey("dialogue.npc_social.walk.reply.0", "Alright. A short walk sounds good.")
+                : LWLang.speechKey("dialogue.npc_social.walk.reply.1", "Sure. Why not?");
         return List.of(new Beat(a.getUUID(), invite, Tone.WARM), new Beat(b.getUUID(), reply, Tone.WARM));
     }
 
@@ -741,104 +746,106 @@ public final class FighterNpcSocialManager {
                 AmbientFighterEntity other = hurt == a ? b : a;
                 ReactiveWorldManager.Temperament otherTemperament = ReactiveWorldManager.temperament(other);
                 boolean bully = otherTemperament == ReactiveWorldManager.Temperament.BULLY;
-                beats.add(new Beat(other.getUUID(), bully ? "You're hurt. Still think you can keep up?" : "You're hurt. How bad is it?", bully ? Tone.HOSTILE : Tone.WARM));
-                beats.add(new Beat(hurt.getUUID(), replyByTemperament(hurt, "I'll manage, but I need a minute.", "It hurts. I can still move.", "I know I'm hurt. Worry about the fight."), Tone.NEUTRAL));
-                beats.add(new Beat(other.getUUID(), bully ? "Then stop looking like you're about to fall over." : "Then slow down until you can move properly.", bully ? Tone.HOSTILE : Tone.WARM));
+                beats.add(new Beat(other.getUUID(), bully ? LWLang.speechKey("dialogue.npc_social.recovery.opening.bully", "You're hurt. Still think you can keep up?") : LWLang.speechKey("dialogue.npc_social.recovery.opening.normal", "You're hurt. How bad is it?"), bully ? Tone.HOSTILE : Tone.WARM));
+                beats.add(new Beat(hurt.getUUID(), replyByTemperament(hurt, LWLang.speechKey("dialogue.npc_social.recovery.reply.warm", "I'll manage, but I need a minute."), LWLang.speechKey("dialogue.npc_social.recovery.reply.neutral", "It hurts. I can still move."), LWLang.speechKey("dialogue.npc_social.recovery.reply.sharp", "I know I'm hurt. Worry about the fight.")), Tone.NEUTRAL));
+                beats.add(new Beat(other.getUUID(), bully ? LWLang.speechKey("dialogue.npc_social.recovery.followup.bully", "Then stop looking like you're about to fall over.") : LWLang.speechKey("dialogue.npc_social.recovery.followup.normal", "Then slow down until you can move properly."), bully ? Tone.HOSTILE : Tone.WARM));
             }
             case RECENT_EVENT -> {
-                AmbientFighterEntity witness = !ReactiveWorldManager.recentEventType(a, 2600L).isBlank() ? a : b;
+                AmbientFighterEntity witness = isConversationalRecentEvent(ReactiveWorldManager.recentEventType(a, 2600L)) ? a : b;
                 AmbientFighterEntity listener = witness == a ? b : a;
                 String type = ReactiveWorldManager.recentEventType(witness, 2600L);
                 String subject = ReactiveWorldManager.recentEventSubject(witness, 2600L);
                 if ("ALLY_DIED".equals(type)) {
-                    beats.add(new Beat(witness.getUUID(), "I saw " + subject + " go down back there.", Tone.NEUTRAL));
+                    beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.ally_died.statement", "I saw %s go down back there.", subject), Tone.NEUTRAL));
                     beats.add(new Beat(listener.getUUID(), replyByTemperament(listener,
-                            "I know. We make sure it wasn't for nothing.",
-                            "Yeah. We keep moving, but we remember it.",
-                            "Then we stop the next one from happening."), Tone.WARM));
-                    beats.add(new Beat(witness.getUUID(), "Right. Nobody else falls if we can help it.", Tone.WARM));
+                            LWLang.speechKey("dialogue.npc_social.recent_event.ally_died.reply.warm", "I know. We make sure it wasn't for nothing."),
+                            LWLang.speechKey("dialogue.npc_social.recent_event.ally_died.reply.neutral", "Yeah. We keep moving, but we remember it."),
+                            LWLang.speechKey("dialogue.npc_social.recent_event.ally_died.reply.sharp", "Then we stop the next one from happening.")), Tone.WARM));
+                    beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.ally_died.followup", "Right. Nobody else falls if we can help it."), Tone.WARM));
                 } else if ("ENEMY_DIED".equals(type)) {
-                    beats.add(new Beat(witness.getUUID(), subject + " went down in that fight.", Tone.NEUTRAL));
+                    beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.enemy_died.statement", "%s went down in that fight.", subject), Tone.NEUTRAL));
                     beats.add(new Beat(listener.getUUID(), listener.getAlignment() == FighterAlignment.BAD
-                            ? "Good. One less problem in our way."
-                            : "Then that fight is over. No reason to keep hitting a body.", Tone.NEUTRAL));
-                    beats.add(new Beat(witness.getUUID(), "Agreed. We watch for whoever is still standing.", Tone.NEUTRAL));
+                            ? LWLang.speechKey("dialogue.npc_social.recent_event.enemy_died.reply.bad", "Good. One less problem in our way.")
+                            : LWLang.speechKey("dialogue.npc_social.recent_event.enemy_died.reply.normal", "Then that fight is over. No reason to keep hitting a body."), Tone.NEUTRAL));
+                    beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.enemy_died.followup", "Agreed. We watch for whoever is still standing."), Tone.NEUTRAL));
                 } else if ("MOB_SEEN".equals(type)) {
                     String lower = subject.toLowerCase(Locale.ROOT);
-                    beats.add(new Beat(witness.getUUID(), "There was a " + lower + " nearby earlier.", Tone.NEUTRAL));
+                    beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.mob_seen.statement", "There was a %s nearby earlier.", lower), Tone.NEUTRAL));
                     if (lower.contains("red ribbon") || lower.contains("robot") || lower.contains("bandit")) {
-                        beats.add(new Beat(listener.getUUID(), "I saw it too. We should keep it in sight until we're clear of the area.", Tone.NEUTRAL));
-                        beats.add(new Beat(witness.getUUID(), "Exactly. No reason to let it walk up behind us.", Tone.NEUTRAL));
+                        beats.add(new Beat(listener.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.mob_seen.threat.reply", "I saw it too. We should keep it in sight until we're clear of the area."), Tone.NEUTRAL));
+                        beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.mob_seen.threat.followup", "Exactly. No reason to let it walk up behind us."), Tone.NEUTRAL));
                     } else if (lower.contains("dinosaur")) {
-                        beats.add(new Beat(listener.getUUID(), "Hard to miss. Let's not corner it unless we want another fight.", Tone.NEUTRAL));
-                        beats.add(new Beat(witness.getUUID(), "Agreed. Give it room and keep moving.", Tone.NEUTRAL));
+                        beats.add(new Beat(listener.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.mob_seen.dinosaur.reply", "Hard to miss. Let's not corner it unless we want another fight."), Tone.NEUTRAL));
+                        beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.mob_seen.dinosaur.followup", "Agreed. Give it room and keep moving."), Tone.NEUTRAL));
                     } else {
-                        beats.add(new Beat(listener.getUUID(), "Yeah, I noticed it. Nice reminder that not everything nearby wants a fight.", Tone.WARM));
-                        beats.add(new Beat(witness.getUUID(), "For once, I'll take that.", Tone.NEUTRAL));
+                        beats.add(new Beat(listener.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.mob_seen.passive.reply", "Yeah, I noticed it. Nice reminder that not everything nearby wants a fight."), Tone.WARM));
+                        beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.mob_seen.passive.followup", "For once, I'll take that."), Tone.NEUTRAL));
                     }
                 } else if ("WORLD_CONDITION".equals(type)) {
-                    beats.add(new Beat(witness.getUUID(), "I was just thinking about " + subject + ".", Tone.NEUTRAL));
-                    beats.add(new Beat(listener.getUUID(), level.isRaining() ? "Same. It changes how far you can see and hear." : "Yeah. It changes the whole feel of this place.", Tone.NEUTRAL));
-                    beats.add(new Beat(witness.getUUID(), "Worth keeping in mind if trouble starts.", Tone.NEUTRAL));
+                    beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.world_condition.statement", "I was just thinking about %s.", subject), Tone.NEUTRAL));
+                    beats.add(new Beat(listener.getUUID(), level.isRaining() ? LWLang.speechKey("dialogue.npc_social.recent_event.world_condition.reply.raining", "Same. It changes how far you can see and hear.") : LWLang.speechKey("dialogue.npc_social.recent_event.world_condition.reply.normal", "Yeah. It changes the whole feel of this place."), Tone.NEUTRAL));
+                    beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.world_condition.followup", "Worth keeping in mind if trouble starts."), Tone.NEUTRAL));
                 } else if ("TRAINING_GROWTH".equals(type)) {
-                    beats.add(new Beat(witness.getUUID(), "Something finally clicked in my last training session.", Tone.WARM));
-                    beats.add(new Beat(listener.getUUID(), "I thought your Ki felt steadier. You're not imagining it.", Tone.WARM));
-                    beats.add(new Beat(witness.getUUID(), "Good. Then I know which part of the routine to keep.", Tone.NEUTRAL));
+                    beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.training_growth.statement", "Something finally clicked in my last training session."), Tone.WARM));
+                    beats.add(new Beat(listener.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.training_growth.reply", "I thought your Ki felt steadier. You're not imagining it."), Tone.WARM));
+                    beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.training_growth.followup", "Good. Then I know which part of the routine to keep."), Tone.NEUTRAL));
                 } else {
-                    String detail = ReactiveWorldManager.recentEventDetail(witness, 2600L);
-                    beats.add(new Beat(witness.getUUID(), detail.isBlank() ? "Something happened nearby earlier." : detail + ".", Tone.NEUTRAL));
-                    beats.add(new Beat(listener.getUUID(), "I noticed. I'm keeping it in mind.", Tone.NEUTRAL));
+                    // Event details are internal memory summaries (for example, "recognized another
+                    // saiyan" or "reacted to a nearby Ki surge"), not authored dialogue. Never
+                    // expose that bookkeeping as something the fighter literally says.
+                    beats.add(new Beat(witness.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.generic.statement", "Something happened nearby earlier."), Tone.NEUTRAL));
+                    beats.add(new Beat(listener.getUUID(), LWLang.speechKey("dialogue.npc_social.recent_event.generic.reply", "I noticed. I'm keeping it in mind."), Tone.NEUTRAL));
                 }
             }
             case RACE_KINSHIP -> {
                 FighterRace race = a.getRace();
                 switch (race) {
                     case SAIYAN -> {
-                        beats.add(new Beat(a.getUUID(), "You're a Saiyan too. I could tell from the way you carry your power.", Tone.NEUTRAL));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.saiyan.opening", "You're a Saiyan too. I could tell from the way you carry your power."), Tone.NEUTRAL));
                         beats.add(new Beat(b.getUUID(), b.getPersonality() == FighterPersonality.PROUD
-                                ? "Of course you could. Saiyan pride isn't exactly subtle."
-                                : "Yeah. It's strange how familiar another Saiyan's presence feels.", Tone.NEUTRAL));
+                                ? LWLang.speechKey("dialogue.npc_social.race.saiyan.reply.proud", "Of course you could. Saiyan pride isn't exactly subtle.")
+                                : LWLang.speechKey("dialogue.npc_social.race.saiyan.reply.normal", "Yeah. It's strange how familiar another Saiyan's presence feels."), Tone.NEUTRAL));
                         beats.add(new Beat(a.getUUID(), a.getPersonality() == FighterPersonality.AGGRESSIVE
-                                ? "Good. Then I know who to ask when I need a real training partner."
-                                : "We should train sometime. No point wasting that kind of common ground.", Tone.WARM));
+                                ? LWLang.speechKey("dialogue.npc_social.race.saiyan.followup.aggressive", "Good. Then I know who to ask when I need a real training partner.")
+                                : LWLang.speechKey("dialogue.npc_social.race.saiyan.followup.normal", "We should train sometime. No point wasting that kind of common ground."), Tone.WARM));
                     }
                     case NAMEKIAN -> {
-                        beats.add(new Beat(a.getUUID(), "Another Namekian. I don't run into that very often out here.", Tone.WARM));
-                        beats.add(new Beat(b.getUUID(), "Same. There's something reassuring about hearing that from one of our own.", Tone.WARM));
-                        beats.add(new Beat(a.getUUID(), "Then let's remember each other. The world is wide enough already.", Tone.WARM));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.namekian.opening", "Another Namekian. I don't run into that very often out here."), Tone.WARM));
+                        beats.add(new Beat(b.getUUID(), LWLang.speechKey("dialogue.npc_social.race.namekian.reply", "Same. There's something reassuring about hearing that from one of our own."), Tone.WARM));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.namekian.followup", "Then let's remember each other. The world is wide enough already."), Tone.WARM));
                     }
                     case MAJIN -> {
-                        beats.add(new Beat(a.getUUID(), "Huh. Another Majin. That explains why your energy felt familiar.", Tone.TEASING));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.majin.opening", "Huh. Another Majin. That explains why your energy felt familiar."), Tone.TEASING));
                         beats.add(new Beat(b.getUUID(), ReactiveWorldManager.temperament(b) == ReactiveWorldManager.Temperament.TEASING
-                                ? "Familiar? I was going to say better." : "I noticed yours too. Hard to mistake it once you know it.", Tone.TEASING));
-                        beats.add(new Beat(a.getUUID(), "Either way, we're not exactly common. That's worth something.", Tone.WARM));
+                                ? LWLang.speechKey("dialogue.npc_social.race.majin.reply.teasing", "Familiar? I was going to say better.") : LWLang.speechKey("dialogue.npc_social.race.majin.reply.normal", "I noticed yours too. Hard to mistake it once you know it."), Tone.TEASING));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.majin.followup", "Either way, we're not exactly common. That's worth something."), Tone.WARM));
                     }
                     case FROST_DEMON -> {
-                        beats.add(new Beat(a.getUUID(), "You're one of my kind. I wondered why your energy felt so... familiar.", Tone.NEUTRAL));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.frost_demon.opening", "You're one of my kind. I wondered why your energy felt so... familiar."), Tone.NEUTRAL));
                         beats.add(new Beat(b.getUUID(), b.getPersonality() == FighterPersonality.PROUD
-                                ? "Then you should know better than to underestimate me."
-                                : "I noticed the same thing. There aren't many of us around here.", Tone.NEUTRAL));
-                        beats.add(new Beat(a.getUUID(), "Rare company, then. I'll remember you.", Tone.WARM));
+                                ? LWLang.speechKey("dialogue.npc_social.race.frost_demon.reply.proud", "Then you should know better than to underestimate me.")
+                                : LWLang.speechKey("dialogue.npc_social.race.frost_demon.reply.normal", "I noticed the same thing. There aren't many of us around here."), Tone.NEUTRAL));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.frost_demon.followup", "Rare company, then. I'll remember you."), Tone.WARM));
                     }
                     case BIO_ANDROID -> {
-                        beats.add(new Beat(a.getUUID(), "Your energy pattern is like mine. Another Bio-Android.", Tone.NEUTRAL));
-                        beats.add(new Beat(b.getUUID(), "I noticed. Similar origin doesn't mean identical purpose, though.", Tone.NEUTRAL));
-                        beats.add(new Beat(a.getUUID(), "No. But it gives us something real to compare.", Tone.WARM));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.bio_android.opening", "Your energy pattern is like mine. Another Bio-Android."), Tone.NEUTRAL));
+                        beats.add(new Beat(b.getUUID(), LWLang.speechKey("dialogue.npc_social.race.bio_android.reply", "I noticed. Similar origin doesn't mean identical purpose, though."), Tone.NEUTRAL));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.bio_android.followup", "No. But it gives us something real to compare."), Tone.WARM));
                     }
                     case ZAARAKIN -> {
-                        beats.add(new Beat(a.getUUID(), "You're Zaarakin too. Your fighting spirit is hard to miss.", Tone.NEUTRAL));
-                        beats.add(new Beat(b.getUUID(), "Then you know why I prefer a close fight.", Tone.WARM));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.zaarakin.opening", "You're Zaarakin too. Your fighting spirit is hard to miss."), Tone.NEUTRAL));
+                        beats.add(new Beat(b.getUUID(), LWLang.speechKey("dialogue.npc_social.race.zaarakin.reply", "Then you know why I prefer a close fight."), Tone.WARM));
                     }
                     case ANTORANIAN -> {
-                        beats.add(new Beat(a.getUUID(), "Another Antoranian. Your presence feels familiar.", Tone.NEUTRAL));
-                        beats.add(new Beat(b.getUUID(), "Familiarity is a good reason to talk.", Tone.WARM));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.antoranian.opening", "Another Antoranian. Your presence feels familiar."), Tone.NEUTRAL));
+                        beats.add(new Beat(b.getUUID(), LWLang.speechKey("dialogue.npc_social.race.antoranian.reply", "Familiarity is a good reason to talk."), Tone.WARM));
                     }
                     case HUMAN -> {
-                        beats.add(new Beat(a.getUUID(), "Funny. With everyone around here, it's nice meeting another ordinary Human fighter.", Tone.WARM));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.human.opening", "Funny. With everyone around here, it's nice meeting another ordinary Human fighter."), Tone.WARM));
                         beats.add(new Beat(b.getUUID(), b.getPersonality() == FighterPersonality.PROUD
-                                ? "Ordinary is doing a lot of work in that sentence."
-                                : "I know what you mean. Makes the place feel a little less strange.", Tone.WARM));
-                        beats.add(new Beat(a.getUUID(), "Fair. Human doesn't have to mean ordinary.", Tone.WARM));
+                                ? LWLang.speechKey("dialogue.npc_social.race.human.reply.proud", "Ordinary is doing a lot of work in that sentence.")
+                                : LWLang.speechKey("dialogue.npc_social.race.human.reply.normal", "I know what you mean. Makes the place feel a little less strange."), Tone.WARM));
+                        beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.race.human.followup", "Fair. Human doesn't have to mean ordinary."), Tone.WARM));
                     }
                 }
             }
@@ -848,104 +855,112 @@ public final class FighterNpcSocialManager {
                 if (FighterScientistManager.isScientist(a) || FighterScientistManager.isScientist(b)) {
                     AmbientFighterEntity scientist = FighterScientistManager.isScientist(a) ? a : b;
                     AmbientFighterEntity listener = scientist == a ? b : a;
-                    beats.add(new Beat(listener.getUUID(), "Still working on those Saibaman cultivation notes?", Tone.NEUTRAL));
-                    beats.add(new Beat(scientist.getUUID(), pick(scientist,
-                            "Yeah. The last batch gave me enough data to change the formula.",
-                            "I am. Power is easy to raise; keeping the specimens controllable is harder.",
-                            "Almost. I want the next batch to scale cleanly without becoming unstable.",
-                            "I found one bad ratio. Now I'm checking whether fixing it changes their temperament."), Tone.NEUTRAL));
+                    beats.add(new Beat(listener.getUUID(), LWLang.speechKey("dialogue.npc_social.scientist.question",
+                            "Still working on those Saibaman cultivation notes?"), Tone.NEUTRAL));
+                    int answer = scientist.getRandom().nextInt(4);
+                    String[] answers = {LWLang.speechKey("dialogue.npc_social.scientist.answer.0", "Yeah. The last batch gave me enough data to change the formula."),
+                            LWLang.speechKey("dialogue.npc_social.scientist.answer.1", "I am. Power is easy to raise; keeping the specimens controllable is harder."),
+                            LWLang.speechKey("dialogue.npc_social.scientist.answer.2", "Almost. I want the next batch to scale cleanly without becoming unstable."),
+                            LWLang.speechKey("dialogue.npc_social.scientist.answer.3", "I found one bad ratio. Now I'm checking whether fixing it changes their temperament.")};
+                    beats.add(new Beat(scientist.getUUID(), answers[answer], Tone.NEUTRAL));
                     beats.add(new Beat(listener.getUUID(), bond(a, b) >= 6
-                            ? "Just make sure your research subjects know which side they're on."
-                            : "I'll give your lab work some distance, then.", Tone.WARM));
+                            ? LWLang.speechKey("dialogue.npc_social.scientist.reply_friend", "Just make sure your research subjects know which side they're on.")
+                            : LWLang.speechKey("dialogue.npc_social.scientist.reply", "I'll give your lab work some distance, then."), Tone.WARM));
                 } else {
                     String activity = !aa.isBlank() && aa.equalsIgnoreCase(ba) ? aa : !aa.isBlank() ? aa : ba;
                     AmbientFighterEntity actor = !aa.isBlank() ? a : b;
                     AmbientFighterEntity observer = actor == a ? b : a;
                     if (activity.isBlank()) activity = "taking it easy";
-                    beats.add(new Beat(observer.getUUID(), "I saw you " + activityPhrase(activity) + " earlier.", Tone.NEUTRAL));
+                    beats.add(new Beat(observer.getUUID(), LWLang.speechKey("dialogue.npc_social.activity.observer", "I saw you %s earlier.", activityPhrase(activity)), Tone.NEUTRAL));
                     beats.add(new Beat(actor.getUUID(), replyByTemperament(actor,
-                            "Yeah. It fit what I needed at the time.",
-                            "It helped. I was trying not to force the rest of the day.",
-                            "You keeping a schedule on me now?"),
+                            LWLang.speechKey("dialogue.npc_social.activity.reply.warm", "Yeah. It fit what I needed at the time."),
+                            LWLang.speechKey("dialogue.npc_social.activity.reply.neutral", "It helped. I was trying not to force the rest of the day."),
+                            LWLang.speechKey("dialogue.npc_social.activity.reply.sharp", "You keeping a schedule on me now?")),
                             ReactiveWorldManager.temperament(actor) == ReactiveWorldManager.Temperament.TEASING ? Tone.TEASING : Tone.NEUTRAL));
-                    beats.add(new Beat(observer.getUUID(), "No. I just noticed. Better than doing the same thing all day.", Tone.WARM));
+                    beats.add(new Beat(observer.getUUID(), LWLang.speechKey("dialogue.npc_social.activity.followup", "No. I just noticed. Better than doing the same thing all day."), Tone.WARM));
                 }
             }
             case TRAINING -> {
-                String[] q = {"Been keeping up with your training?", "Your movement looks sharper lately.", "Still working on that weak side?", "You feel stronger than last time.",
-                        "You changed something in your stance, didn't you?", "Your Ki feels steadier than it did before.",
-                        "How's the new routine treating you?", "You've been training hard. You actually giving yourself time to recover?"};
+                String[] q = {LWLang.speechKey("dialogue.npc_social.training.question.0", "Been keeping up with your training?"), LWLang.speechKey("dialogue.npc_social.training.question.1", "Your movement looks sharper lately."), LWLang.speechKey("dialogue.npc_social.training.question.2", "Still working on that weak side?"), LWLang.speechKey("dialogue.npc_social.training.question.3", "You feel stronger than last time."),
+                        LWLang.speechKey("dialogue.npc_social.training.question.4", "You changed something in your stance, didn't you?"), LWLang.speechKey("dialogue.npc_social.training.question.5", "Your Ki feels steadier than it did before."),
+                        LWLang.speechKey("dialogue.npc_social.training.question.6", "How's the new routine treating you?"), LWLang.speechKey("dialogue.npc_social.training.question.7", "You've been training hard. You actually giving yourself time to recover?")};
                 beats.add(new Beat(a.getUUID(), q[v], Tone.NEUTRAL));
-                beats.add(new Beat(b.getUUID(), replyByTemperament(b, "Every day I can.", "Enough to know I've got more work to do.", "Keep watching and you'll find out."), tb == ReactiveWorldManager.Temperament.TEASING ? Tone.TEASING : Tone.NEUTRAL));
-                beats.add(new Beat(a.getUUID(), ta == ReactiveWorldManager.Temperament.BULLY ? "Good. You need it." : "It shows. Keep at it.", ta == ReactiveWorldManager.Temperament.BULLY ? Tone.HOSTILE : Tone.WARM));
-                if (bond(a,b) >= 6) beats.add(new Beat(b.getUUID(), "Maybe we train together next time.", Tone.WARM));
+                beats.add(new Beat(b.getUUID(), replyByTemperament(b, LWLang.speechKey("dialogue.npc_social.training.reply.warm", "Every day I can."), LWLang.speechKey("dialogue.npc_social.training.reply.neutral", "Enough to know I've got more work to do."), LWLang.speechKey("dialogue.npc_social.training.reply.sharp", "Keep watching and you'll find out.")), tb == ReactiveWorldManager.Temperament.TEASING ? Tone.TEASING : Tone.NEUTRAL));
+                beats.add(new Beat(a.getUUID(), ta == ReactiveWorldManager.Temperament.BULLY ? LWLang.speechKey("dialogue.npc_social.training.followup.bully", "Good. You need it.") : LWLang.speechKey("dialogue.npc_social.training.followup.normal", "It shows. Keep at it."), ta == ReactiveWorldManager.Temperament.BULLY ? Tone.HOSTILE : Tone.WARM));
+                if (bond(a,b) >= 6) beats.add(new Beat(b.getUUID(), LWLang.speechKey("dialogue.npc_social.training.friend", "Maybe we train together next time."), Tone.WARM));
             }
             case HOBBY -> {
                 FighterHobby ah = FighterHobby.of(a), bh = FighterHobby.of(b);
-                beats.add(new Beat(a.getUUID(), "I've been " + ah.activity() + " lately.", Tone.NEUTRAL));
-                beats.add(new Beat(b.getUUID(), ah == bh ? "Same here. It's good to have something normal." : "Better than my habit of " + bh.activity() + ".", Tone.WARM));
-                beats.add(new Beat(a.getUUID(), ta == ReactiveWorldManager.Temperament.TEASING ? "Normal might be asking too much from us." : "Keeps the world from becoming only fights.", ta == ReactiveWorldManager.Temperament.TEASING ? Tone.TEASING : Tone.NEUTRAL));
+                beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.hobby.opening", "I've been %s lately.", localizedHobbyActivity(ah)), Tone.NEUTRAL));
+                beats.add(new Beat(b.getUUID(), ah == bh ? LWLang.speechKey("dialogue.npc_social.hobby.reply.same", "Same here. It's good to have something normal.") : LWLang.speechKey("dialogue.npc_social.hobby.reply.different", "Better than my habit of %s.", localizedHobbyActivity(bh)), Tone.WARM));
+                beats.add(new Beat(a.getUUID(), ta == ReactiveWorldManager.Temperament.TEASING ? LWLang.speechKey("dialogue.npc_social.hobby.followup.teasing", "Normal might be asking too much from us.") : LWLang.speechKey("dialogue.npc_social.hobby.followup.normal", "Keeps the world from becoming only fights."), ta == ReactiveWorldManager.Temperament.TEASING ? Tone.TEASING : Tone.NEUTRAL));
             }
             case FACTION -> {
-                beats.add(new Beat(a.getUUID(), "How are things holding together with the others?", Tone.NEUTRAL));
-                beats.add(new Beat(b.getUUID(), ReactiveWorldManager.mood(b) == ReactiveWorldManager.Mood.WARY ? "Tense. Everyone can feel it." : "Steady enough. I'll take that as a win.", Tone.NEUTRAL));
-                beats.add(new Beat(a.getUUID(), ta == ReactiveWorldManager.Temperament.SUPPORTIVE ? "Then we keep looking out for each other." : "Good. Let's keep it that way.", Tone.WARM));
+                beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.faction.opening", "How are things holding together with the others?"), Tone.NEUTRAL));
+                beats.add(new Beat(b.getUUID(), ReactiveWorldManager.mood(b) == ReactiveWorldManager.Mood.WARY ? LWLang.speechKey("dialogue.npc_social.faction.reply.wary", "Tense. Everyone can feel it.") : LWLang.speechKey("dialogue.npc_social.faction.reply.normal", "Steady enough. I'll take that as a win."), Tone.NEUTRAL));
+                beats.add(new Beat(a.getUUID(), ta == ReactiveWorldManager.Temperament.SUPPORTIVE ? LWLang.speechKey("dialogue.npc_social.faction.followup.supportive", "Then we keep looking out for each other.") : LWLang.speechKey("dialogue.npc_social.faction.followup.normal", "Good. Let's keep it that way."), Tone.WARM));
             }
             case WEATHER -> {
-                beats.add(new Beat(a.getUUID(), "This weather's getting old.", Tone.NEUTRAL));
-                beats.add(new Beat(b.getUUID(), tb == ReactiveWorldManager.Temperament.ALOOF ? "It's just rain." : "At least it keeps the dust down.", Tone.NEUTRAL));
-                beats.add(new Beat(a.getUUID(), ta == ReactiveWorldManager.Temperament.TEASING ? "Tell me that when lightning finds your hair." : "I'd still rather train under a clear sky.", Tone.TEASING));
+                beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.weather.opening", "This weather's getting old."), Tone.NEUTRAL));
+                beats.add(new Beat(b.getUUID(), tb == ReactiveWorldManager.Temperament.ALOOF ? LWLang.speechKey("dialogue.npc_social.weather.reply.aloof", "It's just rain.") : LWLang.speechKey("dialogue.npc_social.weather.reply.normal", "At least it keeps the dust down."), Tone.NEUTRAL));
+                beats.add(new Beat(a.getUUID(), ta == ReactiveWorldManager.Temperament.TEASING ? LWLang.speechKey("dialogue.npc_social.weather.followup.teasing", "Tell me that when lightning finds your hair.") : LWLang.speechKey("dialogue.npc_social.weather.followup.normal", "I'd still rather train under a clear sky."), Tone.TEASING));
             }
             case NIGHT -> {
-                beats.add(new Beat(a.getUUID(), "Quiet night.", Tone.NEUTRAL));
-                beats.add(new Beat(b.getUUID(), tb == ReactiveWorldManager.Temperament.ALOOF ? "That's why I like it." : "Quiet usually means someone is about to ruin it.", Tone.NEUTRAL));
-                beats.add(new Beat(a.getUUID(), "Then let's enjoy the quiet while it lasts.", Tone.WARM));
+                beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.night.opening", "Quiet night."), Tone.NEUTRAL));
+                beats.add(new Beat(b.getUUID(), tb == ReactiveWorldManager.Temperament.ALOOF ? LWLang.speechKey("dialogue.npc_social.night.reply.aloof", "That's why I like it.") : LWLang.speechKey("dialogue.npc_social.night.reply.normal", "Quiet usually means someone is about to ruin it."), Tone.NEUTRAL));
+                beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.night.followup", "Then let's enjoy the quiet while it lasts."), Tone.WARM));
             }
             case ENCOURAGEMENT -> {
-                beats.add(new Beat(a.getUUID(), "You've been carrying a lot lately.", Tone.WARM));
-                beats.add(new Beat(b.getUUID(), replyByTemperament(b, "I'll be alright.", "Yeah... I know.", "Since when did you get sentimental?"), Tone.NEUTRAL));
-                beats.add(new Beat(a.getUUID(), "You don't have to carry all of it alone.", Tone.WARM));
-                beats.add(new Beat(b.getUUID(), "...Thanks.", Tone.WARM));
+                beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.encouragement.opening", "You've been carrying a lot lately."), Tone.WARM));
+                beats.add(new Beat(b.getUUID(), replyByTemperament(b, LWLang.speechKey("dialogue.npc_social.encouragement.reply.warm", "I'll be alright."), LWLang.speechKey("dialogue.npc_social.encouragement.reply.neutral", "Yeah... I know."), LWLang.speechKey("dialogue.npc_social.encouragement.reply.sharp", "Since when did you get sentimental?")), Tone.NEUTRAL));
+                beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.encouragement.followup", "You don't have to carry all of it alone."), Tone.WARM));
+                beats.add(new Beat(b.getUUID(), LWLang.speechKey("dialogue.npc_social.encouragement.thanks", "...Thanks."), Tone.WARM));
             }
             case TENSION -> {
-                beats.add(new Beat(a.getUUID(), "Try not to slow everyone down again.", Tone.HOSTILE));
-                beats.add(new Beat(b.getUUID(), b.getPersonality() == FighterPersonality.PROUD || b.getPersonality() == FighterPersonality.AGGRESSIVE ? "Say that again when you're ready to back it up." : "You could try being useful instead of loud.", Tone.HOSTILE));
-                beats.add(new Beat(a.getUUID(), ta == ReactiveWorldManager.Temperament.BULLY ? "There's the spirit." : "Relax. I'm messing with you.", ta == ReactiveWorldManager.Temperament.BULLY ? Tone.TEASING : Tone.NEUTRAL));
+                beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.tension.opening", "Try not to slow everyone down again."), Tone.HOSTILE));
+                beats.add(new Beat(b.getUUID(), b.getPersonality() == FighterPersonality.PROUD || b.getPersonality() == FighterPersonality.AGGRESSIVE ? LWLang.speechKey("dialogue.npc_social.tension.reply.proud", "Say that again when you're ready to back it up.") : LWLang.speechKey("dialogue.npc_social.tension.reply.normal", "You could try being useful instead of loud."), Tone.HOSTILE));
+                beats.add(new Beat(a.getUUID(), ta == ReactiveWorldManager.Temperament.BULLY ? LWLang.speechKey("dialogue.npc_social.tension.followup.bully", "There's the spirit.") : LWLang.speechKey("dialogue.npc_social.tension.followup.normal", "Relax. I'm messing with you."), ta == ReactiveWorldManager.Temperament.BULLY ? Tone.TEASING : Tone.NEUTRAL));
             }
             case WORLD -> {
                 int nearbyFighters = level.getEntitiesOfClass(AmbientFighterEntity.class,
                         a.getBoundingBox().inflate(24.0D), f -> f.isAlive() && f != a && f != b).size();
                 long localTime = Math.floorMod(level.getDayTime(), 24000L);
                 if (nearbyFighters >= 3) {
-                    beats.add(new Beat(a.getUUID(), "There are a lot of fighters close by right now.", Tone.NEUTRAL));
-                    beats.add(new Beat(b.getUUID(), "I noticed. I'm trying to keep track of who belongs with who.", Tone.NEUTRAL));
-                    beats.add(new Beat(a.getUUID(), "Same. Better than mistaking somebody's friend for an enemy.", Tone.NEUTRAL));
+                    beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.world.crowded.0", "There are a lot of fighters close by right now."), Tone.NEUTRAL));
+                    beats.add(new Beat(b.getUUID(), LWLang.speechKey("dialogue.npc_social.world.crowded.1", "I noticed. I'm trying to keep track of who belongs with who."), Tone.NEUTRAL));
+                    beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.world.crowded.2", "Same. Better than mistaking somebody's friend for an enemy."), Tone.NEUTRAL));
                 } else if (localTime >= 13000L && localTime <= 23000L) {
-                    beats.add(new Beat(a.getUUID(), "It's late. The area finally quieted down.", Tone.NEUTRAL));
-                    beats.add(new Beat(b.getUUID(), "Good. I could use a few minutes without someone starting a fight.", Tone.NEUTRAL));
-                    beats.add(new Beat(a.getUUID(), "Then let's not be the ones who ruin it.", Tone.WARM));
+                    beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.world.night.0", "It's late. The area finally quieted down."), Tone.NEUTRAL));
+                    beats.add(new Beat(b.getUUID(), LWLang.speechKey("dialogue.npc_social.world.night.1", "Good. I could use a few minutes without someone starting a fight."), Tone.NEUTRAL));
+                    beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.world.night.2", "Then let's not be the ones who ruin it."), Tone.WARM));
                 } else {
-                    beats.add(new Beat(a.getUUID(), "Nothing hostile nearby at the moment.", Tone.NEUTRAL));
-                    beats.add(new Beat(b.getUUID(), "Good. Gives us time to recover before the next problem finds us.", Tone.NEUTRAL));
-                    beats.add(new Beat(a.getUUID(), "I'll take a quiet stretch when I can get one.", Tone.NEUTRAL));
+                    beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.world.calm.0", "Nothing hostile nearby at the moment."), Tone.NEUTRAL));
+                    beats.add(new Beat(b.getUUID(), LWLang.speechKey("dialogue.npc_social.world.calm.1", "Good. Gives us time to recover before the next problem finds us."), Tone.NEUTRAL));
+                    beats.add(new Beat(a.getUUID(), LWLang.speechKey("dialogue.npc_social.world.calm.2", "I'll take a quiet stretch when I can get one."), Tone.NEUTRAL));
                 }
             }
             case JOKE -> {
-                String[] q = {"You ever wonder who repairs the ground after our fights?", "I tried counting how many times I've been launched through a hill.", "Do you think yelling makes techniques stronger?", "I saw a chicken survive a Ki blast yesterday.",
-                        "I think that tree has seen more fights than either of us.", "Be honest. Have you ever pretended not to hear someone challenge you?",
-                        "If another person tells me to 'just sense their Ki,' I'm charging them for lessons.", "I nearly tripped over my own landing earlier. Nobody saw it, right?"};
-                String[] r = {"I assumed the ground accepted its fate.", "That's not a statistic I'd brag about.", "Obviously. Science is settled.", "Finally, someone here with proper defense.",
-                        "Then the tree is the veteran here.", "Only when I was hoping they'd challenge somebody else.",
-                        "Make it double if they ask twice.", "I saw nothing. Your dignity is safe."};
+                String[] q = {LWLang.speechKey("dialogue.npc_social.joke.question.0", "You ever wonder who repairs the ground after our fights?"), LWLang.speechKey("dialogue.npc_social.joke.question.1", "I tried counting how many times I've been launched through a hill."), LWLang.speechKey("dialogue.npc_social.joke.question.2", "Do you think yelling makes techniques stronger?"), LWLang.speechKey("dialogue.npc_social.joke.question.3", "I saw a chicken survive a Ki blast yesterday."),
+                        LWLang.speechKey("dialogue.npc_social.joke.question.4", "I think that tree has seen more fights than either of us."), LWLang.speechKey("dialogue.npc_social.joke.question.5", "Be honest. Have you ever pretended not to hear someone challenge you?"),
+                        LWLang.speechKey("dialogue.npc_social.joke.question.6", "If another person tells me to 'just sense their Ki,' I'm charging them for lessons."), LWLang.speechKey("dialogue.npc_social.joke.question.7", "I nearly tripped over my own landing earlier. Nobody saw it, right?")};
+                String[] r = {LWLang.speechKey("dialogue.npc_social.joke.reply.0", "I assumed the ground accepted its fate."), LWLang.speechKey("dialogue.npc_social.joke.reply.1", "That's not a statistic I'd brag about."), LWLang.speechKey("dialogue.npc_social.joke.reply.2", "Obviously. Science is settled."), LWLang.speechKey("dialogue.npc_social.joke.reply.3", "Finally, someone here with proper defense."),
+                        LWLang.speechKey("dialogue.npc_social.joke.reply.4", "Then the tree is the veteran here."), LWLang.speechKey("dialogue.npc_social.joke.reply.5", "Only when I was hoping they'd challenge somebody else."),
+                        LWLang.speechKey("dialogue.npc_social.joke.reply.6", "Make it double if they ask twice."), LWLang.speechKey("dialogue.npc_social.joke.reply.7", "I saw nothing. Your dignity is safe.")};
                 beats.add(new Beat(a.getUUID(), q[v], Tone.TEASING));
                 beats.add(new Beat(b.getUUID(), r[v], Tone.TEASING));
                 beats.add(new Beat(a.getUUID(), switch (v) {
-                    case 2 -> "Knew it."; case 5 -> "See? I'm not the only one."; case 7 -> "Good. Let's keep it that way.";
-                    default -> "Fair point.";
+                    case 2 -> LWLang.speechKey("dialogue.npc_social.joke.followup.2", "Knew it."); case 5 -> LWLang.speechKey("dialogue.npc_social.joke.followup.5", "See? I'm not the only one."); case 7 -> LWLang.speechKey("dialogue.npc_social.joke.followup.7", "Good. Let's keep it that way.");
+                    default -> LWLang.speechKey("dialogue.npc_social.joke.followup.default", "Fair point.");
                 }, Tone.TEASING));
             }
         }
         return List.copyOf(beats);
+    }
+
+    /** Only authored event categories may become NPC-to-NPC dialogue topics. */
+    private static boolean isConversationalRecentEvent(String type) {
+        return "ALLY_DIED".equals(type) || "ENEMY_DIED".equals(type) || "MOB_SEEN".equals(type)
+                || "WORLD_CONDITION".equals(type) || "TRAINING_GROWTH".equals(type);
     }
 
     private static void applyTone(AmbientFighterEntity speaker, AmbientFighterEntity listener, Tone tone) {
@@ -966,22 +981,28 @@ public final class FighterNpcSocialManager {
     }
 
     private static String activityPhrase(String activity) {
-        if (activity == null || activity.isBlank()) return "taking a break";
+        if (activity == null || activity.isBlank()) return LWLang.speechKey("dialogue.npc_social.activity.phrase.break", "taking a break");
         String lower = activity.toLowerCase(Locale.ROOT);
-        if (lower.contains("fish")) return "fishing";
-        if (lower.contains("star")) return "watching the sky";
-        if (lower.contains("fly")) return "flying around";
-        if (lower.contains("train")) return "training";
-        if (lower.contains("jog")) return "out on a run";
-        if (lower.contains("walk")) return "taking a walk";
-        if (lower.contains("study") || lower.contains("notes")) return "reviewing some notes";
-        if (lower.contains("dance")) return "dancing";
-        if (lower.contains("flower")) return "looking at that flower";
-        if (lower.contains("apple") || lower.contains("tree")) return "getting an apple from that tree";
-        if (lower.contains("rest")) return "resting";
-        if (lower.contains("scout") || lower.contains("looking")) return "checking the area";
-        if (lower.contains("eat")) return "grabbing something to eat";
-        return "taking a break";
+        if (lower.contains("fish")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.fishing", "fishing");
+        if (lower.contains("star")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.stargazing", "watching the sky");
+        if (lower.contains("fly")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.flying", "flying around");
+        if (lower.contains("train")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.training", "training");
+        if (lower.contains("jog")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.jogging", "out on a run");
+        if (lower.contains("walk")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.walking", "taking a walk");
+        if (lower.contains("study") || lower.contains("notes")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.study", "reviewing some notes");
+        if (lower.contains("dance")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.dancing", "dancing");
+        if (lower.contains("flower")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.flower", "looking at that flower");
+        if (lower.contains("apple") || lower.contains("tree")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.apple", "getting an apple from that tree");
+        if (lower.contains("rest")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.resting", "resting");
+        if (lower.contains("scout") || lower.contains("looking")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.scouting", "checking the area");
+        if (lower.contains("eat")) return LWLang.speechKey("dialogue.npc_social.activity.phrase.eating", "grabbing something to eat");
+        return LWLang.speechKey("dialogue.npc_social.activity.phrase.break", "taking a break");
+    }
+
+    private static String localizedHobbyActivity(FighterHobby hobby) {
+        String fallback = hobby == null ? "taking it easy" : hobby.activity();
+        String slug = fallback.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        return LWLang.speechKey("dialogue.npc_social.hobby.activity." + slug, fallback);
     }
 
     /** Immediate lifecycle cleanup for a fighter that died/was archived. */

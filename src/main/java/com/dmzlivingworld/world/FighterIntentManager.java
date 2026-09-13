@@ -1,5 +1,7 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
+
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterPersonality;
 import net.minecraft.nbt.CompoundTag;
@@ -168,6 +170,20 @@ public final class FighterIntentManager {
         if (intent == Intent.NONE || fighter == null) return "";
         String reason = fighter.getPersistentData().getString(REASON);
         return reason.isBlank() ? intent.label() : intent.label() + " • " + reason;
+    }
+
+    public static String localizedSummary(AmbientFighterEntity fighter) {
+        Intent intent = current(fighter);
+        if (intent == Intent.NONE || fighter == null) return "";
+        String reason = fighter.getPersistentData().getString(REASON);
+        String intentLabel = keyedLabel("intent", intent.label());
+        return reason.isBlank() ? LWLang.speechKey("profile.task.intent_short", "Intent: %s", intentLabel)
+                : LWLang.speechKey("profile.task.intent", "Intent: %s | %s", intentLabel, keyedLabel("intent_reason", reason));
+    }
+
+    private static String keyedLabel(String category, String value) {
+        String slug = value.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        return LWLang.speechKey("label." + category + "." + slug, value);
     }
 
     public static AmbientFighterEntity preferredSocialTarget(AmbientFighterEntity fighter, double radius) {

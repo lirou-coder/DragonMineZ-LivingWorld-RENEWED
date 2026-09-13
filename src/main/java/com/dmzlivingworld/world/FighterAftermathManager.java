@@ -93,9 +93,9 @@ public final class FighterAftermathManager {
             if (d2 > 16.0D && d2 < 144.0D) fighter.getNavigation().moveTo(hurt, 0.72D);
         }
         if (!d.getBoolean(SPOKE) && now - d.getLong(START) > 35L && fighter.getSpeech().isEmpty()) {
-            if ("ALLY".equals(role) && fighter.getRandom().nextFloat() < 0.40F) fighter.speak("You all right?", 42);
-            else if ("WINNER".equals(role) && fighter.getRandom().nextFloat() < 0.22F) fighter.speak("...Good fight.", 40);
-            else if ("LOSER".equals(role) && fighter.getRandom().nextFloat() < 0.22F) fighter.speak("I need to remember that.", 46);
+            if ("ALLY".equals(role) && fighter.getRandom().nextFloat() < 0.40F) fighter.speakKey("dialogue.aftermath.ally", "You all right?", 42);
+            else if ("WINNER".equals(role) && fighter.getRandom().nextFloat() < 0.22F) fighter.speakKey("dialogue.aftermath.winner", "...Good fight.", 40);
+            else if ("LOSER".equals(role) && fighter.getRandom().nextFloat() < 0.22F) fighter.speakKey("dialogue.aftermath.loser", "I need to remember that.", 46);
             d.putBoolean(SPOKE, true);
             fighter.getPersistentData().put(ROOT, d);
         }

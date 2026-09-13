@@ -45,6 +45,7 @@ import com.dmzlivingworld.world.FactionWorldData;
 import com.dmzlivingworld.world.WorldFaction;
 import com.dmzlivingworld.world.WantedManager;
 import com.dmzlivingworld.world.WorldPowerScaler;
+import com.dmzlivingworld.world.WorldEraData;
 import com.dmzlivingworld.world.FighterPowerStatScaler;
 import com.dmzlivingworld.world.BattlePowerFormula;
 import com.dmzlivingworld.world.NpcDefenseCalculator;
@@ -68,6 +69,7 @@ import com.dmzlivingworld.world.OrganicThreatManager;
 import com.dmzlivingworld.world.ReactiveFusionManager;
 import com.dmzlivingworld.world.SanctionedMatchGuard;
 import com.dmzlivingworld.config.LivingWorldConfig;
+import com.dmzlivingworld.client.LWLang;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -668,7 +670,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         entityData.set(KAIOKEN_LEVEL, 0);
         entityData.set(STORY_ROLE, STORY_NONE);
         entityData.set(FLIGHT_UNLOCKED, race == FighterRace.ANTORANIAN || rollInitialFlight(random, rank));
-        entityData.set(RACIAL_SKILL_LEVEL, rollInitialRacialSkill(random, rank, race));
+        entityData.set(RACIAL_SKILL_LEVEL, level() instanceof ServerLevel racialLevel
+                && WorldEraData.get(racialLevel).eraNumber() >= LivingWorldConfig.racialSkillMinimumEra()
+                ? rollInitialRacialSkill(random, rank, race) : 0);
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, 0);
         entityData.set(AMBIENT_POSE, 0);
         entityData.set(WEAPON_TRAINING_STRIKE, 0);
@@ -1103,6 +1107,17 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             getPersistentData().remove("LWUnownedFlightTicks");
             return;
         }
+        // DMZ's base saga mob can start its emergency "return to the surface" flight in deep
+        // terrain. In the Nether that is usually a flight toward the bedrock roof, not safety.
+        // Only retain that unowned emergency flight at Y 10 or below; ordinary LW activities and
+        // every explicitly owned combat/travel flight above remain untouched.
+        if (level().dimension().equals(Level.NETHER) && getY() > 10.0D) {
+            setFlyingFast(false);
+            setFlying(false);
+            setNoGravity(false);
+            getPersistentData().remove("LWUnownedFlightTicks");
+            return;
+        }
         int unowned = getPersistentData().getInt("LWUnownedFlightTicks") + 1;
         getPersistentData().putInt("LWUnownedFlightTicks", unowned);
         // Grounded stale flight is always invalid. Airborne state gets a short grace so a legitimate
@@ -1341,8 +1356,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             data.putLong("LWIdleStretchUntil", now + 40L + getRandom().nextInt(16));
             getNavigation().stop();
             if (getSpeech().isEmpty()) {
-                String[] stretchLines = {"Needed that stretch.", "Loosen up before moving again.", "Back was getting stiff.", "Just stretching out a little.", "Good. Much better."};
-                speak(stretchLines[getRandom().nextInt(stretchLines.length)], 40);
+                speakKey("dialogue.activity.stretch." + getRandom().nextInt(5), 40);
             }
             return;
         }
@@ -1935,6 +1949,12 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         getNavigation().stop();
     }
 
+    /** True only while this fighter is actively fleeing the entity that forced the retreat. */
+    private boolean isRetreatThreat(Entity entity) {
+        return retreatTicks > 0 && entity != null && retreatThreatId != null
+                && retreatThreatId.equals(entity.getUUID());
+    }
+
     private void tickRetreat() {
         setTarget(null);
         if (retreatTicks-- <= 0) {
@@ -2189,7 +2209,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         deathTime = 0;
         setPose(Pose.STANDING);
         entityData.set(DEFEATED, true);
-        speak(getRandom().nextBoolean() ? "...You spared me." : "I yield. You could've finished that.", 72);
+        speakKey(getRandom().nextBoolean() ? "dialogue.mercy.spared" : "dialogue.mercy.yielded", 72);
         FighterCombatDirector.reset(this);
         defeatedTicks = 180 + getRandom().nextInt(81); // 9-13 seconds, same readable concession family.
         setHealth(Math.max(1.0F, getMaxHealth() * 0.08F));
@@ -2255,6 +2275,13 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     @Override
     public void setTarget(LivingEntity target) {
+        // Retreat is an explicit non-combat state. HurtByTargetGoal and integrations may try
+        // to restore the last attacker every tick, so reject that exact attacker at the target
+        // assignment boundary instead of merely clearing it once in beginRetreat().
+        if (!level().isClientSide && target != null && isRetreatThreat(target)) {
+            super.setTarget(null);
+            return;
+        }
         if (!level().isClientSide && target instanceof ServerPlayer player
                 && PlayerCreationSafety.isCreating(player)) {
             super.setTarget(null);
@@ -2288,6 +2315,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     @Override
     public boolean doHurtTarget(Entity target) {
+        if (!level().isClientSide && isRetreatThreat(target)) return false;
         if (!level().isClientSide && target instanceof ServerPlayer player
                 && PlayerCreationSafety.isCreating(player)) return false;
         if (!level().isClientSide && target instanceof LivingEntity living
@@ -2366,6 +2394,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     @Override
     public boolean canAttack(LivingEntity target) {
+        if (isRetreatThreat(target)) return false;
         if (target instanceof ServerPlayer player && PlayerCreationSafety.isCreating(player)) return false;
         if (target instanceof ServerPlayer player && PlayerSpawnCombatSafety.blocksTarget(this, player)) return false;
         if (!com.dmzlivingworld.world.FactionRequestMissionManager.allowsMissionTarget(this, target)) return false;
@@ -2471,8 +2500,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
         if (isSanctionedMatchParticipant() || getTarget() != null) {
             if (getTarget() != player && !level().isClientSide && player instanceof ServerPlayer serverPlayer) {
-                serverPlayer.displayClientMessage(Component.literal(
-                        "The NPC is fighting! You can't interact right now!").withStyle(ChatFormatting.RED), false);
+                serverPlayer.displayClientMessage(Component.translatable(
+                        "dmzlivingworld.message.interaction.fighting").withStyle(ChatFormatting.RED), false);
             }
             return InteractionResult.sidedSuccess(level().isClientSide);
         }
@@ -2530,7 +2559,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             if (level().isClientSide) return InteractionResult.sidedSuccess(true);
             if (player instanceof ServerPlayer serverPlayer) {
                 if (getHealth() >= getMaxHealth() - 0.5F) {
-                    speak("I'm okay. Save it for when someone needs it.", 72);
+                    speakKey("dialogue.senzu.not_needed", 72);
                     return InteractionResult.CONSUME;
                 }
                 if (!serverPlayer.getAbilities().instabuild) held.shrink(1);
@@ -2553,9 +2582,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         // Sneak + supported equipment is an intentional gift.
         if (!level().isClientSide && player instanceof ServerPlayer serverPlayer
                 && FighterArsenalManager.tryGift(serverPlayer, this, held, false)) {
-            serverPlayer.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                    .append(Component.literal(getFighterName() + " accepted the equipment. Equipment: "
-                            + FighterArsenalManager.summary(this)).withStyle(ChatFormatting.GRAY)), false);
+            serverPlayer.displayClientMessage(Component.translatable("dmzlivingworld.message.interaction.equipment_accepted",
+                    getFighterName(), FighterArsenalManager.summary(this)).withStyle(ChatFormatting.GRAY), false);
             return InteractionResult.CONSUME;
         }
 
@@ -2851,7 +2879,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         combatConfigured = false;
         configureCombatProfile(false);
         recordLegacyEvent("Promoted from " + previous.displayName() + " to " + next.displayName());
-        if (getSpeech().isEmpty()) speak(next == FighterRank.VETERAN ? "I've come a long way." : "I'm getting stronger.", 64);
+        if (getSpeech().isEmpty()) speakKey(next == FighterRank.VETERAN
+                ? "dialogue.fighter.training_complete" : "dialogue.fighter.training_progress", 64);
         return true;
     }
     public FighterPersonality getPersonality() { return FighterPersonality.byId(entityData.get(PERSONALITY)); }
@@ -3233,7 +3262,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             supplyCooldown = 520;
             setHealth(getMaxHealth());
             level().playSound(null, blockPosition(), MainSounds.SENZU_BEAN.get(), SoundSource.HOSTILE, 1.0F, 1.0F);
-            speak("Senzu!", 36);
+            speakKey("dialogue.senzu.use", 36);
             flareAura(55);
             return;
         }
@@ -3279,7 +3308,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             if (getFactionRole().ordinal() >= FactionRole.LIEUTENANT.ordinal()) chance += 0.12F;
             if (getRandom().nextFloat() < Math.min(0.90F, chance)) {
                 flareAura(90 + getRandom().nextInt(111));
-                if (getSpeech().isEmpty() && getRandom().nextFloat() < 0.45F) speak("Enough.", 38);
+                if (getSpeech().isEmpty() && getRandom().nextFloat() < 0.45F) speakKey("dialogue.fighter.enough", 38);
             }
         }
 
@@ -3340,6 +3369,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     /** Fixed classic-inspired appearance for the unique World Menace easter egg. */
     public void configureHerobrineAppearance() {
+        entityData.set(SPEECH, "");
+        speechTicks = 0;
         entityData.set(FIGHTER_NAME, "Herobrine");
         entityData.set(SPEECH, "");
         speechTicks = 0;
@@ -3707,7 +3738,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         setLightning(true);
         if (getRandom().nextFloat() < 0.72F) flareAura(140 + getRandom().nextInt(121));
         level().playSound(null, blockPosition(), MainSounds.TRANSFORM_ON.get(), SoundSource.HOSTILE, 1.25F, 1.0F);
-        speak(getPersonality() == FighterPersonality.PROUD ? "Now we can begin." : "My power just changed.", 52);
+        speakKey(getPersonality() == FighterPersonality.PROUD
+                ? "dialogue.awakened.proud" : "dialogue.awakened.default", 52);
     }
 
     private void applyAwakenedCombatBoost() {
@@ -4666,7 +4698,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 entityData.set(FLIGHT_UNLOCKED, true);
                 setCanFly(true);
                 recordLegacyEvent("Learned flight through training");
-                if (getSpeech().isEmpty()) speak("I think I've got it... I can fly.", 64);
+                if (getSpeech().isEmpty()) speakKey("dialogue.fighter.flight_unlocked", 64);
             }
         }
 
@@ -4684,7 +4716,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 if (unlocked != null) {
                     recordLegacyEvent("Unlocked " + unlocked.displayName() + " through training");
                     FighterGoalManager.onRacialAdvanced(this);
-                    if (getSpeech().isEmpty()) speak("I finally understand " + unlocked.displayName() + ".", 72);
+                    if (getSpeech().isEmpty()) speakKey("dialogue.training.form_unlocked",
+                            "I finally understand %s.", 72, unlocked.displayName());
                 }
             }
         }
@@ -4766,14 +4799,13 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         // Kaioken as a permanent saga-effect pass produced far too many sparks.
         flareAura(22);
         level().playSound(null, blockPosition(), MainSounds.TRANSFORM_ON.get(), SoundSource.HOSTILE, 1.2F, 1.05F);
-        String formSuffix = isRacialFormActive() && getActiveRacialForm() != null ? " with " + getActiveRacialForm().displayName() : "";
-        String line = switch (getRandom().nextInt(4)) {
-            case 0 -> "Kaioken times " + level + formSuffix + "!";
-            case 1 -> "Let's raise it—Kaioken times " + level + formSuffix + "!";
-            case 2 -> "Here goes... Kaioken times " + level + formSuffix + "!";
-            default -> "Kaioken, times " + level + formSuffix + "!";
-        };
-        speak(line, 68);
+        String racialForm = isRacialFormActive() && getActiveRacialForm() != null ? getActiveRacialForm().displayName() : "";
+        int kaiokenLine = getRandom().nextInt(4);
+        boolean combined = !racialForm.isBlank();
+        if (combined) speakKey("dialogue.transform.kaioken." + kaiokenLine + ".form",
+                "Kaioken times %s with %s!", 68, level, racialForm);
+        else speakKey("dialogue.transform.kaioken." + kaiokenLine,
+                "Kaioken times %s!", 68, level);
         return true;
     }
 
@@ -4821,11 +4853,16 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     public void speak(String text, int ticks) {
         if (level().isClientSide || text == null || text.isBlank()) return;
-        // Herobrine has no ambient, social or combat dialogue. Only the two explicit encounter
-        // warnings are allowed through this central gate.
-        if (WorldMenaceManager.isHerobrine(this)
-                && !"You are not yet ready".equals(text)
-                && !"I'll see you at another place".equals(text)) return;
+        if (WorldMenaceManager.isHerobrine(this)) return;
+        if (LWLang.isSpeechKey(text)) {
+            if (com.dmzlwfusion.NpcFusionManager.isHiddenFusionPartner(this)) return;
+            entityData.set(SPEECH, text);
+            speechTicks = Math.max(20, ticks);
+            rememberDialogue(text);
+            return;
+        }
+        // Herobrine is entirely silent. Encounter notices belong to the player's UI/sound layer,
+        // never to the entity speech channel.
         // The hidden NPC inside an active player/NPC fusion is persistence state, not a world
         // speaker. This central gate prevents every ambient/reactive/debug system from making the
         // invisible passenger talk even if a future caller forgets to filter its entity query.
@@ -4837,6 +4874,27 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         entityData.set(SPEECH, clean);
         speechTicks = Math.max(20, ticks);
         rememberDialogue(clean);
+    }
+
+    /** Sends a client-resolved dialogue key through the normal synchronized speech field. */
+    public void speakKey(String key, int ticks) {
+        if (level().isClientSide || key == null || key.isBlank()) return;
+        if (WorldMenaceManager.isHerobrine(this)) return;
+        if (com.dmzlwfusion.NpcFusionManager.isHiddenFusionPartner(this)) return;
+        String encoded = LWLang.speechKey(key);
+        entityData.set(SPEECH, encoded);
+        speechTicks = Math.max(20, ticks);
+        rememberDialogue(encoded);
+    }
+
+    public void speakKey(String key, String fallback, int ticks, Object... arguments) {
+        if (level().isClientSide || key == null || key.isBlank()) return;
+        if (WorldMenaceManager.isHerobrine(this)) return;
+        if (com.dmzlwfusion.NpcFusionManager.isHiddenFusionPartner(this)) return;
+        String encoded = LWLang.speechKey(key, fallback, arguments);
+        entityData.set(SPEECH, encoded);
+        speechTicks = Math.max(20, ticks);
+        rememberDialogue(encoded);
     }
 
     public List<String> getDialogueHistory() { return List.copyOf(dialogueHistory); }

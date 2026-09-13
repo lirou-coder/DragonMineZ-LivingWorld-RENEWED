@@ -1,5 +1,7 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
+
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
@@ -150,7 +152,7 @@ public final class WorldMenaceManager {
         if (fighter == null || attacker == null || !isHerobrine(fighter) || fighter.level().isClientSide) return;
         long now = fighter.level().getGameTime();
         if (PlayerSpawnCombatSafety.isInsideProtectedArea(attacker)) {
-            fighter.speak("I'll see you at another place", 60);
+            fighter.speakKey("dialogue.herobrine.another_place", 60);
             disappear(fighter, attacker, now);
             return;
         }
@@ -170,12 +172,12 @@ public final class WorldMenaceManager {
         double menacePower = Math.max(1.0D, fighter.getBattlePower());
         markSpotted(attacker, fighter);
         if (playerPower < menacePower * 0.81D) {
-            fighter.speak("You are not yet ready", 60);
+            fighter.speakKey("dialogue.herobrine.not_ready", 60);
             disappear(fighter, attacker, fighter.level().getGameTime());
             return true;
         }
         if (PlayerSpawnCombatSafety.isInsideProtectedArea(attacker)) {
-            fighter.speak("I'll see you at another place", 60);
+            fighter.speakKey("dialogue.herobrine.another_place", 60);
             disappear(fighter, attacker, fighter.level().getGameTime());
             return true;
         }
@@ -221,19 +223,19 @@ public final class WorldMenaceManager {
         List<String> lines = new java.util.ArrayList<>();
         if (player == null || fighter == null || !isHerobrine(fighter)) return lines;
         String state = fighter.getPersistentData().getString(MENACE_STATE);
-        lines.add("## Status");
-        lines.add("* " + (state.isBlank() ? "Whereabouts unclear" : switch (state) {
-            case "WATCHING" -> "Watching from a distance";
-            case "SHADOWING" -> "Following from a distance";
-            case "HUNTING" -> "Hostile";
-            case "RETURNED" -> "Returned after defeat";
-            default -> "Whereabouts unclear";
+        lines.add("## " + menaceText("status", "Status"));
+        lines.add("* " + (state.isBlank() ? menaceText("whereabouts_unclear", "Whereabouts unclear") : switch (state) {
+            case "WATCHING" -> menaceText("watching", "Watching from a distance");
+            case "SHADOWING" -> menaceText("following", "Following from a distance");
+            case "HUNTING" -> menaceText("hostile", "Hostile");
+            case "RETURNED" -> menaceText("returned", "Returned after defeat");
+            default -> menaceText("whereabouts_unclear", "Whereabouts unclear");
         }));
-        lines.add("## Behavior");
-        lines.add("* Usually keeps his distance outside combat.");
-        lines.add("* Confirmed sightings: " + sightingCount(player));
+        lines.add("## " + menaceText("behavior", "Behavior"));
+        lines.add("* " + menaceText("keeps_distance", "Usually keeps his distance outside combat."));
+        lines.add("* " + menaceText("confirmed_sightings", "Confirmed sightings: %s", sightingCount(player)));
         int returns = WorldMenaceData.get(player.serverLevel()).deaths();
-        if (returns > 0) lines.add("* Confirmed returns after defeat: " + returns);
+        if (returns > 0) lines.add("* " + menaceText("confirmed_returns", "Confirmed returns after defeat: %s", returns));
         return lines;
     }
 
@@ -254,25 +256,25 @@ public final class WorldMenaceManager {
         int returns = WorldMenaceData.get(player.serverLevel()).deaths();
         long first = pd.getLong(PLAYER_FIRST_SPOTTED_AT);
         long last = pd.getLong(PLAYER_SPOTTED_AT);
-        lines.add("!! HEROBRINE • ENCOUNTER RECORD");
+        lines.add("!! " + menaceText("encounter_record", "HEROBRINE | ENCOUNTER RECORD"));
         if (sightings <= 0) {
-            lines.add(". No confirmed sighting has been recorded.");
+            lines.add(". " + menaceText("no_sighting", "No confirmed sighting has been recorded."));
             return lines;
         }
         long now = player.serverLevel().getGameTime();
-        lines.add("## Sightings");
-        lines.add("* First confirmed " + ageLabel(now, first));
-        lines.add("* Last confirmed " + ageLabel(now, last));
-        lines.add("* Confirmed sightings: " + sightings);
-        lines.add("## Observed Pattern");
-        lines.add("* Watches from long range and withdraws when approached outside combat.");
+        lines.add("## " + menaceText("sightings", "Sightings"));
+        lines.add("* " + menaceText("first_confirmed", "First confirmed %s", ageLabel(now, first)));
+        lines.add("* " + menaceText("last_confirmed", "Last confirmed %s", ageLabel(now, last)));
+        lines.add("* " + menaceText("confirmed_sightings", "Confirmed sightings: %s", sightings));
+        lines.add("## " + menaceText("observed_pattern", "Observed Pattern"));
+        lines.add("* " + menaceText("long_range", "Watches from long range and withdraws when approached outside combat."));
         if (returns > 0) {
-            lines.add("## Return Record");
-            lines.add("* Confirmed returns after defeat: " + returns);
-            lines.add("* Each return has shown a higher Power Level.");
+            lines.add("## " + menaceText("return_record", "Return Record"));
+            lines.add("* " + menaceText("confirmed_returns", "Confirmed returns after defeat: %s", returns));
+            lines.add("* " + menaceText("higher_pl", "Each return has shown a higher PL."));
         }
-        lines.add("## Unknown");
-        lines.add(". Origin • motive • destination");
+        lines.add("## " + menaceText("unknown", "Unknown"));
+        lines.add(". " + menaceText("unknown_fields", "Origin | motive | destination"));
         return lines;
     }
 
@@ -281,24 +283,27 @@ public final class WorldMenaceManager {
         List<String> lines = new java.util.ArrayList<>();
         if (player == null || fighter == null || !isHerobrine(fighter)) return lines;
         CompoundTag pd = player.getPersistentData();
-        lines.add("## Evidence");
-        lines.add("* Confirmed sightings: " + sightingCount(player));
+        lines.add("## " + menaceText("evidence", "Evidence"));
+        lines.add("* " + menaceText("confirmed_sightings", "Confirmed sightings: %s", sightingCount(player)));
         if (pd.contains(PLAYER_LAST_MENACE_X, Tag.TAG_ANY_NUMERIC)) {
-            lines.add("* Last confirmed area: approximately " + Math.round(pd.getDouble(PLAYER_LAST_MENACE_X))
-                    + ", " + Math.round(pd.getDouble(PLAYER_LAST_MENACE_Z)));
+            lines.add("* " + menaceText("last_area", "Last confirmed area: approximately %s, %s", Math.round(pd.getDouble(PLAYER_LAST_MENACE_X)), Math.round(pd.getDouble(PLAYER_LAST_MENACE_Z))));
         }
         int returns = WorldMenaceData.get(player.serverLevel()).deaths();
-        if (returns > 0) lines.add("* Confirmed returns after defeat: " + returns);
+        if (returns > 0) lines.add("* " + menaceText("confirmed_returns", "Confirmed returns after defeat: %s", returns));
         return lines;
     }
 
     private static String ageLabel(long now, long tick) {
-        if (tick <= 0L) return "at an unknown time";
+        if (tick <= 0L) return menaceText("age_unknown", "at an unknown time");
         long age = Math.max(0L, now - tick);
-        if (age < 1200L) return "moments ago";
-        if (age < 24000L) return "earlier today";
+        if (age < 1200L) return menaceText("age_moments", "moments ago");
+        if (age < 24000L) return menaceText("age_today", "earlier today");
         long days = Math.max(1L, age / 24000L);
-        return days + " day" + (days == 1 ? "" : "s") + " ago";
+        return menaceText("age_days", "%s day(s) ago", days);
+    }
+
+    private static String menaceText(String key, String fallback, Object... args) {
+        return LWLang.speechKey("profile.menace.herobrine." + key, fallback, args);
     }
 
     @SubscribeEvent
@@ -382,7 +387,7 @@ public final class WorldMenaceManager {
         CompoundTag profile = fighter.writeMemoryProfile();
         profile.putBoolean(HEROBRINE_TAG, true);
         data.markDead(profile, returnAt, fighter.getX(), fighter.getY(), fighter.getZ());
-        Component omen = Component.literal("The air goes still. Somewhere behind you, something feels unfinished.")
+        Component omen = Component.translatable("dmzlivingworld.message.menace.herobrine.omen")
                 .withStyle(ChatFormatting.DARK_RED);
         for (ServerPlayer player : level.players()) {
             if (player.distanceToSqr(fighter) <= 160.0D * 160.0D) player.displayClientMessage(omen, false);
@@ -573,29 +578,25 @@ public final class WorldMenaceManager {
                 return false;
             }
 
-            if (distance <= 50.0D && playerReady) {
+            // A capable player must deliberately close the remaining distance before the
+            // sighting turns into combat.  Merely entering the old 50-block warning radius
+            // is not itself a challenge anymore.
+            if (distance <= 20.0D && playerReady) {
                 teleportInFront(fighter, watched);
                 engage(fighter, watched, now);
                 return false;
             }
 
             if (!playerReady) {
-                if (distance <= 50.0D) {
-                    fighter.speak("You are not yet ready", 60);
+                // A low-power player breaks the encounter as soon as they either enter its
+                // full visible cone or reach the 50-block proximity boundary. This is an
+                // immediate sighting response, not the former 10-second crosshair stare.
+                if (distance <= 50.0D || observed) {
+                    markSpotted(watched, fighter);
                     disappear(fighter, watched, now);
                     return true;
                 }
-                if (observed) {
-                    markSpotted(watched, fighter);
-                    if (session.observedSince <= 0L) session.observedSince = now;
-                    if (now - session.observedSince >= 200L) {
-                        fighter.speak("You are not yet ready", 60);
-                        disappear(fighter, watched, now);
-                        return true;
-                    }
-                } else {
-                    session.observedSince = 0L;
-                }
+                session.observedSince = 0L;
             }
 
             // When the watched player leaves the intended sighting range, relocate instantly to
@@ -643,7 +644,7 @@ public final class WorldMenaceManager {
 
     private static void engage(AmbientFighterEntity fighter, ServerPlayer player, long now) {
         if (PlayerSpawnCombatSafety.isInsideProtectedArea(player)) {
-            fighter.speak("I'll see you at another place", 60);
+            fighter.speakKey("dialogue.herobrine.another_place", 60);
             disappear(fighter, player, now);
             return;
         }
@@ -683,8 +684,10 @@ public final class WorldMenaceManager {
 
     private static boolean relocateAround(AmbientFighterEntity fighter, ServerPlayer player) {
         if (!(fighter.level() instanceof ServerLevel level) || player.serverLevel() != level) return false;
+        // A relocation is a true reposition, not an approximate ring. Keep every natural
+        // teleport on the 100-block ring around the watched player.
         BlockPos pos = AmbientFighterSpawner.findSafeGroundAroundSeparated(level, player.blockPosition(),
-                fighter.getRandom(), 96, 104, 64, 72.0D);
+                fighter.getRandom(), 100, 100, 64, 72.0D);
         if (pos == null) return false;
         fighter.getNavigation().stop();
         fighter.setFlyingFast(false);
@@ -755,7 +758,10 @@ public final class WorldMenaceManager {
         double distance = to.length();
         if (distance < 0.01D || distance > 118.0D || !player.hasLineOfSight(fighter)) return false;
         double dot = player.getLookAngle().normalize().dot(to.normalize());
-        return dot > 0.965D;
+        // The logical server cannot read the client's FOV slider. This deliberately broad
+        // 110-degree cone represents seeing Herobrine anywhere in the player's view instead
+        // of requiring the old near-crosshair (30-degree) aim check.
+        return dot > 0.57D;
     }
 
     private static void endWatch(AmbientFighterEntity fighter, long now) {
@@ -899,7 +905,7 @@ public final class WorldMenaceManager {
             fighter = findLoaded(player.getServer(), data.entityId());
         }
         if (fighter == null) {
-            player.displayClientMessage(Component.literal("[LW] Herobrine is currently absent. Use /lw menace spawn to force his return for testing."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.debug.herobrine_absent"), false);
             return 0;
         }
         long now = fighter.level().getGameTime();
@@ -911,19 +917,23 @@ public final class WorldMenaceManager {
         fighter.setDeltaMovement(Vec3.ZERO);
         player.teleportTo((ServerLevel)fighter.level(), fighter.getX() + 8.0D, fighter.getY(), fighter.getZ() + 8.0D,
                 player.getYRot(), player.getXRot());
-        player.displayClientMessage(Component.literal("[LW] Debug observation hold: Herobrine will remain here for about 10 seconds unless attacked."), false);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.debug.herobrine_observation_hold"), false);
         return 1;
     }
 
     public static String status(ServerPlayer player) {
         WorldMenaceData data = WorldMenaceData.get(player.serverLevel());
         AmbientFighterEntity loaded = findLoaded(player.getServer(), data.entityId());
-        if (loaded != null) return "Active • " + moodSummary(loaded).split(" — ")[0] + (data.deaths() > 0 ? " • returned " + data.deaths() + "x" : "");
-        if (data.active()) return "Active • whereabouts unknown" + (data.deaths() > 0 ? " • returned " + data.deaths() + "x" : "");
-        if (!data.initialized()) return "Not yet seen";
+        String returned = data.deaths() > 0
+                ? LWLang.speechKey("label.menace_status.returned_count", " | returned %sx", data.deaths())
+                : "";
+        if (loaded != null) return LWLang.speechKey("label.menace_status.active", "Active%s", returned);
+        if (data.active()) return LWLang.speechKey("label.menace_status.whereabouts_unknown", "Active | whereabouts unknown%s", returned);
+        if (!data.initialized()) return LWLang.speechKey("label.menace_status.not_seen", "Not yet seen");
         long now = player.getServer().overworld().getGameTime();
         long ticks = Math.max(0L, data.returnAt() - now);
-        return ticks <= 0 ? "Eligible to return" : "Absent • may return in about " + Math.max(1L, ticks / 24000L) + "d";
+        return ticks <= 0 ? LWLang.speechKey("label.menace_status.eligible", "Eligible to return")
+                : LWLang.speechKey("label.menace_status.absent_days", "Absent | may return in about %sd", Math.max(1L, ticks / 24000L));
     }
 
     /** Watch scenes are process-local presentation state; the menace itself remains in SavedData. */

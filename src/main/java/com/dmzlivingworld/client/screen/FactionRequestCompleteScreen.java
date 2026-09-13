@@ -1,6 +1,7 @@
 package com.dmzlivingworld.client.screen;
 
 import com.dmzlivingworld.network.FactionRequestCompletePacket;
+import com.dmzlivingworld.client.LWLang;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -18,7 +19,7 @@ public final class FactionRequestCompleteScreen extends Screen implements Living
     private int left, top, panelWidth, panelHeight;
 
     private FactionRequestCompleteScreen(FactionRequestCompletePacket data) {
-        super(Component.literal("Faction Request Complete"));
+        super(LWLang.text("screen.faction_request.complete.title"));
         this.data = data;
     }
 
@@ -39,18 +40,18 @@ public final class FactionRequestCompleteScreen extends Screen implements Living
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         renderBackground(g);
         LivingWorldGuiStyle.drawPanel(g, left, top, panelWidth, panelHeight);
-        LivingWorldGuiStyle.drawSectionHeader(g, font, "REQUEST COMPLETE", left + 14, top + 13, panelWidth - 28);
-        LivingWorldGuiStyle.drawFitted(g, font, data.title(), left + 18, top + 34, panelWidth - 36, LivingWorldGuiStyle.GOLD);
+        LivingWorldGuiStyle.drawSectionHeader(g, font, LWLang.string("screen.faction_request.complete.header"), left + 14, top + 13, panelWidth - 28);
+        LivingWorldGuiStyle.drawFitted(g, font, LWLang.speech(data.title()).getString(), left + 18, top + 34, panelWidth - 36, LivingWorldGuiStyle.GOLD);
         if (!data.factionName().isBlank())
             LivingWorldGuiStyle.drawFitted(g, font, data.factionName(), left + 18, top + 47, panelWidth - 36, LivingWorldGuiStyle.MUTED);
 
         int y = top + 66;
-        y = section(g, "OUTCOME", data.summary(), y);
-        y = section(g, "REWARDS", data.rewards().isBlank() ? "No direct payout." : data.rewards(), y + 4);
-        section(g, "WORLD IMPACT", data.worldImpact().isBlank() ? "The faction records the completed operation." : data.worldImpact(), y + 4);
+        y = section(g, LWLang.string("screen.faction_request.complete.outcome"), LWLang.speech(data.summary()).getString(), y);
+        y = section(g, LWLang.string("screen.faction_request.complete.rewards"), data.rewards().isBlank() ? LWLang.string("screen.faction_request.complete.no_rewards") : LWLang.speech(data.rewards()).getString(), y + 4);
+        section(g, LWLang.string("screen.faction_request.complete.world_impact"), data.worldImpact().isBlank() ? LWLang.string("screen.faction_request.complete.default_impact") : LWLang.speech(data.worldImpact()).getString(), y + 4);
         int bw = 128, bh = 24;
         LivingWorldGuiStyle.drawButton(g, font, left + panelWidth - bw - 16, top + panelHeight - bh - 14,
-                bw, bh, "Continue", mouseX, mouseY, true, false, true);
+                bw, bh, LWLang.string("button.continue"), mouseX, mouseY, true, false, true);
         super.render(g, mouseX, mouseY, partialTick);
     }
 

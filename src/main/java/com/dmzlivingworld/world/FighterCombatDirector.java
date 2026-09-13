@@ -5,6 +5,7 @@ import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.FighterArchetype;
 import com.dmzlivingworld.entity.FighterDialogue;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.FighterPersonality;
 import com.dmzlivingworld.entity.FighterRank;
 import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
@@ -426,7 +427,8 @@ public final class FighterCombatDirector {
         // let DMZ freeze/resolve both combatants without our director fighting it.
         if (BeamClashManager.isClashing(fighter.getUUID())) {
             if (!state.clashAnnounced) {
-                fighter.speak(fighter.getPersonality() == FighterPersonality.PROUD ? "Don't you dare lose now!" : "HAAAAA!", 46);
+                fighter.speakKey(fighter.getPersonality() == FighterPersonality.PROUD
+                        ? "dialogue.combat.clash.proud" : "dialogue.combat.clash.default", 46);
                 state.clashAnnounced = true;
             }
             return;
@@ -496,9 +498,12 @@ public final class FighterCombatDirector {
         // dramatic and is much more likely for veterans than trained fighters.
         if (!state.awakeningUsed && shouldAwaken(fighter, state, hp, phase)) {
             state.awakeningUsed = true;
-            fighter.speak(fighter.getPersonality() == FighterPersonality.PROUD ? "You've forced me to go further." : "I'm done holding back!", 58);
+            fighter.speakKey(fighter.getPersonality() == FighterPersonality.PROUD
+                    ? "dialogue.combat.awakening.proud" : "dialogue.combat.awakening.default", 58);
             if (target instanceof AmbientFighterEntity other) {
-                queueSpeech(other, other.getPersonality() == FighterPersonality.PROUD ? "Finally." : "That power...", 30);
+                queueSpeech(other, other.getPersonality() == FighterPersonality.PROUD
+                        ? LWLang.speechKey("dialogue.combat.awakening.reply.proud", "Finally.")
+                        : LWLang.speechKey("dialogue.combat.awakening.reply.default", "That power..."), 30);
             }
             if (fighter.beginAwakening()) {
                 state.actionCooldown = 95;
@@ -811,7 +816,8 @@ public final class FighterCombatDirector {
             DBSagasEntity.KiSkill answer = findReadyClashBeam(fighter);
             if (answer != null && fighter.getRandom().nextFloat() < 0.82F) {
                 fighter.rotateBodyToTarget(target);
-                fighter.speak(fighter.getPersonality() == FighterPersonality.PROUD ? "Then clash with me!" : "I'll meet it head-on!", 44);
+                fighter.speakKey(fighter.getPersonality() == FighterPersonality.PROUD
+                        ? "dialogue.combat.beam_answer.proud" : "dialogue.combat.beam_answer.default", 44);
                 fighter.startSkill(answer);
             applyControlSkillPenalty(answer);
                 rememberSkill(state, answer);
@@ -870,7 +876,8 @@ public final class FighterCombatDirector {
             fighter.startCombo(combo);
             rememberCombo(state, combo);
             if (state.dialogueCooldown <= 0 && fighter.getRandom().nextFloat() < 0.30F) {
-                fighter.speak(fighter.getPersonality() == FighterPersonality.CALM ? "My turn." : "Now!", 30);
+                fighter.speakKey(fighter.getPersonality() == FighterPersonality.CALM
+                        ? "dialogue.combat.combo.calm" : "dialogue.combat.combo.default", 30);
                 state.dialogueCooldown = 80;
             }
             state.actionCooldown = 24;
@@ -949,20 +956,13 @@ public final class FighterCombatDirector {
         }
 
         if (state.dialogueCooldown <= 0) {
-            String line = switch (fighter.getPersonality()) {
-                case PROUD -> "You're still holding something back.";
-                case CALM -> "Your rhythm changed.";
-                case AGGRESSIVE -> "What are you waiting for?";
-                case HEROIC -> "This isn't over.";
-                case CAUTIOUS -> "Something's different...";
-            };
-            fighter.speak(line, 38);
+            fighter.speakKey("dialogue.combat.standoff." + fighter.getPersonality().name().toLowerCase(java.util.Locale.ROOT), 38);
             queueSpeech(other, switch (other.getPersonality()) {
-                case PROUD -> "Then make me show it.";
-                case CALM -> "You noticed.";
-                case AGGRESSIVE -> "Come find out!";
-                case HEROIC -> "Neither am I.";
-                case CAUTIOUS -> "Stay ready.";
+                case PROUD -> LWLang.speechKey("dialogue.combat.standoff.reply.proud", "Then make me show it.");
+                case CALM -> LWLang.speechKey("dialogue.combat.standoff.reply.calm", "You noticed.");
+                case AGGRESSIVE -> LWLang.speechKey("dialogue.combat.standoff.reply.aggressive", "Come find out!");
+                case HEROIC -> LWLang.speechKey("dialogue.combat.standoff.reply.heroic", "Neither am I.");
+                case CAUTIOUS -> LWLang.speechKey("dialogue.combat.standoff.reply.cautious", "Stay ready.");
             }, 12 + other.getRandom().nextInt(10));
             state.dialogueCooldown = 120;
             otherState.dialogueCooldown = 120;
@@ -1014,7 +1014,8 @@ public final class FighterCombatDirector {
         if (fighter.hasFlightUnlocked() && (fighter.isFlying() || threat.getY() > fighter.getY() + 1.5D)) fighter.setFlying(true);
         state.actionCooldown = Math.max(state.actionCooldown, 12);
         if (state.dialogueCooldown <= 0 && fighter.getRandom().nextFloat() < 0.14F) {
-            fighter.speak(fighter.getRandom().nextBoolean() ? "Not walking into that." : "Too close—move!", 38);
+            fighter.speakKey(fighter.getRandom().nextBoolean()
+                    ? "dialogue.combat.spacing.avoid" : "dialogue.combat.spacing.close", 38);
             state.dialogueCooldown = 90;
         }
         return true;
@@ -1316,10 +1317,11 @@ public final class FighterCombatDirector {
         separateFromTarget(fighter, other, 0.34D, 0.72D);
         separateFromTarget(other, fighter, 0.26D, 0.96D);
 
-        fighter.speak(fighter.getPersonality() == FighterPersonality.PROUD
-                ? "Keep up." : "We're taking this higher!", 38);
+        fighter.speakKey(fighter.getPersonality() == FighterPersonality.PROUD
+                ? "dialogue.combat.aerial.proud" : "dialogue.combat.aerial.default", 38);
         queueSpeech(other, other.getPersonality() == FighterPersonality.AGGRESSIVE
-                ? "Don't run from me!" : "Fine by me.", 14);
+                ? LWLang.speechKey("dialogue.combat.aerial.reply.aggressive", "Don't run from me!")
+                : LWLang.speechKey("dialogue.combat.aerial.reply.default", "Fine by me."), 14);
 
         state.actionCooldown = 8;
         otherState.actionCooldown = 8;
@@ -1376,8 +1378,10 @@ public final class FighterCombatDirector {
         other.getNavigation().stop();
         fighter.rotateBodyToTarget(other);
         other.rotateBodyToTarget(fighter);
-        fighter.speak("Let's settle this in one shot!", 50);
-        queueSpeech(other, other.getPersonality() == FighterPersonality.PROUD ? "Don't blink." : "I'm ready!", 18);
+        fighter.speakKey("dialogue.combat.final_clash", 50);
+        queueSpeech(other, other.getPersonality() == FighterPersonality.PROUD
+                ? LWLang.speechKey("dialogue.combat.final_clash.reply.proud", "Don't blink.")
+                : LWLang.speechKey("dialogue.combat.final_clash.reply.default", "I'm ready!"), 18);
 
         fighter.startSkill(ours);
             applyControlSkillPenalty(ours);

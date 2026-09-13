@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
@@ -212,12 +213,12 @@ public final class FighterEnvironmentManager {
         var id = ForgeRegistries.ENTITY_TYPES.getKey(animal.getType());
         String type = id == null ? "animal" : id.getPath();
         String line = switch (type) {
-            case "pig" -> "You know, that pig looks completely unbothered by all this Ki.";
-            case "cow" -> "At least the cows around here know how to stay out of a fight.";
-            case "chicken" -> "That chicken has better survival instincts than some fighters I've met.";
-            case "sheep" -> "Quiet place. The sheep seem to agree.";
-            case "wolf" -> "Good instincts. That wolf's watching everything.";
-            default -> "Funny how ordinary life keeps going around all this fighting.";
+            case "pig" -> LWLang.speechKey("dialogue.environment.animal.pig", "You know, that pig looks completely unbothered by all this Ki.");
+            case "cow" -> LWLang.speechKey("dialogue.environment.animal.cow", "At least the cows around here know how to stay out of a fight.");
+            case "chicken" -> LWLang.speechKey("dialogue.environment.animal.chicken", "That chicken has better survival instincts than some fighters I've met.");
+            case "sheep" -> LWLang.speechKey("dialogue.environment.animal.sheep", "Quiet place. The sheep seem to agree.");
+            case "wolf" -> LWLang.speechKey("dialogue.environment.animal.wolf", "Good instincts. That wolf's watching everything.");
+            default -> LWLang.speechKey("dialogue.environment.animal.default", "Funny how ordinary life keeps going around all this fighting.");
         };
         fighter.getLookControl().setLookAt(animal, 30.0F, 30.0F);
         fighter.speak(line, 74);

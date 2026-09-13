@@ -1,6 +1,7 @@
 package com.dmzlivingworld.client.screen;
 
 import com.dmzlivingworld.network.FactionDossierPacket;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.client.FighterPortraitRenderState;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.LWEntities;
@@ -48,7 +49,7 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
     private record MemberBlock(List<FormattedCharSequence> lines, String rawText, int color, int gapBefore, boolean heading) {}
 
     private FactionDossierScreen(FactionDossierPacket packet) {
-        super(Component.literal(packet.title()));
+        super(LWLang.speechEmbedded(packet.title()));
         this.page = packet.page();
         this.slot = packet.slot();
         this.subtitle = packet.subtitle();
@@ -131,9 +132,9 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
     }
     private String factionBondLabel() {
         String marker = factionBondMarker();
-        if (marker == null) return "Unknown";
+        if (marker == null) return LWLang.string("screen.dossier.unknown", "Unknown");
         String[] parts = marker.split("\\|", 3);
-        return parts.length >= 3 && !parts[2].isBlank() ? parts[2] : "Neutral";
+        return parts.length >= 3 && !parts[2].isBlank() ? parts[2] : LWLang.string("screen.dossier.neutral", "Neutral");
     }
     private int contentBodyTop() {
         int top = bodyTop() + ((factionDetailPage() || factionsHubPage()) ? 25 : 0);
@@ -188,24 +189,25 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
             else if (line.startsWith("~ ")) { line = line.substring(2); color = LivingWorldGuiStyle.BLUE; }
             else if (line.startsWith("* ")) { line = "• " + line.substring(2); color = 0xFFC7CDD3; }
             else if (line.startsWith(". ")) { line = line.substring(2); color = LivingWorldGuiStyle.MUTED; }
+            String displayLine = LWLang.speechEmbedded(line).getString();
             List<FormattedCharSequence> wrapped;
             // Portrait-card pages keep one person/threat on one compact visual row. People rows
             // remain clickable; Wanted/Menace reuse the visual language without pretending they are memories.
             if ((portraitCardPage() && personRecordId != null) || ("world".equals(page) && factionSlot > 0)) {
                 // Portrait people and the two Major Powers are deliberately one visual row / one hit target.
-                String fitted = LivingWorldGuiStyle.fitText(font, line, wrap);
+                String fitted = LivingWorldGuiStyle.fitText(font, displayLine, wrap);
                 wrapped = List.of(Component.literal(fitted).getVisualOrderText());
             } else {
-                wrapped = font.split(Component.literal(line), wrap);
+                wrapped = font.split(Component.literal(displayLine), wrap);
                 if (wrapped.isEmpty()) wrapped = List.of(Component.empty().getVisualOrderText());
             }
             if (membersPage()) {
-                memberBlocks.add(new MemberBlock(List.copyOf(wrapped), line, color, gap, heading));
+                memberBlocks.add(new MemberBlock(List.copyOf(wrapped), displayLine, color, gap, heading));
                 continue;
             }
             boolean first = true;
             for (FormattedCharSequence seq : wrapped) {
-                visualLines.add(new VisualLine(seq, line, fallen ? LivingWorldGuiStyle.MUTED : color, first ? gap : 0, factionSlot, personRecordId, clearAction, heading, fallen));
+                visualLines.add(new VisualLine(seq, displayLine, fallen ? LivingWorldGuiStyle.MUTED : color, first ? gap : 0, factionSlot, personRecordId, clearAction, heading, fallen));
                 first = false;
                 heading = false;
             }
@@ -283,19 +285,23 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
 
     private String pageChip() {
         return switch (page) {
-            case "factions" -> "FACTIONS";
-            case "faction_active" -> "ACTIVE QUEST";
-            case "faction" -> slot > 0 ? "FACTION #" + slot : "FACTION";
-            case "faction_roster" -> slot > 0 ? "MEMBERS #" + slot : "MEMBERS";
-            case "people" -> "PEOPLE";
-            case "travel" -> "COMPANION";
-            case "wanted" -> "WANTED";
-            case "antagonists" -> "ANTAGONISTS";
-            case "menace" -> "WORLD MENACE";
-            case "meditation" -> "MEDITATION";
-            case "fighter" -> "FIGHTER";
-            default -> "WORLD";
+            case "factions" -> LWLang.string("screen.dossier.chip.factions", "FACTIONS");
+            case "faction_active" -> LWLang.string("screen.dossier.chip.active_quest", "ACTIVE QUEST");
+            case "faction" -> slot > 0 ? LWLang.string("screen.dossier.chip.faction_number", "FACTION #%s", slot) : LWLang.string("screen.dossier.chip.faction", "FACTION");
+            case "faction_roster" -> slot > 0 ? LWLang.string("screen.dossier.chip.members_number", "MEMBERS #%s", slot) : LWLang.string("screen.dossier.chip.members", "MEMBERS");
+            case "people" -> LWLang.string("screen.dossier.chip.people", "PEOPLE");
+            case "travel" -> LWLang.string("screen.dossier.chip.companion", "COMPANION");
+            case "wanted" -> LWLang.string("screen.dossier.chip.wanted", "WANTED");
+            case "antagonists" -> LWLang.string("screen.dossier.chip.antagonists", "ANTAGONISTS");
+            case "menace" -> LWLang.string("screen.dossier.chip.world_menace", "WORLD MENACE");
+            case "meditation" -> LWLang.string("screen.dossier.chip.meditation", "MEDITATION");
+            case "fighter" -> LWLang.string("screen.dossier.chip.fighter", "FIGHTER");
+            default -> LWLang.string("screen.dossier.chip.world", "WORLD");
         };
+    }
+
+    private static String tabLabel(String tab) {
+        return LWLang.string("screen.dossier.tab." + tab.toLowerCase(java.util.Locale.ROOT).replace(' ', '_'), tab);
     }
 
     private int pageChipColor() {
@@ -344,7 +350,7 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
         LivingWorldGuiStyle.drawFitted(graphics, font, title.getString(), titleLeft, panelTop + 10,
                 Math.max(24, titleRight - titleLeft), 0xFFFFE29A);
         if (!subtitle.isBlank() && panelHeight >= 190) {
-            LivingWorldGuiStyle.drawFitted(graphics, font, subtitle, titleLeft, panelTop + 26,
+            LivingWorldGuiStyle.drawFitted(graphics, font, LWLang.speechEmbedded(subtitle).getString(), titleLeft, panelTop + 26,
                     Math.max(24, titleRight - titleLeft), LivingWorldGuiStyle.MUTED);
         }
         if (hasBackDestination()) LivingWorldGuiStyle.drawButton(graphics, font, backX(), panelTop + 8, 30, 20, "‹",
@@ -357,7 +363,7 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
             int settingsW = compact ? 54 : 70;
             int settingsX = compact ? closeX - settingsW - 6 : Math.max(panelLeft + 90, chipX - 77);
             if (settingsX > panelLeft + 68) LivingWorldGuiStyle.drawButton(graphics, font, settingsX, panelTop + 8, settingsW, 20,
-                    compact ? "Config" : "Settings", mouseX, mouseY, true, false, false);
+                    compact ? LWLang.string("screen.dossier.config", "Config") : LWLang.string("screen.dossier.settings", "Settings"), mouseX, mouseY, true, false, false);
         }
         if (!compact && factionDetailPage()) {
             int rightArrow = chipX - 32;
@@ -377,18 +383,18 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
         int top = bodyTop();
         int height = bodyBottom() - top;
         LivingWorldGuiStyle.drawInsetPanel(graphics, left, top, navWidth, height);
-        LivingWorldGuiStyle.drawFitted(graphics, font, "LIVING WORLD", left + 9, top + 9, navWidth - 18, 0xFFFFE29A);
+        LivingWorldGuiStyle.drawFitted(graphics, font, LWLang.string("screen.dossier.header", "LIVING WORLD"), left + 9, top + 9, navWidth - 18, 0xFFFFE29A);
         List<String> tabs = tabs();
         int y = navigationTabTop();
         int buttonW = navWidth - 14;
         for (int i = 0; i < tabs.size(); i++) {
             String tab = tabs.get(i);
-            LivingWorldGuiStyle.drawButton(graphics, font, left + 7, y + i * 25, buttonW, 20, tab,
+            LivingWorldGuiStyle.drawButton(graphics, font, left + 7, y + i * 25, buttonW, 20, tabLabel(tab),
                     mouseX, mouseY, true, tabSelected(tab), false);
         }
 
         int settingsY = top + height - 28;
-        LivingWorldGuiStyle.drawButton(graphics, font, left + 7, settingsY, buttonW, 20, "World Settings",
+        LivingWorldGuiStyle.drawButton(graphics, font, left + 7, settingsY, buttonW, 20, LWLang.string("screen.dossier.world_settings", "World Settings"),
                 mouseX, mouseY, true, false, false);
     }
 
@@ -396,14 +402,14 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
         List<String> tabs = tabs();
         for (int i = 0; i < tabs.size(); i++) {
             String tab = tabs.get(i);
-            LivingWorldGuiStyle.drawButton(graphics, font, tabX(i, tabs), footerY(), tabWidth(tabs), 18, tab,
+            LivingWorldGuiStyle.drawButton(graphics, font, tabX(i, tabs), footerY(), tabWidth(tabs), 18, tabLabel(tab),
                     mouseX, mouseY, true, tabSelected(tab), false);
         }
     }
 
     private void drawFighterActions(GuiGraphics graphics, int mouseX, int mouseY) {
         boolean meditation = true;
-        String[] actions = meditation ? new String[]{"Talk", "Go Along", "Come Along", "Fusion", "Meditate"} : new String[]{"Talk", "Fusion"};
+        String[] actions = meditation ? new String[]{LWLang.string("screen.dossier.action.talk", "Talk"), LWLang.string("screen.dossier.action.go_along", "Go Along"), LWLang.string("screen.dossier.action.come_along", "Come Along"), LWLang.string("screen.dossier.action.fusion", "Fusion"), LWLang.string("screen.dossier.action.meditate", "Meditate")} : new String[]{LWLang.string("screen.dossier.action.talk", "Talk"), LWLang.string("screen.dossier.action.fusion", "Fusion")};
         int gap = 5;
         int cols = twoRowFighterActions() ? 3 : actions.length;
         int available = panelWidth - 24 - gap * (cols - 1);
@@ -423,8 +429,8 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
         int y = bodyTop();
         int gap = 5;
         int w = Math.min(132, Math.max(74, (contentWidth() - gap) / 2));
-        LivingWorldGuiStyle.drawButton(graphics, font, x, y, w, 20, "Organizations", mouseX, mouseY, true, "factions".equals(page), false);
-        LivingWorldGuiStyle.drawButton(graphics, font, x + w + gap, y, w, 20, "Active Quest", mouseX, mouseY, true, "faction_active".equals(page), false);
+        LivingWorldGuiStyle.drawButton(graphics, font, x, y, w, 20, LWLang.string("screen.dossier.organizations", "Organizations"), mouseX, mouseY, true, "factions".equals(page), false);
+        LivingWorldGuiStyle.drawButton(graphics, font, x + w + gap, y, w, 20, LWLang.string("screen.dossier.active_quest", "Active Quest"), mouseX, mouseY, true, "faction_active".equals(page), false);
     }
 
     private void drawFactionSubtabs(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -432,9 +438,9 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
         int y = bodyTop();
         int gap = 5;
         int w = Math.min(92, Math.max(24, (contentWidth() - gap * 2) / 3));
-        LivingWorldGuiStyle.drawButton(graphics, font, x, y, w, 20, "Overview", mouseX, mouseY, true, "faction".equals(page), false);
-        LivingWorldGuiStyle.drawButton(graphics, font, x + w + gap, y, w, 20, "Members", mouseX, mouseY, true, "faction_roster".equals(page), false);
-        LivingWorldGuiStyle.drawButton(graphics, font, x + (w + gap) * 2, y, w, 20, "Requests", mouseX, mouseY, true, "faction_requests".equals(page), false);
+        LivingWorldGuiStyle.drawButton(graphics, font, x, y, w, 20, LWLang.string("screen.dossier.overview", "Overview"), mouseX, mouseY, true, "faction".equals(page), false);
+        LivingWorldGuiStyle.drawButton(graphics, font, x + w + gap, y, w, 20, LWLang.string("screen.dossier.members", "Members"), mouseX, mouseY, true, "faction_roster".equals(page), false);
+        LivingWorldGuiStyle.drawButton(graphics, font, x + (w + gap) * 2, y, w, 20, LWLang.string("screen.dossier.requests", "Requests"), mouseX, mouseY, true, "faction_requests".equals(page), false);
     }
 
     private void drawFactionBond(GuiGraphics graphics) {
@@ -524,10 +530,10 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
                         if (line.fallen) {
                             // Deliberately desaturate/mute the historical portrait without changing its stored appearance.
                             graphics.fill(clipLeft + 7, y + 2, clipLeft + 31, y + 29, 0xB05A6066);
-                            LivingWorldGuiStyle.drawFitted(graphics, font, "PASSED AWAY", clipLeft + 36, y + 3, Math.max(40, clipRight - clipLeft - 44), LivingWorldGuiStyle.NEUTRAL);
+                            LivingWorldGuiStyle.drawFitted(graphics, font, LWLang.string("screen.dossier.passed_away", "PASSED AWAY"), clipLeft + 36, y + 3, Math.max(40, clipRight - clipLeft - 44), LivingWorldGuiStyle.NEUTRAL);
                         } else if ("faction_roster".equals(page)) {
                             // Roster portraits are intentionally historical: show the last appearance this player actually saw.
-                            LivingWorldGuiStyle.drawFitted(graphics, font, "LAST SEEN", clipLeft + 36, y + 3, Math.max(40, clipRight - clipLeft - 44), LivingWorldGuiStyle.BLUE);
+                            LivingWorldGuiStyle.drawFitted(graphics, font, LWLang.string("screen.dossier.last_seen", "LAST SEEN"), clipLeft + 36, y + 3, Math.max(40, clipRight - clipLeft - 44), LivingWorldGuiStyle.BLUE);
                         }
                     }
                     textX = clipLeft + 37;
@@ -749,14 +755,16 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
                                 LWNetwork.peopleMemoryAction(action, null);
                                 return true;
                             }
-                            String title = "companion_end".equals(action) ? "End this trip?" : "Are you sure?";
-                            String what = "fallen".equals(action) ? "Clear fallen history from this view?"
-                                    : "companion_end".equals(action) ? "You and your companion will stop travelling together."
-                                    : "Forget all remembered people?";
+                            Component confirmTitle = "companion_end".equals(action)
+                                    ? LWLang.text("screen.dossier.confirm.end_trip", "End this trip?")
+                                    : LWLang.text("screen.dossier.confirm.title", "Are you sure?");
+                            Component what = "fallen".equals(action) ? LWLang.text("screen.dossier.confirm.clear_fallen", "Clear fallen history from this view?")
+                                    : "companion_end".equals(action) ? LWLang.text("screen.dossier.confirm.stop_travelling", "You and your companion will stop travelling together.")
+                                    : LWLang.text("screen.dossier.confirm.forget_people", "Forget all remembered people?");
                             minecraft.setScreen(new ConfirmScreen(ok -> {
                                 if (ok) LWNetwork.peopleMemoryAction(action, null);
                                 else minecraft.setScreen(this);
-                            }, Component.literal(title), Component.literal(what)));
+                            }, confirmTitle, what));
                             return true;
                         }
                         y += 22;

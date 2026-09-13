@@ -1,5 +1,7 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
+
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
@@ -100,13 +102,13 @@ public final class FighterPlayerSocialManager {
         FighterRelationshipManager.Disposition disposition = FighterRelationshipManager.disposition(player, fighter);
         String line;
         if (fighter.getAlignment() == FighterAlignment.GOOD || disposition == FighterRelationshipManager.Disposition.FRIENDLY) {
-            line = pick(fighter, "Hey. Good to see you.", "You doing all right?", "There you are. Been keeping busy?",
+            line = pick(fighter, "idle.good", "Hey. Good to see you.", "You doing all right?", "There you are. Been keeping busy?",
                     "Nice running into you again.", "Hope things are going okay on your side.", "You look like you've had a long day.");
         } else if (fighter.getAlignment() == FighterAlignment.BAD || disposition == FighterRelationshipManager.Disposition.HOSTILE) {
-            line = pick(fighter, "Keep moving.", "Don't mistake quiet for friendly.", "You again.",
-                    "Try not to get in my way.", "I noticed you. That's enough.", "We're not friends just because I'm not fighting you.");
+            line = pick(fighter, "idle.hostile", "Keep moving.", "Don't mistake quiet for friendly.", "You again.",
+                    LWLang.speechKey("dialogue.player_social.try_not_to_get_in_my_way", "Try not to get in my way."), "I noticed you. That's enough.", "We're not friends just because I'm not fighting you.");
         } else {
-            line = pick(fighter, "Hm. We keep crossing paths.", "You headed somewhere?", "Busy day out here.",
+            line = pick(fighter, "idle.neutral", "Hm. We keep crossing paths.", "You headed somewhere?", "Busy day out here.",
                     "Looks like you're doing your own thing too.", "Careful out there.", "You notice how strange this place gets sometimes?");
         }
         fighter.getLookControl().setLookAt(player, 24.0F, 20.0F);
@@ -170,15 +172,15 @@ public final class FighterPlayerSocialManager {
 
     private static String contextLine(ServerPlayer player, AmbientFighterEntity fighter) {
         if (ReactiveWorldManager.moodStrength(fighter) >= 60) {
-            String cause = ReactiveWorldManager.moodCause(fighter);
+            String cause = speechCause(ReactiveWorldManager.moodCause(fighter));
             return switch (ReactiveWorldManager.mood(fighter)) {
-                case UPBEAT -> "Good timing. I'm actually feeling pretty good right now.";
-                case CONTENT -> "Things are calm for once. I'm trying not to ruin that.";
-                case FOCUSED -> "I'm keeping my head on straight. " + cause + " has my attention.";
-                case WARY -> "Keep your eyes open. " + cause + " has me on edge.";
-                case IRRITATED -> "I'm not great company right now. " + cause + " has been getting on my nerves.";
-                case SOMBER -> "I'm a little quiet right now. " + cause + " is still on my mind.";
-                case WEARY -> "I'm worn out. " + cause + " took more out of me than I expected.";
+                case UPBEAT -> speech("context.mood.upbeat", "Good timing. I'm actually feeling pretty good right now.");
+                case CONTENT -> speech("context.mood.content", "Things are calm for once. I'm trying not to ruin that.");
+                case FOCUSED -> speech("context.mood.focused", "I'm keeping my head on straight. %s has my attention.", cause);
+                case WARY -> speech("context.mood.wary", "Keep your eyes open. %s has me on edge.", cause);
+                case IRRITATED -> speech("context.mood.irritated", "I'm not great company right now. %s has been getting on my nerves.", cause);
+                case SOMBER -> speech("context.mood.somber", "I'm a little quiet right now. %s is still on my mind.", cause);
+                case WEARY -> speech("context.mood.weary", "I'm worn out. %s took more out of me than I expected.", cause);
             };
         }
 
@@ -186,9 +188,9 @@ public final class FighterPlayerSocialManager {
         // their ordinary player-facing small talk is much more technical and research-minded.
         if (FighterScientistManager.isScientist(fighter) && fighter.getRandom().nextFloat() < 0.68F) {
             int seeds = FighterScientistManager.availableSeeds(fighter);
-            return pick(fighter,
+            return pick(fighter, "context.scientist",
                     "Hold still a second. Your Ki reading is a useful reference point... no, I'm not harvesting anything.",
-                    "I have " + seeds + " viable specimen" + (seeds == 1 ? "" : "s") + " in reserve. Real combat data is the limiting reagent now.",
+                    speech("context.scientist.1", "I have %s viable specimen(s) in reserve. Real combat data is the limiting reagent now.", seeds),
                     "Do you know how hard it is to keep one biological variable constant around people who transform mid-fight?",
                     "I've been recalibrating the cultivation model. Temporary power spikes make terrible baseline data.",
                     "If a specimen dies, I want the cause, not a dramatic speech. Failure mode, attacker, elapsed time, tissue response.",
@@ -199,13 +201,13 @@ public final class FighterPlayerSocialManager {
         // so Dragon Balls remain a surprising character glimpse instead of a recurring topic.
         if (fighter.getRandom().nextInt(1800) == 0) {
             return switch (fighter.getAlignment()) {
-                case GOOD -> pick(fighter, "If I ever found all seven Dragon Balls... I'd probably use the wish for someone who couldn't help themselves.",
+                case GOOD -> pick(fighter, "context.wish.good", "If I ever found all seven Dragon Balls... I'd probably use the wish for someone who couldn't help themselves.",
                         "Seven Dragon Balls, one wish. I'd be terrified of wasting it on myself.",
                         "Sometimes I wonder who I'd bring back if Shenron actually stood in front of me.");
-                case BAD -> pick(fighter, "If I had the Dragon Balls? Heh. Better if I keep that wish to myself.",
+                case BAD -> pick(fighter, "context.wish.bad", "If I had the Dragon Balls? Heh. Better if I keep that wish to myself.",
                         "One wish from Shenron could change a lot. Maybe too much.",
                         "I'd know exactly what to ask the Dragon Balls for. You wouldn't like it.");
-                case NEUTRAL -> pick(fighter, "I wonder what I'd actually wish for if I found all seven Dragon Balls.",
+                case NEUTRAL -> pick(fighter, "context.wish.neutral", "I wonder what I'd actually wish for if I found all seven Dragon Balls.",
                         "Seven Dragon Balls sounds simple until you have to choose one wish.",
                         "I'd probably spend so long deciding on a Dragon Ball wish that Shenron would get annoyed.");
             };
@@ -217,25 +219,25 @@ public final class FighterPlayerSocialManager {
         int easterRoll = fighter.getRandom().nextInt(bulgarianHobby ? 18 : 140);
         if (easterRoll == 0) {
             return fighter.getPersonality() == FighterPersonality.PROUD
-                    ? "I heard the mountains in Bulgaria are good for training. RAHHH. I'd test that."
-                    : "Ever heard of Bulgaria? Mountains, good food, stubborn people. RAHHH.";
+                    ? speech("context.bulgaria.proud", "I heard the mountains in Bulgaria are good for training. RAHHH. I'd test that.")
+                    : speech("context.bulgaria.normal", "Ever heard of Bulgaria? Mountains, good food, stubborn people. RAHHH.");
         }
 
         // A couple of much rarer Minecraft-world jokes. They stay sparse so ordinary dialogue
         // remains about the actual fighter/world instead of becoming a meme feed.
         int oddWorldRoll = fighter.getRandom().nextInt(260);
         if (oddWorldRoll == 0)
-            return "Someone told me they train by punching trees with their bare hands. I'm not testing that.";
+            return speech("context.world_joke.tree", "Someone told me they train by punching trees with their bare hands. I'm not testing that.");
         if (oddWorldRoll == 1)
-            return "A green thing hissed at me near a cave. I call leaving immediately tactical awareness.";
+            return speech("context.world_joke.creeper", "A green thing hissed at me near a cave. I call leaving immediately tactical awareness.");
 
         if (fighter.isRememberedFor(player) && fighter.getMemoryRelationship() >= 60 && fighter.getRandom().nextFloat() < 0.30F) {
             return switch (fighter.getPersonality()) {
-                case PROUD -> "You holding up all right? Don't make me start worrying about you.";
-                case HEROIC -> "Hey. How've you been? You doing okay?";
-                case CALM -> "It's been a while. How have you been doing?";
-                case CAUTIOUS -> "You seem all right. Everything been okay lately?";
-                case AGGRESSIVE -> "There you are. You good? You look like you've been busy.";
+                case PROUD -> speech("context.friend.proud", "You holding up all right? Don't make me start worrying about you.");
+                case HEROIC -> speech("context.friend.heroic", "Hey. How've you been? You doing okay?");
+                case CALM -> speech("context.friend.calm", "It's been a while. How have you been doing?");
+                case CAUTIOUS -> speech("context.friend.cautious", "You seem all right. Everything been okay lately?");
+                case AGGRESSIVE -> speech("context.friend.aggressive", "There you are. You good? You look like you've been busy.");
             };
         }
 
@@ -245,7 +247,7 @@ public final class FighterPlayerSocialManager {
         if (fighter.isRememberedFor(player) && fighter.getMemoryRelationship() >= 35
                 && fighter.getRandom().nextFloat() < (fighter.getMemoryRelationship() >= 60 ? 0.34F : 0.18F)) {
             String life = FighterLifeJoinManager.currentLifeHint(fighter);
-            if (!life.isBlank()) return life + " You can come with me if you want.";
+            if (!life.isBlank()) return speech("context.life_invite", "%s You can come with me if you want.", life);
         }
 
         List<String> incidents = WorldIncidentData.get(player.serverLevel()).recent(1);
@@ -257,30 +259,31 @@ public final class FighterPlayerSocialManager {
         if (fighter.isRememberedFor(player) && fighter.getMemoryRelationship() >= 35) {
             String last = FighterMemoryManager.lastBondEvent(player, fighter);
             if (last != null && !last.isBlank() && fighter.getRandom().nextFloat() < 0.30F)
-                return "I was thinking about when we " + lowerEvent(last) + ". Funny how much has happened since.";
+                return speech("context.shared_history", "I was thinking about this: %s. Funny how much has happened since.",
+                        FighterMemoryManager.localizedLegacyEvent(last));
         }
 
         int era = WorldEraData.get(player.serverLevel()).eraNumber();
         if (era > 0 && fighter.getRandom().nextFloat() < 0.55F) {
-            return "Things have changed since the latest saga ended. Even ordinary fighters are training more seriously.";
+            return speech("context.era_changed", "Things have changed since the latest saga ended. Even ordinary fighters are training more seriously.");
         }
 
         return switch (FighterHobby.of(fighter)) {
-            case COOKING -> "I've been trying a new recipe between training sessions. Turns out timing matters there too.";
-            case STARGAZING -> "The sky's been clear lately. I might go stargazing when things calm down.";
-            case FISHING -> "I found a quiet fishing spot nearby. No shouting, no Ki blasts. Almost suspicious.";
-            case MUSIC -> "I've had a melody stuck in my head all day. Better than a battle cry, I suppose.";
-            case MECHANICS -> "I've been tinkering with some gear. Tiny adjustments are weirdly satisfying.";
-            case MAPMAKING -> "I've been updating my maps. This world never stays as familiar as you think.";
-            case GARDENING -> "My plants survived another round of fighters blasting the countryside. That's a victory.";
-            case TEA -> "I was about to make tea. Training can wait five minutes sometimes.";
-            case ROCK_COLLECTING -> "I found a strange rock earlier. No power in it. I checked. Twice.";
-            case CLOUD_WATCHING -> "Those clouds look calm. Nice change from watching for incoming Ki attacks.";
-            case MARTIAL_NOTES -> "I've been writing down what works in fights instead of trusting memory. It helps.";
-            case CARD_GAMES -> "I could use a card game that doesn't end with someone challenging the loser to a duel.";
-            case CAMPING -> "I miss a quiet campfire sometimes. Simple nights are underrated.";
-            case FASHION -> "I've been thinking about changing my outfit. Fighting isn't an excuse to look identical forever.";
-            case BULGARIAN_FOLKLORE -> "I found some Bulgarian folk music. The rhythm has more fight in it than half the warriors I've met.";
+            case COOKING -> speech("context.hobby.cooking", "I've been trying a new recipe between training sessions. Turns out timing matters there too.");
+            case STARGAZING -> speech("context.hobby.stargazing", "The sky's been clear lately. I might go stargazing when things calm down.");
+            case FISHING -> speech("context.hobby.fishing", "I found a quiet fishing spot nearby. No shouting, no Ki blasts. Almost suspicious.");
+            case MUSIC -> speech("context.hobby.music", "I've had a melody stuck in my head all day. Better than a battle cry, I suppose.");
+            case MECHANICS -> speech("context.hobby.mechanics", "I've been tinkering with some gear. Tiny adjustments are weirdly satisfying.");
+            case MAPMAKING -> speech("context.hobby.mapmaking", "I've been updating my maps. This world never stays as familiar as you think.");
+            case GARDENING -> speech("context.hobby.gardening", "My plants survived another round of fighters blasting the countryside. That's a victory.");
+            case TEA -> speech("context.hobby.tea", "I was about to make tea. Training can wait five minutes sometimes.");
+            case ROCK_COLLECTING -> speech("context.hobby.rock_collecting", "I found a strange rock earlier. No power in it. I checked. Twice.");
+            case CLOUD_WATCHING -> speech("context.hobby.cloud_watching", "Those clouds look calm. Nice change from watching for incoming Ki attacks.");
+            case MARTIAL_NOTES -> speech("context.hobby.martial_notes", "I've been writing down what works in fights instead of trusting memory. It helps.");
+            case CARD_GAMES -> speech("context.hobby.card_games", "I could use a card game that doesn't end with someone challenging the loser to a duel.");
+            case CAMPING -> speech("context.hobby.camping", "I miss a quiet campfire sometimes. Simple nights are underrated.");
+            case FASHION -> speech("context.hobby.fashion", "I've been thinking about changing my outfit. Fighting isn't an excuse to look identical forever.");
+            case BULGARIAN_FOLKLORE -> speech("context.hobby.bulgarian_folklore", "I found some Bulgarian folk music. The rhythm has more fight in it than half the warriors I've met.");
         };
     }
 
@@ -288,15 +291,15 @@ public final class FighterPlayerSocialManager {
         if (line == null || line.isBlank()) return "";
         if (line.contains(" resolved: ") && line.contains(" defeated ")) {
             String body = line.substring(line.indexOf(" resolved: ") + 11);
-            return "Did you hear? " + body + ".";
+            return speech("context.incident.resolved", "Did you hear? %s.", body);
         }
         int colon = line.indexOf(':');
         if (colon > 0 && line.substring(colon + 1).contains(" vs ")) {
             String type = line.substring(0, colon).toLowerCase(java.util.Locale.ROOT);
             String pair = line.substring(colon + 1).trim().replace(" vs ", " and ");
-            return "Looks like " + pair + " started an " + type + ".";
+            return speech("context.incident.started", "Looks like %s started a %s.", pair, type);
         }
-        return "I heard about what happened: " + line + ".";
+        return speech("context.incident.generic", "I heard about what happened: %s.", line);
     }
 
     private static String lowerEvent(String event) {
@@ -305,8 +308,27 @@ public final class FighterPlayerSocialManager {
         return java.lang.Character.toLowerCase(s.charAt(0)) + s.substring(1);
     }
 
-    private static String pick(AmbientFighterEntity fighter, String... lines) {
-        return lines[fighter.getRandom().nextInt(lines.length)];
+    private static String pick(AmbientFighterEntity fighter, String group, String... lines) {
+        int index = fighter.getRandom().nextInt(lines.length);
+        String selected = lines[index];
+        return LWLang.isSpeechKey(selected) ? selected : speech(group + "." + index, selected);
+    }
+
+    private static String speech(String key, String fallback, Object... arguments) {
+        return LWLang.speechKey("dialogue.player_social." + key, fallback, arguments);
+    }
+
+    private static String speechCause(String raw) {
+        String key = raw == null || raw.isBlank() || "recent events".equals(raw) ? "recent_events"
+                : "a quiet stretch".equals(raw) ? "quiet"
+                : "debug mood test".equals(raw) ? "current_feeling"
+                : "their injuries".equals(raw) ? "injuries"
+                : "their faction".equals(raw) ? "faction"
+                : "the fight in front of them".equals(raw) ? "fight"
+                : "their head".equals(raw) ? "thoughts" : null;
+        return key == null ? LWLang.speechKey("label.mood_cause." + raw.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", ""), raw)
+                : LWLang.speechKey("dialogue.social.cause." + key, raw);
     }
 
     private static void finish(Approach approach, AmbientFighterEntity fighter) {

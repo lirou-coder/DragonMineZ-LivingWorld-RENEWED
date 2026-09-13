@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterPersonality;
@@ -71,19 +72,19 @@ public final class ReactiveWorldEventManager {
         String line = "";
         String event = "";
         if (level.isThundering()) {
-            line = fighter.getRandom().nextBoolean() ? "That thunder is getting close. Good weather for staying alert." : "Storm's getting rough. I wouldn't want to fight blind in this.";
+            line = fighter.getRandom().nextBoolean() ? LWLang.speechKey("dialogue.world_weather.thunder.0", "That thunder is getting close. Good weather for staying alert.") : LWLang.speechKey("dialogue.world_weather.thunder.1", "Storm's getting rough. I wouldn't want to fight blind in this.");
             event = "the thunderstorm";
         } else if (level.isRaining()) {
-            line = fighter.getRandom().nextBoolean() ? "Rain's really settled in." : "Everything smells different after the rain starts.";
+            line = fighter.getRandom().nextBoolean() ? LWLang.speechKey("dialogue.world_weather.rain.0", "Rain's really settled in.") : LWLang.speechKey("dialogue.world_weather.rain.1", "Everything smells different after the rain starts.");
             event = "the rain";
         } else if (day >= 22500L || day < 1000L) {
-            line = "Sun's coming up. Quietest part of the day."; event = "sunrise";
+            line = LWLang.speechKey("dialogue.world_weather.sunrise", "Sun's coming up. Quietest part of the day."); event = "sunrise";
         } else if (day >= 11500L && day < 13000L) {
-            line = "Getting late. We should decide where we're going before dark."; event = "sunset";
+            line = LWLang.speechKey("dialogue.world_weather.sunset", "Getting late. We should decide where we're going before dark."); event = "sunset";
         } else if (day >= 13000L && day < 22500L) {
-            line = fighter.getRandom().nextBoolean() ? "It's properly dark now. Harder to read the terrain." : "Night's quiet around here. For now."; event = "nightfall";
+            line = fighter.getRandom().nextBoolean() ? LWLang.speechKey("dialogue.world_weather.night.0", "It's properly dark now. Harder to read the terrain.") : LWLang.speechKey("dialogue.world_weather.night.1", "Night's quiet around here. For now."); event = "nightfall";
         } else if (day >= 5000L && day < 9000L && fighter.getRandom().nextBoolean()) {
-            line = "Bright day. You can see trouble coming from a long way off."; event = "the clear day";
+            line = LWLang.speechKey("dialogue.world_weather.clear_day", "Bright day. You can see trouble coming from a long way off."); event = "the clear day";
         }
         if (line.isBlank()) return;
         fighter.speak(line, 76);
@@ -147,19 +148,19 @@ public final class ReactiveWorldEventManager {
     private static String allyDeathLine(AmbientFighterEntity observer, AmbientFighterEntity fallen) {
         String name = fallen.getFighterName();
         return switch (ReactiveWorldManager.temperament(observer)) {
-            case SUPPORTIVE, WARM -> name + "! No... stay with us!";
-            case BULLY, BLUNT -> name + " is down. Nobody else falls!";
-            case TEASING -> "Damn it, " + name + "... this isn't funny.";
-            case ALOOF -> name + "... understood. I'll finish this.";
+            case SUPPORTIVE, WARM -> LWLang.speechKey("dialogue.world_event.ally_death.supportive", "%s! No... stay with us!", name);
+            case BULLY, BLUNT -> LWLang.speechKey("dialogue.world_event.ally_death.blunt", "%s is down. Nobody else falls!", name);
+            case TEASING -> LWLang.speechKey("dialogue.world_event.ally_death.teasing", "Damn it, %s... this isn't funny.", name);
+            case ALOOF -> LWLang.speechKey("dialogue.world_event.ally_death.aloof", "%s... understood. I'll finish this.", name);
         };
     }
 
     private static String enemyDeathLine(AmbientFighterEntity observer, AmbientFighterEntity fallen) {
         String name = fallen.getFighterName();
         return switch (observer.getAlignment()) {
-            case GOOD -> name + " is down. That's enough—keep moving.";
-            case BAD -> name + " is finished. Who's next?";
-            default -> name + " is down. Stay sharp.";
+            case GOOD -> LWLang.speechKey("dialogue.world_event.enemy_death.good", "%s is down. That's enough—keep moving.", name);
+            case BAD -> LWLang.speechKey("dialogue.world_event.enemy_death.bad", "%s is finished. Who's next?", name);
+            default -> LWLang.speechKey("dialogue.world_event.enemy_death.neutral", "%s is down. Stay sharp.", name);
         };
     }
 
@@ -190,28 +191,28 @@ public final class ReactiveWorldEventManager {
         var id = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
         if (id != null && "dragonminez".equals(id.getNamespace())) {
             String path = id.getPath().toLowerCase(java.util.Locale.ROOT);
-            if (path.contains("dino")) return fighter.getRandom().nextBoolean() ? "That's a dinosaur. Give it room unless you want a very stupid fight." : "Big dinosaur nearby. I'm keeping an eye on it.";
-            if (path.contains("robot")) return "Red Ribbon robot nearby. Those things never look friendly.";
-            if (path.contains("redribbon") || path.contains("red_ribbon")) return "Red Ribbon soldier. Keep your guard up until we know what they're doing.";
-            if (path.contains("bandit")) return "Bandit nearby. Watch your pockets—and your back.";
-            if (path.contains("namek_frog")) return "A Namekian frog. That's a long way from an ordinary pasture.";
-            if (path.contains("namek_trader")) return "Namekian trader nearby. Probably knows more about this area than we do.";
-            if (path.contains("namek_warrior")) return "Namekian warrior nearby. They look ready for trouble.";
-            return "Something from the wider Dragon World is nearby. I'm watching it.";
+            if (path.contains("dino")) return fighter.getRandom().nextBoolean() ? LWLang.speechKey("dialogue.world_event.mob.dinosaur.0", "That's a dinosaur. Give it room unless you want a very stupid fight.") : LWLang.speechKey("dialogue.world_event.mob.dinosaur.1", "Big dinosaur nearby. I'm keeping an eye on it.");
+            if (path.contains("robot")) return LWLang.speechKey("dialogue.world_event.mob.robot", "Red Ribbon robot nearby. Those things never look friendly.");
+            if (path.contains("redribbon") || path.contains("red_ribbon")) return LWLang.speechKey("dialogue.world_event.mob.red_ribbon", "Red Ribbon soldier. Keep your guard up until we know what they're doing.");
+            if (path.contains("bandit")) return LWLang.speechKey("dialogue.world_event.mob.bandit", "Bandit nearby. Watch your pockets—and your back.");
+            if (path.contains("namek_frog")) return LWLang.speechKey("dialogue.world_event.mob.namek_frog", "A Namekian frog. That's a long way from an ordinary pasture.");
+            if (path.contains("namek_trader")) return LWLang.speechKey("dialogue.world_event.mob.namek_trader", "Namekian trader nearby. Probably knows more about this area than we do.");
+            if (path.contains("namek_warrior")) return LWLang.speechKey("dialogue.world_event.mob.namek_warrior", "Namekian warrior nearby. They look ready for trouble.");
+            return LWLang.speechKey("dialogue.world_event.mob.dmz_creature", "Something from the wider Dragon World is nearby. I'm watching it.");
         }
         if (entity instanceof Villager) {
             return switch (ReactiveWorldManager.temperament(fighter)) {
-                case SUPPORTIVE, WARM -> "That villager looks nervous. We should keep trouble away from here.";
-                case BULLY -> "That villager keeps staring. Smart enough not to get involved.";
-                default -> "There's a villager nearby. Better not turn this place into a battlefield.";
+                case SUPPORTIVE, WARM -> LWLang.speechKey("dialogue.world_event.mob.villager.supportive", "That villager looks nervous. We should keep trouble away from here.");
+                case BULLY -> LWLang.speechKey("dialogue.world_event.mob.villager.bully", "That villager keeps staring. Smart enough not to get involved.");
+                default -> LWLang.speechKey("dialogue.world_event.mob.villager.default", "There's a villager nearby. Better not turn this place into a battlefield.");
             };
         }
-        if (entity instanceof IronGolem) return "That iron golem hasn't taken its eyes off me.";
-        if (entity instanceof Cow) return fighter.getRandom().nextBoolean() ? "That cow has been staring at me for a while." : "Easy, cow. I'm just passing through.";
-        if (entity instanceof Pig) return "That pig looks completely unbothered by all of this.";
-        if (entity instanceof Chicken) return "That chicken has better survival instincts than half the fighters I know.";
-        if (entity instanceof Sheep) return "That sheep picked a surprisingly peaceful spot.";
-        if (entity instanceof Wolf) return "There's a wolf nearby. It looks like it knows this area better than I do.";
-        return "There's wildlife nearby. Nice change from another fight.";
+        if (entity instanceof IronGolem) return LWLang.speechKey("dialogue.world_event.mob.iron_golem", "That iron golem hasn't taken its eyes off me.");
+        if (entity instanceof Cow) return fighter.getRandom().nextBoolean() ? LWLang.speechKey("dialogue.world_event.mob.cow.0", "That cow has been staring at me for a while.") : LWLang.speechKey("dialogue.world_event.mob.cow.1", "Easy, cow. I'm just passing through.");
+        if (entity instanceof Pig) return LWLang.speechKey("dialogue.world_event.mob.pig", "That pig looks completely unbothered by all of this.");
+        if (entity instanceof Chicken) return LWLang.speechKey("dialogue.world_event.mob.chicken", "That chicken has better survival instincts than half the fighters I know.");
+        if (entity instanceof Sheep) return LWLang.speechKey("dialogue.world_event.mob.sheep", "That sheep picked a surprisingly peaceful spot.");
+        if (entity instanceof Wolf) return LWLang.speechKey("dialogue.world_event.mob.wolf", "There's a wolf nearby. It looks like it knows this area better than I do.");
+        return LWLang.speechKey("dialogue.world_event.mob.wildlife", "There's wildlife nearby. Nice change from another fight.");
     }
 }

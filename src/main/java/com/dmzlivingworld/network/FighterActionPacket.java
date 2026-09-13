@@ -41,37 +41,37 @@ public record FighterActionPacket(String action, UUID fighterId) {
                 if (!(entity instanceof AmbientFighterEntity fighter) || sender.distanceToSqr(fighter) > 12.0D * 12.0D) return;
                 if (fighter.isSanctionedMatchParticipant() || fighter.getTarget() != null) {
                     if (fighter.getTarget() != sender) {
-                        sender.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                                "The NPC is fighting! You can't interact right now!")
+                        sender.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                                "dmzlivingworld.message.interaction.fighting")
                                 .withStyle(net.minecraft.ChatFormatting.RED), false);
                     }
                     return;
                 }
                 if ("deliver".equals(msg.action)) {
                     if (!FactionRequestManager.deliverToReceiver(sender, fighter)) {
-                        sender.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                                "[Living World] This fighter is not the assigned receiver for your active supply request."), false);
+                        sender.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                                "dmzlivingworld.message.action.not_supply_receiver"), false);
                     }
                     return;
                 }
                 if ("clearmessages".equals(msg.action)) {
                     fighter.clearDialogueHistory();
-                    sender.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                            "[Living World] Cleared recent messages for " + fighter.getFighterName() + "."), false);
+                    sender.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                            "dmzlivingworld.message.action.messages_cleared", fighter.getFighterName()), false);
                     return;
                 }
                 // An accepted faction request owns this participant until it releases them. Delivery is
                 // handled above because that is the request action itself; all unrelated social/bond/combat
                 // requests are rejected server-side even if a stale/modified client tries to send one.
                 if (FactionRequestMissionManager.isRequestActionLocked(fighter)) {
-                    sender.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                            "[Living World] " + fighter.getFighterName() + " is busy with an active faction request."), false);
+                    sender.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                            "dmzlivingworld.message.action.busy_request", fighter.getFighterName()), false);
                     return;
                 }
                 // World Menaces expose no social/action surface. Keep the obsolete spar_x7 packet
                 // value rejected here too so an old client or manual packet cannot bypass the rule.
                 if (WorldMenaceManager.isWorldMenace(fighter)) {
-                    sender.displayClientMessage(net.minecraft.network.chat.Component.literal("[Living World] World Menaces cannot be used for social actions."), false);
+                    sender.displayClientMessage(net.minecraft.network.chat.Component.translatable("dmzlivingworld.message.action.world_menace"), false);
                     return;
                 }
                 if (!"talk".equals(msg.action) && !"spar".equals(msg.action) && !"fullpower".equals(msg.action)) {
@@ -79,8 +79,8 @@ public record FighterActionPacket(String action, UUID fighterId) {
                     String refusal = ReactiveInteractionManager.otherActionRefusal(sender, fighter, msg.action, relationship);
                     if (refusal != null) {
                         fighter.speak(refusal, 90);
-                        sender.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                                "[Living World] " + fighter.getFighterName() + " doesn't want to do that right now."), false);
+                        sender.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                                "dmzlivingworld.message.action.refused", fighter.getFighterName()), false);
                         return;
                     }
                 }

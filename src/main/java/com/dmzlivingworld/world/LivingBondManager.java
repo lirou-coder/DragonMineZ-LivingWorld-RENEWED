@@ -193,7 +193,7 @@ public final class LivingBondManager {
                     .stream().findAny().orElse(null);
             if (friend != null) {
                 INVITES.put(player.getUUID(), new Invite(friend.getUUID(), InviteType.TRAVEL, now + 800L));
-                friend.speak("You're heading out again? Want some company?", 110);
+                friend.speakKey("dialogue.bond.travel.invite", 110);
                 friend.getNavigation().moveTo(player, 1.05D);
             }
             save(player, root);
@@ -207,7 +207,7 @@ public final class LivingBondManager {
         INVITES.remove(player.getUUID());
         if (invite.type == InviteType.TRAVEL) {
             setCompanion(player, npc);
-            npc.speak("I'll come with you. But I'm making my own calls.", 86);
+            npc.speakKey("dialogue.bond.travel.accept_independent", 86);
             FighterMemoryManager.strengthenRelationship(player, npc, 3, FighterRelationshipManager.BondEvent.TRAVEL, "Travelled together");
             return true;
         }
@@ -218,46 +218,46 @@ public final class LivingBondManager {
     public static void requestSharedMeditation(ServerPlayer player, AmbientFighterEntity npc) {
         if (player == null || npc == null || !(player.level() instanceof ServerLevel level)) return;
         if (!MeditationCompat.isAvailable()) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] Meditation is unavailable right now."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.unavailable"), false);
             return;
         }
         if (!MeditationCompat.isNpcMeditationEnabled()) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] NPC meditation is disabled in World Settings."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.disabled"), false);
             return;
         }
         if (!npc.isAlive() || npc.isCaptive() || npc.isDefeated() || npc.isTransforming()
                 || npc.isKaiokenActive() || npc.getTarget() != null
                 || player.distanceToSqr(npc) > 12.0D * 12.0D) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] This fighter cannot meditate with you right now."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.fighter_unavailable"), false);
             return;
         }
         if (!canShareMeditation(player, npc)) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] This fighter is not comfortable meditating together yet."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.insufficient_bond"), false);
             return;
         }
         if (MeditationCompat.isPlayerMeditating(player) && npc.isMeditatingWith(player)) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] You are already meditating together."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.already_together"), false);
             return;
         }
         if (activeMeditationPartnerCount(player, level) >= MAX_MEDITATION_PARTNERS) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] Your meditation circle is already full."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.circle_full"), false);
             return;
         }
         if (!MeditationCompat.startPlayerMeditation(player)) return;
         if (!npc.beginSharedMeditation(player)) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] The fighter could not settle into meditation."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.start_failed"), false);
             return;
         }
         INVITES.remove(player.getUUID());
         trackMeditationBond(player, npc, level.getServer().overworld().getGameTime());
-        if (npc.getSpeech().isEmpty()) npc.speak("Let's focus.", 52);
+        if (npc.getSpeech().isEmpty()) npc.speakKey("dialogue.bond.meditation.focus", 52);
     }
 
     /**
@@ -289,13 +289,13 @@ public final class LivingBondManager {
                 session.firstMilestone = true;
                 FighterMemoryManager.strengthenRelationship(player, npc, 1,
                         FighterRelationshipManager.BondEvent.MEDITATION, "Meditated together");
-                if (npc.getSpeech().isEmpty() && npc.getRandom().nextFloat() < 0.35F) npc.speak("Your focus is steady.", 54);
+                if (npc.getSpeech().isEmpty() && npc.getRandom().nextFloat() < 0.35F) npc.speakKey("dialogue.bond.meditation.steady", 54);
             }
             if (!session.secondMilestone && elapsed >= 20L * 90L) {
                 session.secondMilestone = true;
                 FighterMemoryManager.strengthenRelationship(player, npc, 1,
                         FighterRelationshipManager.BondEvent.MEDITATION, "Shared a long meditation");
-                if (npc.getSpeech().isEmpty() && npc.getRandom().nextFloat() < 0.55F) npc.speak("That was good. I feel clearer.", 64);
+                if (npc.getSpeech().isEmpty() && npc.getRandom().nextFloat() < 0.55F) npc.speakKey("dialogue.bond.meditation.clearer", 64);
             }
         }
         if (sessions.isEmpty()) MEDITATION_BONDS.remove(player.getUUID());
@@ -323,18 +323,18 @@ public final class LivingBondManager {
     public static boolean inviteNearestMeditationFriend(ServerPlayer player) {
         if (player == null || !(player.level() instanceof ServerLevel level) || !MeditationCompat.isAvailable()) return false;
         if (!MeditationCompat.isNpcMeditationEnabled()) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] NPC meditation is disabled in World Settings."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.disabled"), false);
             return false;
         }
         if (!MeditationCompat.isPlayerMeditating(player) && !MeditationCompat.startPlayerMeditation(player)) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] Start meditation first, then invite someone into the circle."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.start_first"), false);
             return false;
         }
         if (activeMeditationPartnerCount(player, level) >= MAX_MEDITATION_PARTNERS) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] Your meditation circle is already full."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.circle_full"), false);
             return false;
         }
         UUID companion = companionId(player);
@@ -344,8 +344,8 @@ public final class LivingBondManager {
                         && ((companion != null && companion.equals(fighter.getUUID()))
                         || isFriendlyMeditationCandidate(player, fighter)));
         if (candidates.isEmpty()) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] No nearby friend is free to join you right now."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.meditation.no_friend_available"), false);
             return false;
         }
         candidates.sort(java.util.Comparator.comparingDouble(player::distanceToSqr));
@@ -353,7 +353,7 @@ public final class LivingBondManager {
         if (!npc.beginSharedMeditation(player)) return false;
         long now = level.getServer().overworld().getGameTime();
         trackMeditationBond(player, npc, now);
-        if (npc.getSpeech().isEmpty()) npc.speak("I'll join you.", 58);
+        if (npc.getSpeech().isEmpty()) npc.speakKey("dialogue.bond.meditation.join", 58);
         return true;
     }
 
@@ -383,7 +383,7 @@ public final class LivingBondManager {
             if (companion.beginSharedMeditation(player)) {
                 trackMeditationBond(player, companion, now);
                 activePartners++;
-                if (companion.getSpeech().isEmpty()) companion.speak("I'll join you.", 58);
+                if (companion.getSpeech().isEmpty()) companion.speakKey("dialogue.bond.meditation.join", 58);
             }
         }
 
@@ -404,7 +404,7 @@ public final class LivingBondManager {
         if (friend.beginSharedMeditation(player)) {
             state.spontaneousJoins++;
             trackMeditationBond(player, friend, now);
-            if (friend.getSpeech().isEmpty()) friend.speak("Mind if I join you?", 62);
+            if (friend.getSpeech().isEmpty()) friend.speakKey("dialogue.bond.meditation.ask_join", 62);
         }
     }
 
@@ -477,7 +477,7 @@ public final class LivingBondManager {
 
         long joined = root.getLong("CompanionJoined");
         if (joined > 0 && now - joined > 96000L) {
-            companion.speak("I should head back for a while. We'll meet again.", 82);
+            companion.speakKey("dialogue.bond.travel.return_home", 82);
             removeCompanion(player, companion);
             return;
         }
@@ -486,7 +486,7 @@ public final class LivingBondManager {
             if (faction != null && !FactionWorldData.get(level).warEnemies(faction, now).isEmpty()
                     && now - joined > 24000L && Math.floorMod(now + companion.getUUID().hashCode(), 24000L) == 0L
                     && companion.getRandom().nextFloat() < 0.35F) {
-                companion.speak("My people are at war. I need to go back.", 82);
+                companion.speakKey("dialogue.bond.travel.faction_war", 82);
                 removeCompanion(player, companion);
                 return;
             }
@@ -762,28 +762,24 @@ public final class LivingBondManager {
         LivingEntity threat = player.getLastHurtByMob();
         if (threat != null && threat.isAlive() && player.distanceToSqr(threat) < 48.0D * 48.0D) {
             line = companion.getPersonality() == com.dmzlivingworld.entity.FighterPersonality.CAUTIOUS
-                    ? "Stay sharp. That fight might not be over." : "That got interesting fast.";
+                    ? "threat.cautious" : "threat.default";
         } else if (player.getHealth() < player.getMaxHealth() * 0.40F) {
-            line = "You're hurt. Don't push yourself too hard.";
+            line = "hurt";
         } else if (player.isSprinting() || player.getDeltaMovement().horizontalDistanceSqr() > 0.10D) {
             line = switch (companion.getPersonality()) {
-                case PROUD -> "Keep moving. I'm not falling behind.";
-                case AGGRESSIVE -> "Finally, some pace.";
-                case CAUTIOUS -> "Slow down a little. I'd rather see where we're going.";
-                default -> "You've got somewhere in mind, or are we just moving?";
+                case PROUD -> "moving.proud"; case AGGRESSIVE -> "moving.aggressive";
+                case CAUTIOUS -> "moving.cautious"; default -> "moving.default";
             };
         } else if (player.isUsingItem()) {
-            line = "Good time for a quick break.";
+            line = "break";
         } else {
             line = switch (companion.getPersonality()) {
-                case HEROIC -> "Quiet for once. I don't mind it.";
-                case CALM -> "This is nice. Just travelling without a crisis.";
-                case CAUTIOUS -> "Nothing strange nearby so far.";
-                case PROUD -> "Don't get too comfortable. We still have ground to cover.";
-                case AGGRESSIVE -> "If nothing happens soon, I'm picking the next route.";
+                case HEROIC -> "idle.heroic"; case CALM -> "idle.calm";
+                case CAUTIOUS -> "idle.cautious"; case PROUD -> "idle.proud";
+                case AGGRESSIVE -> "idle.aggressive";
             };
         }
-        companion.speak(line, 92);
+        companion.speakKey("dialogue.bond.chatter." + line, 92);
     }
 
     /** GUI-facing companion recovery. */
@@ -844,7 +840,7 @@ public final class LivingBondManager {
             rememberCompanionState(player, root, companion);
             LOGGER.info("[LW CompanionRecovery] regrouped existing travelling companion uuid={} name={} near player={} without recreation",
                     companion.getUUID(), companion.getFighterName(), player.getGameProfile().getName());
-            companion.speak("There you are. I caught up.", 58);
+            companion.speakKey("dialogue.bond.travel.caught_up", 58);
             return companion;
         }
 
@@ -886,7 +882,7 @@ public final class LivingBondManager {
         root.putLong("LastCompanionRegroup", player.getServer().overworld().getGameTime());
         root.remove("CompanionMissingSince");
         rememberCompanionState(player, root, recreated);
-        recreated.speak("There you are. I caught up.", 58);
+        recreated.speakKey("dialogue.bond.travel.caught_up", 58);
         return recreated;
     }
 
@@ -975,24 +971,24 @@ public final class LivingBondManager {
         if (player == null || !(player.level() instanceof ServerLevel level)) return 0;
         AmbientFighterEntity companion = findLoadedCompanion(player, companionId(player));
         if (companion == null || !companion.isAlive()) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] No loaded travelling companion. Use the Companion system first."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.debug.no_loaded_companion"), false);
             return 0;
         }
 
         var type = ForgeRegistries.ENTITY_TYPES.getValue(
                 new ResourceLocation("dragonminez", "red_ribbon_soldier"));
         if (type == null) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] Dragon Mine Z red_ribbon_soldier entity was not found."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.debug.red_ribbon_missing"), false);
             return 0;
         }
 
         net.minecraft.world.entity.Entity created = type.create(level);
         if (!(created instanceof LivingEntity attacker)) {
             if (created != null) created.discard();
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] Red Ribbon soldier could not be created as a living attacker."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.debug.red_ribbon_invalid"), false);
             return 0;
         }
 
@@ -1005,13 +1001,13 @@ public final class LivingBondManager {
         if (attacker instanceof Mob mob) mob.setTarget(player);
         if (!level.addFreshEntity(attacker)) {
             attacker.discard();
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] Could not add the Red Ribbon soldier to the world."), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.debug.red_ribbon_spawn_failed"), false);
             return 0;
         }
 
-        player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                "[Living World] Spawned a real DMZ Red Ribbon soldier targeting you. Let it land one hit; your companion should intervene immediately."), false);
+        player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                "dmzlivingworld.message.debug.red_ribbon_spawned"), false);
         return 1;
     }
 
@@ -1026,25 +1022,25 @@ public final class LivingBondManager {
         if (player == null || npc == null || !(player.level() instanceof ServerLevel level)) return false;
         if (isCompanion(player, npc)) {
             removeCompanion(player, npc);
-            npc.speak("I'll head out on my own again.", 58);
+            npc.speakKey("dialogue.bond.travel.let_go", 58);
             return true;
         }
         if (companionIds(player).size() >= MAX_COMPANIONS) {
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "You can't have more than 5 companions!").withStyle(net.minecraft.ChatFormatting.RED), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.companion.limit").withStyle(net.minecraft.ChatFormatting.RED), false);
             return false;
         }
         if (!npc.isAlive() || npc.isCaptive() || npc.isDefeated() || npc.isRecovering() || npc.isMeditating()
                 || npc.isTransforming() || npc.isKaiokenActive() || npc.getTarget() != null
                 || npc.isSocialLifeActivity() || npc.isSocialPlayerApproach() || npc.isSocialPowerDisplay()
                 || npc.isSanctionedMatchParticipant()) {
-            npc.speak("Not right now. I've got something else going on.", 76);
+            npc.speakKey("dialogue.bond.travel.busy", 76);
             return false;
         }
         int relationship = npc.isRememberedFor(player) ? npc.getMemoryRelationship() : Integer.MIN_VALUE;
         boolean factionFriend = npc.isFactionMember() && FactionManager.getReputation(player, npc.getFactionId()) >= FactionManager.FRIENDLY_REP;
         if (relationship < 15 && !factionFriend) {
-            npc.speak("We don't know each other well enough for that yet.", 82);
+            npc.speakKey("dialogue.bond.travel.not_close", 82);
             return false;
         }
         // Familiar fighters are willing sometimes; established friends generally say yes unless busy.
@@ -1057,24 +1053,17 @@ public final class LivingBondManager {
                 case AGGRESSIVE -> 0.58F;
             };
             if (npc.getRandom().nextFloat() > accept) {
-                npc.speak(switch (npc.getPersonality()) {
-                    case CAUTIOUS -> "Maybe another time. I have my own route today.";
-                    case PROUD -> "Not today. Keep up with me a little longer first.";
-                    case AGGRESSIVE -> "Not this time. I've got my own thing to do.";
-                    default -> "Not today. Maybe another time.";
-                }, 84);
+                String refusal = switch (npc.getPersonality()) {
+                    case CAUTIOUS -> "cautious"; case PROUD -> "proud";
+                    case AGGRESSIVE -> "aggressive"; default -> "default";
+                };
+                npc.speakKey("dialogue.bond.travel.refuse." + refusal, 84);
                 return false;
             }
         }
         setCompanion(player, npc);
         npc.setSocialLifeActivity(false);
-        npc.speak(switch (npc.getPersonality()) {
-            case HEROIC -> "Sure. I'll watch your back.";
-            case CALM -> "All right. Let's go together for a while.";
-            case CAUTIOUS -> "Okay. But let's not get careless.";
-            case PROUD -> "Fine. Just don't expect me to follow blindly.";
-            case AGGRESSIVE -> "Yeah. If trouble finds us, even better.";
-        }, 90);
+        npc.speakKey("dialogue.bond.travel.accept." + npc.getPersonality().name().toLowerCase(java.util.Locale.ROOT), 90);
         FighterMemoryManager.strengthenRelationship(player, npc, 1,
                 FighterRelationshipManager.BondEvent.TRAVEL, "Agreed to travel together");
         INVITES.remove(player.getUUID());
@@ -1264,13 +1253,9 @@ public final class LivingBondManager {
             root.putInt("CompanionFriendlyFireStrikes", strikes);
             save(player, root);
             npc.setTarget(null);
-            npc.speak(switch (strikes) {
-                case 1 -> "Hey! Watch it.";
-                case 2 -> "Seriously. Be careful.";
-                default -> "That's three. Hit me again and I'm defending myself.";
-            }, 92);
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "[Living World] Companion warning " + strikes + "/3 — accidental hit ignored."), false);
+            npc.speakKey("dialogue.bond.friendly_fire.warning." + strikes, 92);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "dmzlivingworld.message.companion.friendly_fire_warning", strikes, 3), false);
             return true;
         }
 
@@ -1278,7 +1263,7 @@ public final class LivingBondManager {
         root.remove("CompanionLastFriendlyFire");
         root.putLong("CompanionFriendlyFireBrokenUntil", now + FRIENDLY_FIRE_RESET_TICKS);
         save(player, root);
-        if (npc.getSpeech().isEmpty()) npc.speak("Enough. I'm not taking another one.", 92);
+        if (npc.getSpeech().isEmpty()) npc.speakKey("dialogue.bond.friendly_fire.enough", 92);
         return false;
     }
 
@@ -1297,7 +1282,7 @@ public final class LivingBondManager {
         if (!MeditationCompat.startPlayerMeditation(player)) return 0;
         if (!npc.beginSharedMeditation(player)) return 0;
         trackMeditationBond(player, npc, level.getServer().overworld().getGameTime());
-        npc.speak("Let's focus for a while.", 82);
+        npc.speakKey("dialogue.bond.meditation.focus_long", 82);
         return 1;
     }
 
@@ -1316,7 +1301,7 @@ public final class LivingBondManager {
         npc.setFlightUnlockedForDebug(true);
         setCompanion(player, npc);
         npc.setSocialLifeActivity(false);
-        npc.speak("Let's move. I'll travel with you.", 90);
+        npc.speakKey("dialogue.bond.travel.accept", 90);
         return 1;
     }
 
@@ -1330,7 +1315,7 @@ public final class LivingBondManager {
         if (npc == null) return 0;
         long now = level.getServer().overworld().getGameTime();
         INVITES.put(player.getUUID(), new Invite(npc.getUUID(), InviteType.TRAVEL, now + 1200L));
-        npc.speak("You're heading out again? Want some company?", 110);
+        npc.speakKey("dialogue.bond.travel.invite", 110);
         npc.getNavigation().moveTo(player, 1.05D);
         return 1;
     }

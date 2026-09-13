@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import net.minecraft.network.chat.Component;
@@ -117,8 +118,8 @@ public final class FighterPracticeSparManager {
         BY_FIGHTER.put(b.getUUID(), session);
         a.beginSanctionedMatch(b);
         b.beginSanctionedMatch(a);
-        a.speak(pick(a, "Want to run a few rounds?", "Let's train for real.", "Spar with me. I need the practice.", "No holding back on the technique—just stop before it gets stupid."), 78);
-        b.speak(pick(b, "You're on.", "Good. I needed a real opponent.", "All right. Let's see what needs work.", "Fine by me. Keep it clean."), 78);
+        a.speak(pick(a, "practice.start.invite", "Want to run a few rounds?", "Let's train for real.", "Spar with me. I need the practice.", "No holding back on the technique—just stop before it gets stupid."), 78);
+        b.speak(pick(b, "practice.start.accept", "You're on.", "Good. I needed a real opponent.", "All right. Let's see what needs work.", "Fine by me. Keep it clean."), 78);
         ReactiveWorldManager.rememberEvent(a, "PRACTICE_START", b.getFighterName(), "started a real practice spar");
         ReactiveWorldManager.rememberEvent(b, "PRACTICE_START", a.getFighterName(), "started a real practice spar");
         return true;
@@ -161,8 +162,8 @@ public final class FighterPracticeSparManager {
             AmbientFighterEntity loser = winner == a ? b : a;
             ReactiveWorldManager.react(winner, ReactiveWorldManager.Mood.FOCUSED, "finishing a useful practice spar", 760);
             ReactiveWorldManager.react(loser, ReactiveWorldManager.Mood.FOCUSED, "learning from a practice loss", 900);
-            winner.speak(pick(winner, "Good round. That gave me something to work with.", "Nice. Again another time.", "That was useful. I felt a few openings I need to remember."), 84);
-            loser.speak(pick(loser, "Yeah... I see what I did wrong.", "Good. I needed to find that weakness.", "Next time I'll read that sooner."), 84);
+            winner.speak(pick(winner, "practice.finish.winner", "Good round. That gave me something to work with.", "Nice. Again another time.", "That was useful. I felt a few openings I need to remember."), 84);
+            loser.speak(pick(loser, "practice.finish.loser", "Yeah... I see what I did wrong.", "Good. I needed to find that weakness.", "Next time I'll read that sooner."), 84);
         } else {
             ReactiveWorldManager.react(a, ReactiveWorldManager.Mood.FOCUSED, "cooling down after a long practice session", 620);
             ReactiveWorldManager.react(b, ReactiveWorldManager.Mood.FOCUSED, "cooling down after a long practice session", 620);
@@ -201,11 +202,11 @@ public final class FighterPracticeSparManager {
         for (int i = 0; i < nearby.size(); i++) for (int j = i + 1; j < nearby.size(); j++) {
             AmbientFighterEntity a = nearby.get(i), b = nearby.get(j);
             if (sociallySafePair(a, b) && start(a, b, level.getServer().overworld().getGameTime())) {
-                player.displayClientMessage(Component.literal("[Living World] Started a real NPC practice spar: " + a.getFighterName() + " vs " + b.getFighterName() + "."), false);
+                player.displayClientMessage(Component.translatable("dmzlivingworld.message.debug.practice_spar_started", a.getFighterName(), b.getFighterName()), false);
                 return 1;
             }
         }
-        player.displayClientMessage(Component.literal("[Living World] Could not find/create a compatible practice pair."), false);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.debug.practice_spar_failed"), false);
         return 0;
     }
 
@@ -216,7 +217,8 @@ public final class FighterPracticeSparManager {
     public static int runtimeEntries() { return new java.util.HashSet<>(BY_FIGHTER.values()).size(); }
     public static void clearRuntime() { BY_FIGHTER.clear(); }
 
-    private static String pick(AmbientFighterEntity fighter, String... lines) {
-        return lines[fighter.getRandom().nextInt(lines.length)];
+    private static String pick(AmbientFighterEntity fighter, String group, String... lines) {
+        int index = fighter.getRandom().nextInt(lines.length);
+        return LWLang.speechKey("dialogue." + group + "." + index, lines[index]);
     }
 }

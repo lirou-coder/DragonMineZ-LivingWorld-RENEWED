@@ -58,9 +58,9 @@ public final class BondInterventionManager {
         player.getPersistentData().putLong("LWNextBondRescue", now + VICTIM_COOLDOWN);
         noteIntervention(helper, null, player.getGameProfile().getName());
         if (helper.isRememberedFor(player)) FighterMemoryManager.strengthenRelationship(player, helper, 1, FighterRelationshipManager.BondEvent.PROTECTION, "Intervened to protect you");
-        helper.speak("Back off.", 44);
-        player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                .append(Component.literal(helper.getFighterName() + " intervened to protect you.").withStyle(ChatFormatting.GREEN)), false);
+        helper.speakKey("dialogue.intervention.back_off", 44);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.intervention.protected", helper.getFighterName())
+                .withStyle(ChatFormatting.GREEN), false);
     }
 
     private static void interveneForFighter(AmbientFighterEntity victim, LivingEntity attacker) {
@@ -77,7 +77,7 @@ public final class BondInterventionManager {
         helper.getPersistentData().putLong("LWNextBondIntervention", now + HELPER_COOLDOWN);
         victim.getPersistentData().putLong("LWNextBondRescue", now + VICTIM_COOLDOWN);
         noteIntervention(helper, victim, victim.getFighterName());
-        helper.speak("I've got you.", 44);
+        helper.speakKey("dialogue.intervention.protect", 44);
     }
 
     private static boolean eligibleHelper(AmbientFighterEntity helper, LivingEntity attacker, long now) {

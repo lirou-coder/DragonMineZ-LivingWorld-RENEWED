@@ -54,7 +54,7 @@ public final class AmbientFighterSpawner {
                 FactionWorldData.get(level).tickOrganizations(level);
                 organizationsTicked = true;
             }
-            if (player.isSpectator() || player.isCreative()) continue;
+            if (player.isSpectator() || (player.isCreative() && !LivingWorldConfig.npcsEnabledOnCreativeMode())) continue;
             // Active gravity chambers are deliberate training interiors. Ambient/faction population
             // waits outside instead of materializing an attacker in the player's sealed room.
             if (GravityChamberSafety.isPlayerInsideActiveChamber(player)) continue;
@@ -136,7 +136,7 @@ public final class AmbientFighterSpawner {
         AmbientFighterEntity spawned = spawnNearPlayer(player, alignment, FighterRank.roll(random), false);
         if (spawned != null && alignment != FighterAlignment.BAD && random.nextFloat() < 0.20F) {
             spawned.setNonCombatant(true);
-            if (spawned.getSpeech().isEmpty() && random.nextFloat() < 0.25F) spawned.speak("Just passing through.", 42);
+            if (spawned.getSpeech().isEmpty() && random.nextFloat() < 0.25F) spawned.speakKey("dialogue.ambient.just_passing_through", 42);
         }
     }
 
@@ -228,7 +228,8 @@ public final class AmbientFighterSpawner {
         if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) return null;
         // Dead-record tombstones are authoritative across every materialization path, including
         // debug recurrence and companion recovery. A historical person must never be recreated.
-        if (recordId != null && FighterLegacyWorldData.get(level).isDeadRecord(recordId)) return null;
+        if (recordId != null && (FighterLegacyWorldData.get(level).isDeadRecord(recordId)
+                || FighterAfterlifeManager.isRecoveryQueued(level, recordId))) return null;
         if (recordId != null && isMemoryRecordLoaded(player, recordId)) return null;
         int min = closeForDebug ? 8 : 0;
         int max = closeForDebug ? 14 : 18;
@@ -267,7 +268,8 @@ public final class AmbientFighterSpawner {
                                                                 BlockPos life) {
         if (player == null || life == null || !(player.level() instanceof ServerLevel level)
                 || !LivingWorldDimensions.isSupported(level)) return null;
-        if (recordId != null && FighterLegacyWorldData.get(level).isDeadRecord(recordId)) return null;
+        if (recordId != null && (FighterLegacyWorldData.get(level).isDeadRecord(recordId)
+                || FighterAfterlifeManager.isRecoveryQueued(level, recordId))) return null;
         if (recordId != null && isMemoryRecordLoaded(player, recordId)) return null;
         // Instant Transmission is an intentional lock-on, so synchronously load only the destination
         // chunk required for that action. Ambient simulation still never force-loads remote chunks.

@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
 import com.dmzlivingworld.entity.FighterArchetype;
@@ -583,7 +584,9 @@ public final class FighterArsenalManager {
     private static void detail(List<String> out, String slot, ItemStack stack) {
         if (stack == null || stack.isEmpty() || isNonPersistentActivityProp(stack)) return;
         String owners = ownershipSummary(stack);
-        out.add(slot + ": " + stack.getHoverName().getString() + (owners.isBlank() ? "" : " • owners: " + owners));
+        String translatedSlot = LWLang.speechKey("equipment.slot." + slot.toLowerCase(java.util.Locale.ROOT).replace(' ', '_'), slot);
+        String ownership = owners.isBlank() ? "" : LWLang.speechKey("equipment.owners", " • owners: %s", owners);
+        out.add(LWLang.speechKey("equipment.entry", "%s: %s%s", translatedSlot, stack.getHoverName().getString(), ownership));
     }
 
     private static void add(List<String> out, ItemStack stack) {

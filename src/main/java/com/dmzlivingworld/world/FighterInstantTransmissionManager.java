@@ -52,7 +52,7 @@ public final class FighterInstantTransmissionManager {
         if (data == null) return;
         int skillLevel = data.getSkills().getSkillLevel("instant_transmission");
         if (skillLevel < MENU_SKILL_LEVEL) {
-            message(player, "You need a stronger Instant Transmission skill before you can lock onto remembered Ki this way.");
+            message(player, "skill_too_weak");
             return;
         }
         // IT is an explicit attempt to sense a real remembered person. Advance their coarse
@@ -60,18 +60,18 @@ public final class FighterInstantTransmissionManager {
         FighterMemoryManager.tickPersistentLives(player, player.getServer().overworld().getGameTime());
         CompoundTag remembered = FighterMemoryManager.rememberedRecord(player, recordId);
         if (remembered.isEmpty()) {
-            message(player, "You do not remember that Ki signature clearly enough yet.");
+            message(player, "memory_too_weak");
             return;
         }
         if (remembered.contains("Profile", Tag.TAG_COMPOUND)) {
             CompoundTag profile = remembered.getCompound("Profile");
             if (profile.getBoolean(WorldMenaceManager.HEROBRINE_TAG) || profile.getBoolean(RedRibbonExperimentManager.TAG)) {
-                message(player, "That presence cannot be selected as a personal Instant Transmission destination.");
+                message(player, "invalid_destination");
                 return;
             }
         }
         if (FighterLegacyWorldData.get(player.serverLevel()).isDeadRecord(recordId)) {
-            message(player, "No Ki signal. You cannot sense them anymore.");
+            message(player, "no_signal");
             return;
         }
 
@@ -79,9 +79,9 @@ public final class FighterInstantTransmissionManager {
         AmbientFighterEntity target = findLoadedIdentity(player, recordId, signalRecord);
         if (!knowsKiSignature(remembered)) {
             if (target != null && target.isAlive()) {
-                message(player, "You can sense them, but you have not learned their Ki well enough yet. Spend more time together first.");
+                message(player, "learn_ki_spend_time");
             } else {
-                message(player, "You remember them, but you have not learned their Ki signature well enough yet.");
+                message(player, "learn_ki");
             }
             return;
         }
@@ -92,13 +92,13 @@ public final class FighterInstantTransmissionManager {
                 ? target.level().dimension().equals(player.level().dimension())
                 : recordedDimension.isBlank() || recordedDimension.equals(player.level().dimension().location().toString());
         if (!sameDimension && skillLevel < CROSS_DIMENSION_SKILL_LEVEL) {
-            message(player, "Your Instant Transmission is not strong enough to reach their Ki across dimensions.");
+            message(player, "cross_dimension_too_weak");
             return;
         }
 
         boolean bypassCosts = player.isCreative() || player.isSpectator();
         if (!bypassCosts && data.getCooldowns().hasCooldown(Cooldowns.TELEPORT_CD)) {
-            message(player, "Instant Transmission is still recovering.");
+            message(player, "cooldown");
             return;
         }
 
@@ -111,20 +111,20 @@ public final class FighterInstantTransmissionManager {
                 double dz = signalRecord.getInt("LifeZ") + 0.5D - player.getZ();
                 distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
             } else {
-                message(player, "You remember their Ki, but you cannot sense that signature in the world right now.");
+                message(player, "cannot_sense_now");
                 return;
             }
 
         } else if (!targetLoaded) {
             // Cross-dimension travel is supported when the fighter is physically present in that
             // dimension. Living World never force-loads another dimension just to create a target.
-            message(player, "You remember their Ki, but you cannot get a stable lock across dimensions right now.");
+            message(player, "unstable_cross_dimension");
             return;
         }
 
         int estimatedKiCost = (DashHandler.getFlyDashKiCost() * 5) + ITTeleportHelper.extraKiCostForDistance(distance);
         if (!bypassCosts && data.getResources().getCurrentEnergy() < estimatedKiCost) {
-            message(player, "You do not have enough Ki for Instant Transmission.");
+            message(player, "not_enough_ki");
             return;
         }
 
@@ -134,7 +134,7 @@ public final class FighterInstantTransmissionManager {
             target = tryMaterializeNearbySignal(player, recordId, signalRecord, skillLevel);
             targetLoaded = target != null && target.isAlive() && !target.isCaptive();
             if (!targetLoaded) {
-                message(player, "You remember their Ki, but you cannot sense that signature in the world right now.");
+                message(player, "cannot_sense_now");
                 return;
             }
             sameDimension = target.level().dimension().equals(player.level().dimension());
@@ -144,7 +144,7 @@ public final class FighterInstantTransmissionManager {
         int kiCost = (DashHandler.getFlyDashKiCost() * 5) + ITTeleportHelper.extraKiCostForDistance(distance);
         if (!bypassCosts) {
             if (data.getResources().getCurrentEnergy() < kiCost) {
-                message(player, "You do not have enough Ki for Instant Transmission.");
+                message(player, "not_enough_ki");
                 return;
             }
             data.getResources().removeEnergy(kiCost);
@@ -282,7 +282,7 @@ public final class FighterInstantTransmissionManager {
         FighterMemoryManager.refreshLoadedProfile(fighter);
     }
 
-    private static void message(ServerPlayer player, String text) {
-        player.displayClientMessage(Component.literal("[Living World] " + text), false);
+    private static void message(ServerPlayer player, String key) {
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.instant_transmission." + key), false);
     }
 }

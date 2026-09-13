@@ -1,5 +1,7 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
+
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -149,10 +151,10 @@ public final class FighterLegacyWorldData extends SavedData {
             CompoundTag r = fallen.get(i);
             if (isWorldMenaceRecord(r) || r.getLong("FallenAt") <= since) continue;
             String title = r.getString("Title");
-            String line = (title.isBlank() ? "" : title + " ") + r.getString("Name")
-                    + " — " + r.getString("Race") + " • Last known PL " + r.getInt("BattlePower");
+            String line = LWLang.speechKey("screen.dossier.content.fallen.entry", "%s%s | %s | Last known PL %s%s",
+                    title.isBlank() ? "" : title + " ", r.getString("Name"), r.getString("Race"), r.getInt("BattlePower"),
+                    r.getString("Killer").isBlank() ? "" : LWLang.speechKey("screen.dossier.content.fallen.cause", " | Fell to %s", r.getString("Killer")));
             String killer = r.getString("Killer");
-            if (!killer.isBlank()) line += " • fell to " + killer;
             UUID recordId = r.hasUUID("RecordId") ? r.getUUID("RecordId") : null;
             CompoundTag profile = r.contains("Profile", Tag.TAG_COMPOUND) ? r.getCompound("Profile").copy() : new CompoundTag();
             out.add(new FallenEntry(recordId, line, profile));
@@ -168,10 +170,10 @@ public final class FighterLegacyWorldData extends SavedData {
             if (isWorldMenaceRecord(r)) continue;
             if (!r.hasUUID("RecordId") || !wanted.equals(r.getUUID("RecordId"))) continue;
             String title = r.getString("Title");
-            String line = (title.isBlank() ? "" : title + " ") + r.getString("Name")
-                    + " — " + r.getString("Race") + " • Last known PL " + r.getInt("BattlePower");
+            String line = LWLang.speechKey("screen.dossier.content.fallen.entry", "%s%s | %s | Last known PL %s%s",
+                    title.isBlank() ? "" : title + " ", r.getString("Name"), r.getString("Race"), r.getInt("BattlePower"),
+                    r.getString("Killer").isBlank() ? "" : LWLang.speechKey("screen.dossier.content.fallen.cause", " | Fell to %s", r.getString("Killer")));
             String killer = r.getString("Killer");
-            if (!killer.isBlank()) line += " • fell to " + killer;
             CompoundTag profile = r.contains("Profile", Tag.TAG_COMPOUND) ? r.getCompound("Profile").copy() : new CompoundTag();
             return new FallenEntry(wanted, line, profile);
         }

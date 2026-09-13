@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -401,20 +402,22 @@ public final class DialogueLocalityManager {
     private static String chooseReplacement(AmbientFighterEntity fighter, String original, Deque<Spoken> recent, long now) {
         String lower = original.toLowerCase(Locale.ROOT);
         String[] pool;
-        if (containsAny(lower, "rain", "storm", "thunder", "weather", "cloud", "sky", "wind")) pool = WEATHER;
-        else if (containsAny(lower, "train", "power", "strong", "technique", "practice", "punch", "kick")) pool = TRAINING;
-        else if (containsAny(lower, "road", "travel", "walk", "route", "fly", "flying", "distance")) pool = TRAVEL;
-        else if (containsAny(lower, "rest", "sit", "tired", "breath", "quiet")) pool = REST;
-        else if (containsAny(lower, "flower", "tree", "grass", "animal", "nature", "river", "water")) pool = NATURE;
-        else if (containsAny(lower, "see you", "friend", "talk", "hello", "hey", "good to see", "how are")) pool = SOCIAL;
-        else pool = GENERIC;
+        String group;
+        if (containsAny(lower, "rain", "storm", "thunder", "weather", "cloud", "sky", "wind")) { pool = WEATHER; group = "weather"; }
+        else if (containsAny(lower, "train", "power", "strong", "technique", "practice", "punch", "kick")) { pool = TRAINING; group = "training"; }
+        else if (containsAny(lower, "road", "travel", "walk", "route", "fly", "flying", "distance")) { pool = TRAVEL; group = "travel"; }
+        else if (containsAny(lower, "rest", "sit", "tired", "breath", "quiet")) { pool = REST; group = "rest"; }
+        else if (containsAny(lower, "flower", "tree", "grass", "animal", "nature", "river", "water")) { pool = NATURE; group = "nature"; }
+        else if (containsAny(lower, "see you", "friend", "talk", "hello", "hey", "good to see", "how are")) { pool = SOCIAL; group = "social"; }
+        else { pool = GENERIC; group = "generic"; }
 
-        List<String> available = new ArrayList<>();
-        for (String candidate : pool) {
-            if (!recentlyUsed(recent, normalize(candidate), fighter, now, LOCAL_REPEAT_TICKS, false)) available.add(candidate);
+        List<Integer> available = new ArrayList<>();
+        for (int i = 0; i < pool.length; i++) {
+            if (!recentlyUsed(recent, normalize(pool[i]), fighter, now, LOCAL_REPEAT_TICKS, false)) available.add(i);
         }
         if (available.isEmpty()) return null;
-        return available.get(fighter.getRandom().nextInt(available.size()));
+        int index = available.get(fighter.getRandom().nextInt(available.size()));
+        return LWLang.speechKey("dialogue.locality." + group + "." + index, pool[index]);
     }
 
     private static boolean containsAny(String text, String... needles) {

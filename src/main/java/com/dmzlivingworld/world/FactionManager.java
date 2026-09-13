@@ -208,7 +208,7 @@ public final class FactionManager {
             if (relationship >= 35) return false;
             if (relationship <= -35) {
                 if (PlayerWorldManager.shouldFearPlayer(fighter, serverPlayer)) {
-                    if (fighter.getSpeech().isEmpty()) fighter.speak("...Not worth dying over.", 48);
+                    if (fighter.getSpeech().isEmpty()) fighter.speakKey("dialogue.faction.fear.retreat", 48);
                     return false;
                 }
                 return true;
@@ -220,7 +220,7 @@ public final class FactionManager {
         boolean wantedPursuit = WantedManager.shouldFactionPursuePlayer(faction, serverPlayer);
         if (!wantedPursuit && getReputation(serverPlayer, faction) > HOSTILE_REP) return false;
         if (PlayerWorldManager.shouldFearPlayer(fighter, serverPlayer)) {
-            if (fighter.getSpeech().isEmpty()) fighter.speak("...Not worth dying over.", 48);
+            if (fighter.getSpeech().isEmpty()) fighter.speakKey("dialogue.faction.fear.retreat", 48);
             return false;
         }
         return true;
@@ -316,7 +316,7 @@ public final class FactionManager {
         if (faction == null) return;
         FactionWorldData data = FactionWorldData.get(level);
         data.addSupplies(faction, 4 + hunter.getRandom().nextInt(4));
-        if (hunter.getSpeech().isEmpty() && data.supplies(faction) < 35) hunter.speak("This should keep us fed.", 45);
+        if (hunter.getSpeech().isEmpty() && data.supplies(faction) < 35) hunter.speakKey("dialogue.faction.provisions.found", 45);
     }
 
     @SubscribeEvent
@@ -413,7 +413,7 @@ public final class FactionManager {
         if (wanderer.isRegionalPresence()) FactionWorldData.get(level).recordResident(faction, wanderer);
         FactionWorldData.get(level).addPopulation(faction, wanderer.isNonCombatant(), 1,
                 level.getServer().overworld().getGameTime(), wanderer.getFighterName() + " joined from the unaffiliated population.");
-        wanderer.speak("I'll run with " + faction.name() + ".", 65);
+        wanderer.speakKey("dialogue.faction.joined", "I'll run with %s.", 65, faction.name());
     }
 
     /** Called from fighter AI at low frequency. */
@@ -423,7 +423,7 @@ public final class FactionManager {
         if (faction == null) return;
         if (FactionWorldData.get(level).isExtinct(faction)) {
             fighter.leaveFaction();
-            if (fighter.getSpeech().isEmpty()) fighter.speak("It's over. We scattered.", 65);
+            if (fighter.getSpeech().isEmpty()) fighter.speakKey("dialogue.faction.scattered", 65);
             return;
         }
         if (fighter.getFactionDisplayName().isBlank() || fighter.getFactionTitle().isBlank()) {
@@ -435,7 +435,7 @@ public final class FactionManager {
                 && fighter.getFactionRole().ordinal() >= FactionRole.ENFORCER.ordinal()) {
             fighter.setFactionRole(FactionRole.LEADER);
             fighter.flareAura(110);
-            fighter.speak("I'll lead us from here.", 75);
+            fighter.speakKey("dialogue.faction.new_leader", 75);
             org.markLeaderSpawned(faction, fighter.blockPosition());
             org.addHistory(faction, level.getServer().overworld().getGameTime(),
                     fighter.getFighterName() + " assumed leadership as " + faction.roleTitle(FactionRole.LEADER) + ".");
@@ -508,7 +508,7 @@ public final class FactionManager {
         if (crossFaction && winner.getRandom().nextFloat() < 0.16F && winner.getRivalName().isBlank() && loser.getRivalName().isBlank()) {
             winner.setRivalName(loser.getFighterName());
             loser.setRivalName(winner.getFighterName());
-            if (winner.getSpeech().isEmpty()) winner.speak("We're not finished. Remember my name.", 68);
+            if (winner.getSpeech().isEmpty()) winner.speakKey("dialogue.faction.rivalry.winner", 68);
         }
         if (crossFaction) {
             WorldFaction loserFaction = byId(level, loser.getFactionId());
@@ -531,7 +531,7 @@ public final class FactionManager {
         if (fighter.level() instanceof ServerLevel residentLevel && fighter.isRegionalPresence())
             FactionWorldData.get(residentLevel).recordResident(faction, fighter);
         fighter.flareAura(70);
-        fighter.speak("I've earned my place.", 55);
+        fighter.speakKey("dialogue.faction.promotion", 55);
         if (fighter.level() instanceof ServerLevel level) {
             FactionWorldData.get(level).addHistory(faction, level.getServer().overworld().getGameTime(),
                     fighter.getFighterName() + " was promoted to " + faction.roleTitle(next) + ".");
@@ -559,7 +559,7 @@ public final class FactionManager {
                 : fighter.getFactionRole() == FactionRole.LIEUTENANT ? FactionRole.ENFORCER : fighter.getFactionRole();
         fighter.assignFaction(target, newRole, null, false, fighter.isRegionalPresence());
         if (fighter.isRegionalPresence()) data.recordResident(target, fighter);
-        fighter.speak("I'm done with " + faction.name() + ".", 75);
+        fighter.speakKey("dialogue.faction.left", "I'm done with %s.", 75, faction.name());
     }
 
     private static void huntNearbyRogue(AmbientFighterEntity fighter, WorldFaction faction) {
@@ -575,7 +575,7 @@ public final class FactionManager {
         if (rogue != null && fighter.canAttack(rogue)) {
             fighter.setTarget(rogue);
             if (fighter.getSpeech().isEmpty() && fighter.getRandom().nextFloat() < 0.38F)
-                fighter.speak("That's the wanted one.", 48);
+                fighter.speakKey("dialogue.faction.wanted.spotted", 48);
         }
     }
 
@@ -588,7 +588,7 @@ public final class FactionManager {
         Animal prey = animals.stream().min(Comparator.comparingDouble(fighter::distanceToSqr)).orElse(null);
         if (prey != null && fighter.canAttack(prey)) {
             fighter.setTarget(prey);
-            if (fighter.getSpeech().isEmpty() && fighter.getRandom().nextFloat() < 0.25F) fighter.speak("We need provisions.", 44);
+            if (fighter.getSpeech().isEmpty() && fighter.getRandom().nextFloat() < 0.25F) fighter.speakKey("dialogue.faction.provisions.needed", 44);
         }
     }
 

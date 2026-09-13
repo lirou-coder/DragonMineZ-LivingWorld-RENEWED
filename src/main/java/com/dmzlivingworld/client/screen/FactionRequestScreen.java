@@ -2,6 +2,7 @@ package com.dmzlivingworld.client.screen;
 
 import com.dmzlivingworld.network.FactionRequestScreenPacket;
 import com.dmzlivingworld.network.LWNetwork;
+import com.dmzlivingworld.client.LWLang;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -27,7 +28,7 @@ public final class FactionRequestScreen extends Screen implements LivingWorldScr
     private long cachedLiveProgressTick = Long.MIN_VALUE;
 
     private FactionRequestScreen(FactionRequestScreenPacket data) {
-        super(Component.literal("Faction Request"));
+        super(LWLang.text("screen.faction_request.title"));
         this.data = data;
         this.receivedAtMs = System.currentTimeMillis();
         this.selectedContact = data.contacts().isEmpty() ? -1 : 0;
@@ -70,14 +71,15 @@ public final class FactionRequestScreen extends Screen implements LivingWorldScr
 
     private String refreshLabel() {
         long s = remainingSeconds(), m = s / 60L, r = s % 60L;
-        return m > 0 ? "Offer refreshes in " + m + "m " + r + "s" : "Offer refreshes in " + r + "s";
+        return m > 0 ? LWLang.string("screen.faction_request.refresh.minutes", m, r)
+                : LWLang.string("screen.faction_request.refresh.seconds", r);
     }
 
     private void refreshLiveProgress(boolean force) {
         Minecraft mc = Minecraft.getInstance();
         long tick = mc.level == null ? 0L : mc.level.getGameTime();
         if (!force && tick - cachedLiveProgressTick < 5L) return;
-        cachedLiveProgress = SupplyInventoryClient.withLiveCounts(data.progress(), data.supplyItems());
+        cachedLiveProgress = SupplyInventoryClient.withLiveCounts(LWLang.speech(data.progress()).getString(), data.supplyItems());
         cachedLiveProgressTick = tick;
     }
 
@@ -95,7 +97,7 @@ public final class FactionRequestScreen extends Screen implements LivingWorldScr
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics);
         LivingWorldGuiStyle.drawPanel(graphics, left, top, widthPanel, heightPanel);
-        graphics.drawString(font, data.factionName() + " — Requests", left + 48, top + 14, LivingWorldGuiStyle.GOLD, false);
+        graphics.drawString(font, LWLang.string("screen.faction_request.faction_requests", data.factionName()), left + 48, top + 14, LivingWorldGuiStyle.GOLD, false);
         LivingWorldGuiStyle.drawButton(graphics, font, left + 12, top + 8, 28, 20, "‹", mouseX, mouseY, true, false, false);
         LivingWorldGuiStyle.drawButton(graphics, font, left + widthPanel - 40, top + 8, 28, 20, "×", mouseX, mouseY, true, false, false);
         String standing = data.standing() + "  " + (data.reputation() >= 0 ? "+" : "") + data.reputation();
@@ -104,24 +106,26 @@ public final class FactionRequestScreen extends Screen implements LivingWorldScr
         LivingWorldGuiStyle.drawHeaderDivider(graphics, left + 8, left + widthPanel - 8, top + 40);
 
         int cardX = left + 18, cardY = top + 55, cardW = widthPanel - 36, cardH = heightPanel - 166;
-        int accent = "Elite".equals(data.difficulty()) ? LivingWorldGuiStyle.RED : "Very Hard".equals(data.difficulty()) ? LivingWorldGuiStyle.ORANGE : LivingWorldGuiStyle.BLUE;
+        String difficulty = LWLang.speech(data.difficulty()).getString();
+        int accent = data.difficulty().contains("difficulty.elite") || "Elite".equals(data.difficulty()) ? LivingWorldGuiStyle.RED
+                : data.difficulty().contains("difficulty.very_hard") || "Very Hard".equals(data.difficulty()) ? LivingWorldGuiStyle.ORANGE : LivingWorldGuiStyle.BLUE;
         LivingWorldGuiStyle.drawInsetPanel(graphics, cardX, cardY, cardW, cardH, accent);
 
         int titleRight = data.difficulty().isBlank() ? cardX + cardW - 14 : cardX + cardW - 120;
-        List<FormattedCharSequence> titleLines = font.split(Component.literal(data.title()), Math.max(80, titleRight - (cardX + 14)));
+        List<FormattedCharSequence> titleLines = font.split(LWLang.speech(data.title()), Math.max(80, titleRight - (cardX + 14)));
         int ty = cardY + 11;
         for (int i = 0; i < Math.min(2, titleLines.size()); i++) { graphics.drawString(font, titleLines.get(i), cardX + 14, ty, LivingWorldGuiStyle.GOLD, false); ty += 11; }
-        if (!data.difficulty().isBlank()) LivingWorldGuiStyle.drawChip(graphics, font, data.difficulty(), cardX + cardW - 104, cardY + 8, 90, 20, accent);
+        if (!data.difficulty().isBlank()) LivingWorldGuiStyle.drawChip(graphics, font, difficulty, cardX + cardW - 104, cardY + 8, 90, 20, accent);
 
         int bodyTop = cardY + (titleLines.size() > 1 ? 40 : 32);
         int bodyBottom = cardY + cardH - 22;
         graphics.enableScissor(cardX + 8, bodyTop, cardX + cardW - 8, bodyBottom);
         int contentY = bodyTop - bodyScroll;
-        contentY = drawWrapped(graphics, data.description(), cardX + 14, contentY, cardW - 28, LivingWorldGuiStyle.TEXT, 11);
+        contentY = drawWrapped(graphics, LWLang.speech(data.description()).getString(), cardX + 14, contentY, cardW - 28, LivingWorldGuiStyle.TEXT, 11);
         contentY += 7;
-        if (!data.reward().isBlank()) { contentY = drawWrapped(graphics, "Reward • " + data.reward(), cardX + 14, contentY, cardW - 28, LivingWorldGuiStyle.GREEN, 11); contentY += 5; }
+        if (!data.reward().isBlank()) { contentY = drawWrapped(graphics, LWLang.text("screen.faction_request.reward", LWLang.speech(data.reward())).getString(), cardX + 14, contentY, cardW - 28, LivingWorldGuiStyle.GREEN, 11); contentY += 5; }
         if (!cachedLiveProgress.isBlank()) { contentY = drawWrapped(graphics, cachedLiveProgress, cardX + 14, contentY, cardW - 28, LivingWorldGuiStyle.BLUE, 11); contentY += 5; }
-        if (!data.note().isBlank()) { contentY = drawWrapped(graphics, data.note(), cardX + 14, contentY, cardW - 28, LivingWorldGuiStyle.MUTED, 11); contentY += 4; }
+        if (!data.note().isBlank()) { contentY = drawWrapped(graphics, LWLang.speech(data.note()).getString(), cardX + 14, contentY, cardW - 28, LivingWorldGuiStyle.MUTED, 11); contentY += 4; }
         if (!data.activeForFaction() && !data.activeElsewhere() && data.hasRequest())
             contentY = drawWrapped(graphics, refreshLabel(), cardX + 14, contentY, cardW - 28, LivingWorldGuiStyle.MUTED, 11);
         graphics.disableScissor();
@@ -132,8 +136,8 @@ public final class FactionRequestScreen extends Screen implements LivingWorldScr
 
         int navY = top + heightPanel - 102;
         String navInfo = data.activeForFaction()
-                ? "Live compass is primary navigation" + (data.travelFactionName().isBlank() ? "" : " • contact region: " + data.travelFactionName())
-                : "Accept the request to unlock its live compass and trusted-contact shortcut.";
+                ? LWLang.string("screen.faction_request.navigation.live", data.travelFactionName().isBlank() ? "" : LWLang.string("screen.faction_request.navigation.contact_region", data.travelFactionName()))
+                : LWLang.string("screen.faction_request.navigation.inactive");
         drawWrappedLimited(graphics, navInfo, left + 20, navY - 5, widthPanel - 40,
                 data.activeForFaction() ? LivingWorldGuiStyle.BLUE : LivingWorldGuiStyle.MUTED, 2);
 
@@ -141,18 +145,18 @@ public final class FactionRequestScreen extends Screen implements LivingWorldScr
         int buttonY2 = top + heightPanel - 44;
         boolean supply = data.canDeliver();
         if (data.canAccept())
-            LivingWorldGuiStyle.drawButton(graphics, font, left + 18, buttonY1, 150, 24, "Accept Request", mouseX, mouseY, true, false, true);
+            LivingWorldGuiStyle.drawButton(graphics, font, left + 18, buttonY1, 150, 24, LWLang.string("button.accept_request"), mouseX, mouseY, true, false, true);
         else if (data.activeForFaction() && supply)
-            LivingWorldGuiStyle.drawButton(graphics, font, left + 18, buttonY1, 150, 24, "Deliver Items", mouseX, mouseY, true, false, true);
-        else LivingWorldGuiStyle.drawButton(graphics, font, left + 18, buttonY1, 150, 24, data.activeElsewhere() ? "Another request active" : "Request active", mouseX, mouseY, false, false, false);
-        if (data.canAbandon()) LivingWorldGuiStyle.drawDangerButton(graphics, font, left + widthPanel - 168, buttonY1, 150, 24, "Abandon Request", mouseX, mouseY, true);
+            LivingWorldGuiStyle.drawButton(graphics, font, left + 18, buttonY1, 150, 24, LWLang.string("button.deliver_items"), mouseX, mouseY, true, false, true);
+        else LivingWorldGuiStyle.drawButton(graphics, font, left + 18, buttonY1, 150, 24, LWLang.string(data.activeElsewhere() ? "screen.faction_request.another_active" : "screen.faction_request.active"), mouseX, mouseY, false, false, false);
+        if (data.canAbandon()) LivingWorldGuiStyle.drawDangerButton(graphics, font, left + widthPanel - 168, buttonY1, 150, 24, LWLang.string("button.abandon_request"), mouseX, mouseY, true);
 
         boolean hasContact = data.activeForFaction() && selectedContact >= 0 && selectedContact < data.contacts().size();
-        String contactLabel = hasContact ? "Contact ▾  " + data.contacts().get(selectedContact).name() : "No trusted contact";
+        String contactLabel = hasContact ? LWLang.string("screen.faction_request.contact", data.contacts().get(selectedContact).name()) : LWLang.string("screen.faction_request.no_contact");
         LivingWorldGuiStyle.drawButton(graphics, font, left + 18, buttonY2, 220, 24, contactLabel, mouseX, mouseY, hasContact, contactsOpen, false);
         boolean canTravel = hasContact && "READY".equals(data.instantTransmissionStatus());
-        LivingWorldGuiStyle.drawButton(graphics, font, left + 246, buttonY2, 118, 24, canTravel ? "Transmit" : data.instantTransmissionStatus(), mouseX, mouseY, canTravel, false, true);
-        LivingWorldGuiStyle.drawButton(graphics, font, left + widthPanel - 168, buttonY2, 150, 24, "Back to Faction", mouseX, mouseY, true, false, false);
+        LivingWorldGuiStyle.drawButton(graphics, font, left + 246, buttonY2, 118, 24, canTravel ? LWLang.string("button.transmit") : data.instantTransmissionStatus(), mouseX, mouseY, canTravel, false, true);
+        LivingWorldGuiStyle.drawButton(graphics, font, left + widthPanel - 168, buttonY2, 150, 24, LWLang.string("button.back_to_faction"), mouseX, mouseY, true, false, false);
 
         if (contactsOpen && hasContact) drawContactDropdown(graphics, mouseX, mouseY, buttonY2);
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -165,7 +169,7 @@ public final class FactionRequestScreen extends Screen implements LivingWorldScr
         for (int i = start; i < start + count; i++, y += 27) {
             var c = data.contacts().get(i); boolean selected = i == selectedContact;
             LivingWorldGuiStyle.drawButton(graphics, font, left + 18, y, 300, 24,
-                    c.name() + " • REL " + c.relationship() + " • " + c.rank(), mouseX, mouseY, true, selected, false);
+                    LWLang.string("screen.faction_request.contact_entry", c.name(), c.relationship(), LWLang.label("fighter_rank", c.rank())), mouseX, mouseY, true, selected, false);
         }
     }
 

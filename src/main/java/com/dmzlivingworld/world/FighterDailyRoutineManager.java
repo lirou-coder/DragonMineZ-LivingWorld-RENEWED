@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterPersonality;
 import com.dmzlivingworld.entity.FighterArchetype;
@@ -28,6 +29,13 @@ import java.util.UUID;
  * variation after personality/goals/hobbies/relevance have done the real decision-making.
  */
 public final class FighterDailyRoutineManager {
+    private static String routineText(String key, String fallback, Object... args) {
+        return LWLang.speechKey("profile.routine." + key, fallback, args);
+    }
+    private static String routineLabel(String fallback) {
+        String slug = fallback.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        return LWLang.speechKey("label.routine_activity." + slug, fallback);
+    }
     private static final int SCHEMA = 12;
     private static final int SLOT_TICKS = 1_500;
     private static final String K_SCHEMA = "LWDailyRoutineSchema";
@@ -263,17 +271,17 @@ public final class FighterDailyRoutineManager {
         ensurePlan(fighter);
         long today = currentDay(level);
         String live = FighterAmbientActivityManager.currentActivity(fighter);
-        if (fighter.isMeditating() || fighter.isPreparingMeditation()) live = "Meditation";
-        if (live.isBlank()) live = currentActivity(fighter).label() + " (planned/current routine)";
-        out.add("## Now");
-        out.add("+ " + live);
+        if (fighter.isMeditating() || fighter.isPreparingMeditation()) live = routineLabel("Meditation");
+        if (live.isBlank()) live = routineText("planned_current", "%s (planned/current routine)", routineLabel(currentActivity(fighter).label()));
+        out.add("## " + routineText("now", "Now"));
+        out.add("+ " + (LWLang.isSpeechKey(live) ? live : routineLabel(live)));
 
         // The nested Schedule view is the authoritative place for the full generated day plan.
         // Always show every remaining slot, even when the activity journal is sparse. This fixes
         // profiles that appeared to know only their next slot while others showed further plans.
         CompoundTag data = fighter.getLegacyData();
         Segment current = currentSegment(level);
-        out.add("## Today's plan");
+        out.add("## " + routineText("todays_plan", "Today's plan"));
         Segment[] segments = Segment.values();
         for (int start = 0; start < segments.length; ) {
             int end = start;
@@ -281,16 +289,17 @@ public final class FighterDailyRoutineManager {
             while (end + 1 < segments.length && planText.equals(planTextAt(data, end + 1))) end++;
             boolean containsCurrent = current.ordinal() >= start && current.ordinal() <= end;
             String marker = containsCurrent ? "→ " : end < current.ordinal() ? "· " : "• ";
-            String period = start == end ? segments[start].label() : segments[start].label() + "–" + segments[end].label();
-            out.add(marker + period + " — " + planText);
+            String period = start == end ? routineLabel(segments[start].label())
+                    : routineText("period", "%s-%s", routineLabel(segments[start].label()), routineLabel(segments[end].label()));
+            out.add(marker + routineText("plan_entry", "%s - %s", period, planText));
             start = end + 1;
         }
 
         ListTag journal = data.getList(K_ACTIVITY_JOURNAL, Tag.TAG_COMPOUND);
-        appendJournalDay(out, journal, today, "Actually started today", false);
-        appendJournalDay(out, journal, today - 1L, "Previous day", false);
+        appendJournalDay(out, journal, today, routineText("started_today", "Actually started today"), false);
+        appendJournalDay(out, journal, today - 1L, routineText("previous_day", "Previous day"), false);
 
-        out.add("## Earlier");
+        out.add("## " + routineText("earlier", "Earlier"));
         int shown = 0;
         Set<String> earlierShown = new HashSet<>();
         for (int i = journal.size() - 1; i >= 0 && shown < 16; i--) {
@@ -300,18 +309,20 @@ public final class FighterDailyRoutineManager {
             Segment segment = segmentForTick(row.getInt("Tick"));
             String activity = canonicalJournalActivity(row.getString("Activity"));
             if (!earlierShown.add(day + "\u0000" + segment.ordinal() + "\u0000" + activity)) continue;
-            out.add("* " + (today - day) + "d ago • " + segment.label() + " — " + activity);
+            out.add("* " + routineText("older_entry", "%sd ago | %s - %s", today - day,
+                    routineLabel(segment.label()), routineLabel(activity)));
             shown++;
         }
-        if (shown == 0) out.add(". No older activity starts recorded yet.");
-        out.add("~ Actual starts are retained for the last " + ACTIVITY_JOURNAL_DAYS + " Minecraft days; generated plans are not counted as completed activity.");
+        if (shown == 0) out.add(". " + routineText("no_older", "No older activity starts recorded yet."));
+        out.add("~ " + routineText("retention", "Actual starts are retained for the last %s Minecraft days; generated plans are not counted as completed activity.", ACTIVITY_JOURNAL_DAYS));
         return out;
     }
 
     private static String planTextAt(CompoundTag data, int ordinal) {
         Activity activity = activityAt(data, ordinal);
         Activity beat = interludeAt(data, ordinal);
-        return beat == null ? activity.label() : beat.label() + " → " + activity.label();
+        return beat == null ? routineLabel(activity.label())
+                : routineText("transition", "%s -> %s", routineLabel(beat.label()), routineLabel(activity.label()));
     }
 
     private static void appendJournalDay(List<String> out, ListTag journal, long wantedDay, String title, boolean reverse) {
@@ -324,9 +335,9 @@ public final class FighterDailyRoutineManager {
             Segment segment = segmentForTick(row.getInt("Tick"));
             String activity = canonicalJournalActivity(row.getString("Activity"));
             if (!shown.add(segment.ordinal() + "\u0000" + activity)) continue;
-            out.add("* " + segment.label() + " — " + activity);
+            out.add("* " + routineText("journal_entry", "%s - %s", routineLabel(segment.label()), routineLabel(activity)));
         }
-        if (out.size() == before) out.add(". No recorded activity starts.");
+        if (out.size() == before) out.add(". " + routineText("no_recorded", "No recorded activity starts."));
     }
 
     /**

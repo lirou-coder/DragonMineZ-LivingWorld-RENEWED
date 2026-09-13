@@ -96,8 +96,8 @@ public final class PeacekeeperManager {
             helpers++;
         }
         if (helpers > 0) {
-            firstHelper.speak("Earth Guardian Corps! Get away from them.", 78);
-            player.displayClientMessage(Component.literal("Living World • Earth Guardian Corps responding to the attack"), true);
+        firstHelper.speakKey("dialogue.peacekeeper.get_away", 78);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.peacekeeper.responding"), true);
             FactionActivityRegistry.acquire(level, guardians, 1200L);
             return;
         }
@@ -117,8 +117,8 @@ public final class PeacekeeperManager {
             response.add(guard);
         }
         if (!response.isEmpty()) {
-            response.get(0).speak("Earth Guardian Corps! Step away from them.", 78);
-            player.displayClientMessage(Component.literal("Living World • Guardian response team incoming"), true);
+        response.get(0).speakKey("dialogue.peacekeeper.step_away", 78);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.peacekeeper.team_incoming"), true);
             FactionActivityRegistry.acquire(level, guardians, 1400L);
         }
     }
@@ -235,7 +235,7 @@ public final class PeacekeeperManager {
         root.putInt("PendingCount", 2 + (victim.isNonCombatant() ? 1 : 0));
         root.putString("PendingVictim", victim.getFighterName());
         player.getPersistentData().put(PLAYER_ROOT, root);
-        player.displayClientMessage(Component.literal("Living World • Earth Guardian Corps alerted — response inbound"), true);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.peacekeeper.alerted"), true);
     }
 
     /** Lightweight delayed-response processor, called from the existing player tick. */
@@ -257,7 +257,7 @@ public final class PeacekeeperManager {
         if (spawned > 0) {
             root.putLong("LastResponse", now);
             root.putInt("Incidents", 0);
-            player.displayClientMessage(Component.literal("Living World • Earth Guardian Corps arriving"), true);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.peacekeeper.arriving"), true);
         }
         clearPending(player, root);
     }
@@ -297,7 +297,7 @@ public final class PeacekeeperManager {
             spawned.add(guard);
         }
         if (!spawned.isEmpty()) {
-            spawned.get(0).speak("Earth Guardian Corps. Stand down.", 72);
+        spawned.get(0).speakKey("dialogue.peacekeeper.stand_down", 72);
             FactionActivityRegistry.acquire(level, guardians, 1200L);
         }
         return spawned.size();
@@ -331,8 +331,8 @@ public final class PeacekeeperManager {
             guards.add(guard);
         }
         if (!guards.isEmpty()) {
-            guards.get(0).speak("Earth Guardian Corps! Break it up!", 72);
-            player.displayClientMessage(Component.literal("Living World • Guardian signatures approaching the conflict"), true);
+        guards.get(0).speakKey("dialogue.peacekeeper.break_up", 72);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.peacekeeper.signatures"), true);
             FactionActivityRegistry.acquire(level, guardians, 1600L);
         }
     }

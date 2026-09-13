@@ -38,7 +38,7 @@ public final class MercyManager {
     private static final String ACTIVE_UNTIL = "ActiveUntil";
     private static final String BROKEN_UNTIL = "BrokenUntil";
 
-    private static final long LOCAL_PEACE_GRACE = 240L;   // 12s after leaving the local scene.
+    private static final long LOCAL_PEACE_GRACE = 200L;   // Hard cap: 10s after the mercy transition.
     private static final long BETRAYAL_MEMORY = 1200L;    // one minute is plenty to wake/re-engage.
     private static final double LOCAL_ENCOUNTER_RADIUS = 96.0D;
     private static final double BETRAYAL_WAKE_RADIUS = 192.0D;
@@ -96,15 +96,14 @@ public final class MercyManager {
 
             if (player != null && isPlayerMercyBroken(player, factionId, now)) {
                 revokeForBetrayal(fighter, player, now, false);
+            } else if (data.getLong(PEACE_UNTIL) <= now) {
+                clearPeace(data);
             } else if (player != null && player.isAlive() && player.level() == level
                     && player.distanceToSqr(fighter) <= LOCAL_ENCOUNTER_RADIUS * LOCAL_ENCOUNTER_RADIUS) {
-                // Staying near the confrontation keeps this exact encounter peaceful. Walking away
-                // lets the grace expire, so meeting the hostile faction later is a new encounter.
-                data.putLong(PEACE_UNTIL, now + LOCAL_PEACE_GRACE);
-                keepPlayerEncounterActive(player, factionId, now + LOCAL_PEACE_GRACE);
+                // Keep the yielded fighter disengaged during the fixed grace window. Do not move
+                // PEACE_UNTIL forward here: doing so made Friendly-Fist immunity permanent while
+                // the player remained within the encounter radius.
                 if (fighter.getTarget() == player) fighter.setTarget(null);
-            } else if (data.getLong(PEACE_UNTIL) < now) {
-                clearPeace(data);
             }
         }
 
@@ -157,9 +156,8 @@ public final class MercyManager {
         ReactiveWorldManager.rememberEvent(fighter, "SHOWN_MERCY", player.getGameProfile().getName(),
                 "was spared with Friendly Fist after yielding");
         FactionRequestManager.onMercyDowned(player, fighter);
-        player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                .append(Component.literal("You spare " + fighter.getFighterName()
-                        + ". Their trust toward you improves slightly.").withStyle(ChatFormatting.GREEN)), false);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.mercy.spared", fighter.getFighterName())
+                .withStyle(ChatFormatting.GREEN), false);
     }
 
     /** Mercy peace is pair-specific and also invalidated immediately by a broken faction encounter. */
@@ -167,7 +165,7 @@ public final class MercyManager {
         if (fighter == null || player == null || !(fighter.level() instanceof ServerLevel level)) return false;
         CompoundTag data = fighter.getPersistentData();
         if (!data.hasUUID(SPARED_BY) || !player.getUUID().equals(data.getUUID(SPARED_BY))) return false;
-        if (data.getLong(PEACE_UNTIL) < level.getGameTime()) return false;
+        if (data.getLong(PEACE_UNTIL) <= level.getGameTime()) return false;
         String factionId = data.getString(SPARED_FACTION);
         return !isPlayerMercyBroken(player, factionId, level.getGameTime());
     }
@@ -205,9 +203,8 @@ public final class MercyManager {
             spoke = true;
         }
 
-        player.displayClientMessage(Component.literal("[Living World] Mercy broken • ").withStyle(ChatFormatting.DARK_RED)
-                .append(Component.literal("you killed a member of " + faction.name()
-                        + "; spared allies will fight you again.").withStyle(ChatFormatting.RED)), false);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.mercy.broken", faction.name())
+                .withStyle(ChatFormatting.RED), false);
     }
 
     private static void revokeForBetrayal(AmbientFighterEntity fighter, ServerPlayer player, long now, boolean speak) {
@@ -221,7 +218,7 @@ public final class MercyManager {
         ReactiveWorldManager.rememberEvent(fighter, "MERCY_BROKEN", player.getGameProfile().getName(),
                 "saw the player kill an ally after offering mercy");
         if (speak && fighter.getSpeech().isEmpty()) {
-            fighter.speak("You spared us, then killed one of ours? We're not done.", 92);
+        fighter.speakKey("dialogue.mercy.betrayed", 92);
         }
         if (!fighter.isDefeated() && !fighter.isRecovering() && fighter.canAttack(player)) {
             FighterAmbientActivityManager.cancel(fighter);

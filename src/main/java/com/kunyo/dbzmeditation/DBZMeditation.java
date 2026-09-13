@@ -39,7 +39,6 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
@@ -175,9 +174,12 @@ public final class DBZMeditation {
      * entire system can be tuned in one place.
      */
     private static final double KI_VISUAL_Y_LIFT = 0.82D;
+    private static boolean initialized;
 
     /** Initializes the former standalone meditation module inside Living World. */
-    public static void init(IEventBus modEventBus) {
+    public static synchronized void init(IEventBus modEventBus) {
+        if (initialized) return;
+        initialized = true;
         ModLoadingContext.get().registerConfig(
             ModConfig.Type.SERVER, MeditationConfig.SERVER_SPEC, "dmzlivingworld-meditation-server.toml"
         );
@@ -185,10 +187,15 @@ public final class DBZMeditation {
             ModConfig.Type.CLIENT, MeditationConfig.CLIENT_SPEC, "dmzlivingworld-meditation-client.toml"
         );
         PARTICLE_TYPES.register(modEventBus);
-        modEventBus.addListener((FMLCommonSetupEvent event) -> event.enqueueWork(() -> {
-            MeditationNetwork.register();
-            MinecraftForge.EVENT_BUS.register(new DBZMeditation());
-        }));
+        // Event handlers do not depend on registry completion. Register them once
+        // during construction instead of mutating the Forge bus from a parallel
+        // CommonSetup work item (which could leave Forge's Mod Gather barrier waiting).
+        MinecraftForge.EVENT_BUS.register(new DBZMeditation());
+    }
+
+    /** Called by Living World's single serialized CommonSetup work item. */
+    public static void commonSetup() {
+        MeditationNetwork.register();
     }
 
     private DBZMeditation() {}

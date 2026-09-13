@@ -55,14 +55,15 @@ public final class DynamicEncounterManager {
         };
         if (spawned > 0 && player.level() instanceof ServerLevel level) {
             String label = switch (type) {
-                case CLASH -> "LOCAL CLASH";
-                case MUGGING -> "MUGGING IN PROGRESS";
-                case RESCUE -> "RESCUE IN PROGRESS";
-                case BRAWL -> "MULTI-FIGHTER BRAWL";
-                case FRIEZA_SKIRMISH -> "FRIEZA SKIRMISH";
+                case CLASH -> com.dmzlivingworld.client.LWLang.speechKey("message.world_event.local_clash", "LOCAL CLASH");
+                case MUGGING -> com.dmzlivingworld.client.LWLang.speechKey("message.world_event.mugging", "MUGGING IN PROGRESS");
+                case RESCUE -> com.dmzlivingworld.client.LWLang.speechKey("message.world_event.rescue", "RESCUE IN PROGRESS");
+                case BRAWL -> com.dmzlivingworld.client.LWLang.speechKey("message.world_event.brawl", "MULTI-FIGHTER BRAWL");
+                case FRIEZA_SKIRMISH -> com.dmzlivingworld.client.LWLang.speechKey("message.world_event.frieza_skirmish", "FRIEZA SKIRMISH");
                 default -> "";
             };
-            if (!label.isBlank()) WorldEventNotifier.announce(level, anchor, label, "A Living World scene is unfolding");
+            if (!label.isBlank()) WorldEventNotifier.announce(level, anchor, label,
+                    com.dmzlivingworld.client.LWLang.speechKey("message.world_event.unfolding", "A Living World scene is unfolding"));
         }
         return spawned;
     }

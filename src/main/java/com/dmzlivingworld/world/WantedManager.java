@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
 import com.dmzlivingworld.entity.LWEntities;
@@ -50,6 +51,7 @@ public final class WantedManager {
         long overworldTime = event.getServer().overworld().getGameTime();
         if (overworldTime % 200L == 0L) WantedWorldData.get(event.getServer().overworld()).purgeWorldMenaces();
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
+            if (overworldTime % 20L == 0L) tickPlayerWantedDecay(player, overworldTime);
             if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) continue;
             if (player.isCreative() || player.isSpectator()) continue;
             long time = level.getGameTime();
@@ -75,6 +77,20 @@ public final class WantedManager {
     public static String playerWantedCrime(ServerPlayer player) {
         if (player == null) return "";
         return player.getPersistentData().getCompound(PLAYER_WANTED).getString(PLAYER_CRIME);
+    }
+
+    /** Converts persisted factual crime summaries, including old saves, into client-localized payloads. */
+    public static String localizedCrime(String crime) {
+        if (crime == null || crime.isBlank() || com.dmzlivingworld.client.LWLang.isSpeechKey(crime)) return crime == null ? "" : crime;
+        java.util.regex.Matcher count = java.util.regex.Pattern.compile("killing (\\d+) (non-combatants?|non-hostile fighters?|all(?:y|ies))", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(crime);
+        if (count.matches()) {
+            String kind = count.group(2).toLowerCase(java.util.Locale.ROOT);
+            String key = kind.startsWith("non-combatant") ? "non_combatant" : kind.startsWith("non-hostile") ? "non_hostile" : "ally";
+            return com.dmzlivingworld.client.LWLang.speechKey("label.wanted_crime." + key, crime, count.group(1));
+        }
+        java.util.regex.Matcher player = java.util.regex.Pattern.compile("killing the player (\\d+) times?", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(crime);
+        if (player.matches()) return com.dmzlivingworld.client.LWLang.speechKey("label.wanted_crime.player", crime, player.group(1));
+        return crime;
     }
 
     public static boolean shouldFactionPursuePlayer(WorldFaction faction, ServerPlayer player) {
@@ -107,10 +123,10 @@ public final class WantedManager {
         root.putLong("LastCrime", player.getServer().overworld().getGameTime());
         player.getPersistentData().put(PLAYER_WANTED, root);
         if (severity > old && severity > 0) {
-            player.displayClientMessage(Component.literal("[Living World] WANTED • threat " + "★".repeat(severity)
-                    + " • " + crime + ". Guard-aligned factions may now pursue you."), false);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.wanted.gained",
+                    "★".repeat(severity), crime), false);
         } else if (severity == 0 && acts > 0) {
-            player.displayClientMessage(Component.literal("[Living World] Unlawful kill recorded • " + acts + " / " + PLAYER_WANTED_THRESHOLD + " wanted pressure."), true);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.wanted.pressure", acts, PLAYER_WANTED_THRESHOLD), true);
         }
     }
 
@@ -136,6 +152,41 @@ public final class WantedManager {
 
     public static void clearPlayerWanted(ServerPlayer player) {
         if (player != null) player.getPersistentData().remove(PLAYER_WANTED);
+    }
+
+    /** Lowers Wanted by whole stars, never merely subtracting an arbitrary kill counter. */
+    public static void reducePlayerWantedPressure(ServerPlayer player, int stars) {
+        if (player == null || stars <= 0 || playerUnlawfulKills(player) <= 0) return;
+        CompoundTag root = player.getPersistentData().getCompound(PLAYER_WANTED);
+        int target = Math.max(0, playerWantedSeverity(player) - stars);
+        int pressure = switch (target) { case 4 -> 44; case 3 -> 29; case 2 -> 19; case 1 -> 11; default -> 0; };
+        if (pressure <= 0) { clearPlayerWanted(player); return; }
+        root.putInt(PLAYER_KILLS, pressure);
+        root.putInt(PLAYER_LEVEL, severityForPressure(pressure));
+        root.putLong("LastCrime", player.getServer().overworld().getGameTime());
+        player.getPersistentData().put(PLAYER_WANTED, root);
+    }
+
+    /** Reduces the factual Wanted-pressure counter while preserving its current crime record. */
+    public static void reducePlayerWantedPressurePoints(ServerPlayer player, int points) {
+        if (player == null || points <= 0 || playerUnlawfulKills(player) <= 0) return;
+        CompoundTag root = player.getPersistentData().getCompound(PLAYER_WANTED);
+        int pressure = Math.max(0, root.getInt(PLAYER_KILLS) - points);
+        int severity = severityForPressure(pressure);
+        if (severity <= 0) { clearPlayerWanted(player); return; }
+        root.putInt(PLAYER_KILLS, pressure);
+        root.putInt(PLAYER_LEVEL, severity);
+        player.getPersistentData().put(PLAYER_WANTED, root);
+    }
+
+    private static void tickPlayerWantedDecay(ServerPlayer player, long now) {
+        int minutes = LivingWorldConfig.wantedPressureDecayMinutes();
+        if (player == null || minutes <= 0 || playerUnlawfulKills(player) <= 0) return;
+        CompoundTag root = player.getPersistentData().getCompound(PLAYER_WANTED);
+        long lastCrime = root.getLong("LastCrime");
+        if (lastCrime <= 0L) { root.putLong("LastCrime", now); player.getPersistentData().put(PLAYER_WANTED, root); return; }
+        if (now - lastCrime < Math.max(1L, minutes) * 60L * 20L) return;
+        reducePlayerWantedPressure(player, 1);
     }
 
     private static boolean isLawfulSelfDefense(ServerPlayer player, AmbientFighterEntity victim) {
@@ -200,20 +251,20 @@ public final class WantedManager {
         WantedWorldData.WantedProfile profile = data.bySlot(slot);
         if (profile == null || profile.eliminated) {
             clearTrack(player);
-            if (profile != null) player.displayClientMessage(Component.literal("WANTED TRACK • " + profile.name + " • eliminated"), true);
+            if (profile != null) player.displayClientMessage(Component.translatable("dmzlivingworld.message.wanted.track_eliminated", profile.name), true);
             return;
         }
         if (!(player.level() instanceof ServerLevel current) || LivingWorldDimensions.realm(current) != profile.realm) {
-            player.displayClientMessage(Component.literal("WANTED TRACK • " + profile.name + " • " + profile.realm.displayName()
-                    + " • threat " + "★".repeat(profile.severity)), true);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.wanted.track_realm",
+                    profile.name, profile.realm.displayName(), "★".repeat(profile.severity)), true);
             return;
         }
         int x = profile.lastX != 0 ? profile.lastX : profile.anchorX;
         int z = profile.lastZ != 0 ? profile.lastZ : profile.anchorZ;
         int distance = (int)Math.round(Math.hypot(x - player.getX(), z - player.getZ()));
         String direction = FactionManager.direction(player.getX(), player.getZ(), x, z);
-        player.displayClientMessage(Component.literal("WANTED TRACK • " + profile.name + " • " + direction + " • "
-                + distance + "b • last known • " + "★".repeat(profile.severity)), true);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.wanted.track_position",
+                profile.name, direction, distance, "★".repeat(profile.severity)), true);
     }
 
     /**
@@ -254,8 +305,8 @@ public final class WantedManager {
                 data.markEliminated(profile, wantedLevel.getServer().overworld().getGameTime());
                 if (attacker instanceof ServerPlayer player) {
                     if (trackedSlot(player) == profile.slot) clearTrack(player);
-                    player.displayClientMessage(Component.literal("[Living World] WANTED eliminated: " + profile.name
-                            + " — " + profile.crime + "."), false);
+                    player.displayClientMessage(Component.translatable("dmzlivingworld.message.wanted.eliminated",
+                            profile.name, profile.crime), false);
                     PlayerWorldManager.recordWantedElimination(player);
                     List<WorldFaction> factions = FactionManager.factionsForRealm(wantedLevel);
                     for (WorldFaction faction : factions) {

@@ -1,5 +1,6 @@
 package com.dmzlivingworld.client.screen;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.client.FighterPortraitRenderState;
 import com.dragonminez.client.systems.kisense.KiSenseScan;
 import com.dragonminez.client.systems.kisense.KiSenseState;
@@ -32,10 +33,11 @@ import java.util.Locale;
  */
 @OnlyIn(Dist.CLIENT)
 public final class FighterProfileScreen extends Screen implements LivingWorldScreenMarker {
-    private enum Tab { OVERVIEW("Overview"), STORY("Story"), COMBAT("Combat"), SCIENCE("Science"), MESSAGES("Messages");
-        private final String label;
-        Tab(String label) { this.label = label; }
-        String label() { return label; }
+    private enum Tab { OVERVIEW("overview", "Overview"), STORY("story", "Story"), COMBAT("combat", "Combat"), SCIENCE("science", "Science"), MESSAGES("messages", "Messages");
+        private final String key;
+        private final String fallback;
+        Tab(String key, String fallback) { this.key = key; this.fallback = fallback; }
+        String label() { return LWLang.string("screen.fighter.tab." + key, fallback); }
     }
 
     private record VisualLine(FormattedCharSequence text, int color, int gapBefore) {}
@@ -157,8 +159,8 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
     private boolean hasBodyUtilityRow() { return canClearMessages() || canOpenSchedule(); }
     private boolean canGoFullPower() { return !profile.rememberedSnapshot() && !isWorldMenace() && profile.relationshipKnown() && profile.relationship() >= 35; }
     private String fullPowerHint() {
-        if (canGoFullPower()) return "Ask them to reveal their real learned full-power state.";
-        return "Unavailable until this fighter trusts you enough.";
+        if (canGoFullPower()) return LWLang.string("screen.fighter.full_power_hint.available", "Ask them to reveal their real learned full-power state.");
+        return LWLang.string("screen.fighter.full_power_hint.unavailable", "Unavailable until this fighter trusts you enough.");
     }
     private String instantTransmissionStatus() {
         for (String line : profile.overviewLines()) {
@@ -214,7 +216,7 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
             else if (line.startsWith("~ ")) { line = line.substring(2); color = 0xFF8ED6FF; }
             else if (line.startsWith("* ")) { line = "• " + line.substring(2); color = 0xFFC7C7C7; }
             else if (line.startsWith(". ")) { line = line.substring(2); color = 0xFF8D8D8D; }
-            List<FormattedCharSequence> wrapped = font.split(Component.literal(line), wrap);
+            List<FormattedCharSequence> wrapped = font.split(LWLang.speechEmbedded(line), wrap);
             if (wrapped.isEmpty()) wrapped = List.of(Component.empty().getVisualOrderText());
             boolean first = true;
             for (FormattedCharSequence seq : wrapped) {
@@ -258,7 +260,7 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
         int x = panelLeft + 49;
         boolean compact = panelWidth < 360;
         FighterRelationshipManager.Disposition disposition = FighterRelationshipManager.Disposition.byId(profile.dispositionId());
-        String chip = profile.combatOnly() ? "COMBAT READOUT" : isHerobrine() ? "! ANOMALY" : isX7() ? "! X-7" : isWorldMenace() ? "! WORLD MENACE" : disposition.worldBadge() + " " + profile.dispositionLabel();
+        String chip = profile.combatOnly() ? LWLang.string("screen.fighter.chip.combat_readout", "COMBAT READOUT") : isHerobrine() ? LWLang.string("screen.fighter.chip.anomaly", "! ANOMALY") : isX7() ? "! X-7" : isWorldMenace() ? LWLang.string("screen.fighter.chip.world_menace", "! WORLD MENACE") : disposition.worldBadge() + " " + LWLang.label("disposition", profile.dispositionLabel());
         int chipWidth = compact ? 0 : Math.min(86, Math.max(54, font.width(chip) + 12));
         int chipX = compact ? panelLeft + panelWidth - 43 : panelLeft + panelWidth - 76 - chipWidth;
         int right = compact ? panelLeft + panelWidth - 45 : Math.max(x + 40, chipX - 7);
@@ -268,15 +270,15 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
 
         if (panelHeight >= 190) {
             String sub;
-            if (profile.combatOnly()) sub = "Scientist specimen • live combat attributes";
-            else if (isHerobrine()) sub = "WORLD MENACE • encounter dossier";
-            else if (isX7()) sub = "WORLD MENACE • Red Ribbon engineered subject";
-            else if (isWorldMenace()) sub = "WORLD MENACE • hostile subject";
+            if (profile.combatOnly()) sub = LWLang.string("screen.fighter.subtitle.specimen", "Scientist specimen • live combat attributes");
+            else if (isHerobrine()) sub = LWLang.string("screen.fighter.subtitle.herobrine", "WORLD MENACE • encounter dossier");
+            else if (isX7()) sub = LWLang.string("screen.fighter.subtitle.x7", "WORLD MENACE • Red Ribbon engineered subject");
+            else if (isWorldMenace()) sub = LWLang.string("screen.fighter.subtitle.menace", "WORLD MENACE • hostile subject");
             else {
-                sub = profile.rememberedSnapshot() ? "Last remembered • " : "";
-                sub += profile.faction().isBlank() ? "Independent fighter" : profile.faction();
-                if (!profile.factionRole().isBlank()) sub += " • " + profile.factionRole();
-                sub += " • " + profile.race() + " • " + profile.rank();
+                sub = profile.rememberedSnapshot() ? LWLang.string("screen.fighter.last_remembered", "Last remembered • ") : "";
+                sub += profile.faction().isBlank() ? LWLang.string("screen.fighter.independent", "Independent fighter") : profile.faction();
+                if (!profile.factionRole().isBlank()) sub += " • " + LWLang.label("faction_role", profile.factionRole());
+                sub += " • " + LWLang.label("race", profile.race()) + " • " + LWLang.label("fighter_rank", profile.rank());
             }
             LivingWorldGuiStyle.drawFitted(graphics, font, sub, x, panelTop + 26, Math.max(24, right - x), LivingWorldGuiStyle.MUTED);
         }
@@ -299,11 +301,17 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
             Tab shown = tabs.get(i);
             String label = shown.label();
             if (isHerobrine() || isX7()) label = switch (shown) {
-                case OVERVIEW -> isX7() ? "Dossier" : "Evidence";
-                case STORY -> isX7() ? "Record" : "Encounters";
-                case COMBAT -> "Threat";
-                case SCIENCE -> "Science";
-                case MESSAGES -> isX7() ? "Reports" : "Signs";
+                case OVERVIEW -> isX7()
+                        ? LWLang.string("screen.fighter.tab.dossier", "Dossier")
+                        : LWLang.string("screen.fighter.tab.evidence", "Evidence");
+                case STORY -> isX7()
+                        ? LWLang.string("screen.fighter.tab.record", "Record")
+                        : LWLang.string("screen.fighter.tab.encounters", "Encounters");
+                case COMBAT -> LWLang.string("screen.fighter.tab.threat", "Threat");
+                case SCIENCE -> LWLang.string("screen.fighter.tab.science", "Science");
+                case MESSAGES -> isX7()
+                        ? LWLang.string("screen.fighter.tab.reports", "Reports")
+                        : LWLang.string("screen.fighter.tab.signs", "Signs");
             };
             LivingWorldGuiStyle.drawButton(graphics, font, x + i * (w + gap), y, w, 18, label,
                     mouseX, mouseY, true, tab == shown, false);
@@ -317,19 +325,19 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
         if (profile.combatOnly()) {
             graphics.fill(x, y, x + w, y + 14, LivingWorldGuiStyle.CONTROL_BORDER);
             graphics.fill(x + 1, y + 1, x + w - 1, y + 13, LivingWorldGuiStyle.CARD);
-            LivingWorldGuiStyle.drawCentered(graphics, font, "LIVE ATTRIBUTE READOUT", x, y, w, 14, LivingWorldGuiStyle.BLUE);
+            LivingWorldGuiStyle.drawCentered(graphics, font, LWLang.string("screen.fighter.live_attributes", "LIVE ATTRIBUTE READOUT"), x, y, w, 14, LivingWorldGuiStyle.BLUE);
             return;
         }
         if (isWorldMenace()) {
             graphics.fill(x, y, x + w, y + 14, 0xFF6E1C1C);
             graphics.fill(x + 1, y + 1, x + w - 1, y + 13, 0xFF160B0B);
-            LivingWorldGuiStyle.drawCentered(graphics, font, "NO PERSONAL BOND • OBSERVATION ONLY", x, y, w, 14, 0xFFFF7777);
+            LivingWorldGuiStyle.drawCentered(graphics, font, LWLang.string("screen.fighter.no_bond_observation", "NO PERSONAL BOND • OBSERVATION ONLY"), x, y, w, 14, 0xFFFF7777);
             return;
         }
         if (!profile.relationshipKnown()) {
             graphics.fill(x, y, x + w, y + 14, LivingWorldGuiStyle.CONTROL_BORDER);
             graphics.fill(x + 1, y + 1, x + w - 1, y + 13, LivingWorldGuiStyle.CARD);
-            String label = "No personal bond yet";
+            String label = LWLang.string("screen.fighter.no_bond", "No personal bond yet");
             LivingWorldGuiStyle.drawFitted(graphics, font, label, x + 5, y + 3, w - 10, LivingWorldGuiStyle.MUTED);
             return;
         }
@@ -346,7 +354,7 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
             int px = Math.min(x + w - 1, center + (w / 2 - 2) * rel / 100);
             graphics.fill(center + 1, y + 2, px, y + 12, 0xFF4F9A63);
         }
-        LivingWorldGuiStyle.drawCentered(graphics, font, profile.relationshipStage(), x, y, w, 14, 0xFFFFFFFF);
+        LivingWorldGuiStyle.drawCentered(graphics, font, LWLang.label("relationship", profile.relationshipStage()), x, y, w, 14, 0xFFFFFFFF);
     }
 
     private void drawCharacterCard(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -384,25 +392,28 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
                 }
                 if ("fallen".equals(archiveKind())) {
                     graphics.fill(left + 7, top + 7, right - 7, top + 143, 0x99545A60);
-                    LivingWorldGuiStyle.drawChip(graphics, font, "PASSED AWAY", left + 8, top + 8, 82, 14, LivingWorldGuiStyle.NEUTRAL);
+                    LivingWorldGuiStyle.drawChip(graphics, font, LWLang.string("screen.fighter.passed_away", "PASSED AWAY"), left + 8, top + 8, 82, 14, LivingWorldGuiStyle.NEUTRAL);
                 } else if (profile.rememberedSnapshot()) {
-                    LivingWorldGuiStyle.drawChip(graphics, font, "LAST SEEN", left + 8, top + 8, 62, 14, LivingWorldGuiStyle.BLUE);
+                    LivingWorldGuiStyle.drawChip(graphics, font, LWLang.string("screen.fighter.last_seen", "LAST SEEN"), left + 8, top + 8, 62, 14, LivingWorldGuiStyle.BLUE);
                 }
                 drawHeightMarker(graphics, portrait, right, top, baseY);
             } catch (RuntimeException ignored) {
                 // The rest of the profile remains usable even if another renderer rejects GUI rendering.
             }
         } else if (showModel) {
-            LivingWorldGuiStyle.drawCentered(graphics, font, profile.rememberedSnapshot() ? "Portrait unavailable" : "Fighter",
+            LivingWorldGuiStyle.drawCentered(graphics, font, profile.rememberedSnapshot()
+                            ? LWLang.string("screen.fighter.portrait_unavailable")
+                            : LWLang.string("screen.fighter.fighter"),
                     left + 8, top + 50, right - left - 16, 18, LivingWorldGuiStyle.MUTED);
         }
 
         if (showModel) {
             String formattedPower = BattlePowerDisplay.format(profile.battlePower());
-            String powerLabel = profile.combatOnly() ? "Live Power Level: " + formattedPower
-                    : isWorldMenace() ? "Power Level: " + formattedPower
-                    : profile.rememberedSnapshot() ? "Last known PL: " + formattedPower
-                    : hasLivePowerRead() ? "Live Power Level: " + formattedPower : "Live PL: scouter / Ki Sense required";
+            String powerLabel = profile.combatOnly() ? LWLang.string("screen.fighter.power.live", formattedPower)
+                    : isWorldMenace() ? LWLang.string("screen.fighter.power.level", formattedPower)
+                    : profile.rememberedSnapshot() ? LWLang.string("screen.fighter.power.last_known", formattedPower)
+                    : hasLivePowerRead() ? LWLang.string("screen.fighter.power.live", formattedPower)
+                    : LWLang.string("screen.fighter.power.requires_sense");
             LivingWorldGuiStyle.drawCentered(graphics, font, powerLabel, left + 7, top + 145, right - left - 14, 12,
                     hasLivePowerRead() ? 0xFF8ED6FF : LivingWorldGuiStyle.MUTED);
         }
@@ -410,12 +421,14 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
         // Menaces/specimens have purpose-built dossier data on the right. Do not fill the left
         // card with generic NPC placeholders such as Unknown nature or an empty Equipment section.
         if (profile.combatOnly()) {
-            LivingWorldGuiStyle.drawCentered(graphics, font, "Scientist specimen", left + 7, showModel ? top + 160 : top + 22,
+            LivingWorldGuiStyle.drawCentered(graphics, font, LWLang.string("screen.fighter.scientist_specimen"), left + 7, showModel ? top + 160 : top + 22,
                     right - left - 14, 14, LivingWorldGuiStyle.BLUE);
             return;
         }
         if (isWorldMenace()) {
-            LivingWorldGuiStyle.drawCentered(graphics, font, isX7() ? "Red Ribbon engineered combatant" : "World Menace",
+            LivingWorldGuiStyle.drawCentered(graphics, font, isX7()
+                            ? LWLang.string("screen.fighter.red_ribbon_combatant")
+                            : LWLang.string("screen.fighter.world_menace"),
                     left + 7, showModel ? top + 160 : top + 22, right - left - 14, 14, 0xFFFF7777);
             return;
         }
@@ -430,7 +443,7 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
 
         int detailCursor = detailY + (!showModel && !mood.isBlank() ? 12 : 0);
         int gearY = detailCursor + 5;
-        graphics.drawString(font, "Equipment", left + 7, gearY, LivingWorldGuiStyle.GOLD, false);
+        graphics.drawString(font, LWLang.string("screen.fighter.equipment"), left + 7, gearY, LivingWorldGuiStyle.GOLD, false);
         int cell = 23;
         int startX = left + 7;
         int startY = gearY + 12;
@@ -460,11 +473,12 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
         final int color = 0xFF8ED6FF;
         String eyes = "👀";
         if (mood == null || !mood.startsWith(eyes)) {
-            if (centered) LivingWorldGuiStyle.drawCentered(graphics, font, "Mood: " + mood, x, y, width, 14, color);
-            else graphics.drawString(font, "Mood: " + mood, x, y, color, false);
+            String moodText = LWLang.string("screen.fighter.mood", mood);
+            if (centered) LivingWorldGuiStyle.drawCentered(graphics, font, moodText, x, y, width, 14, color);
+            else graphics.drawString(font, moodText, x, y, color, false);
             return;
         }
-        String prefix = "Mood: ";
+        String prefix = LWLang.string("screen.fighter.mood_prefix");
         String rest = mood.substring(eyes.length()).trim();
         float iconScale = 1.14F;
         int iconWidth = Math.max(1, font.width(eyes));
@@ -542,11 +556,11 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
         int clipRight = contentRight();
         int clipBottom = bodyBottom();
         if (canClearMessages()) {
-            LivingWorldGuiStyle.drawButton(graphics, font, clipRight - 92, bodyTop() + 1, 92, 18, "Clear recent",
+            LivingWorldGuiStyle.drawButton(graphics, font, clipRight - 92, bodyTop() + 1, 92, 18, LWLang.string("screen.fighter.clear_recent", "Clear recent"),
                     -10_000, -10_000, true, false, false);
         } else if (canOpenSchedule()) {
             LivingWorldGuiStyle.drawButton(graphics, font, clipRight - 92, bodyTop() + 1, 92, 18,
-                    scheduleView ? "‹ Overview" : "Schedule ›", -10_000, -10_000, true, false, false);
+                    scheduleView ? LWLang.string("screen.fighter.overview_back", "‹ Overview") : LWLang.string("screen.fighter.schedule", "Schedule ›"), -10_000, -10_000, true, false, false);
         }
         graphics.enableScissor(clipLeft, clipTop, clipRight, clipBottom);
         int y = clipTop - scroll;
@@ -569,7 +583,7 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
     private void drawFooterActions(GuiGraphics graphics, int mouseX, int mouseY) {
         if (profile.combatOnly()) {
             LivingWorldGuiStyle.drawButton(graphics, font, panelLeft + 12, footerY(), panelWidth - 24, 18,
-                    "Refresh Combat Stats", mouseX, mouseY, true, false, false);
+                    LWLang.string("screen.fighter.refresh_combat", "Refresh Combat Stats"), mouseX, mouseY, true, false, false);
             return;
         }
         if (isWorldMenace()) {
@@ -577,13 +591,13 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
             int w = panelWidth - 24;
             graphics.fill(x, footerY(), x + w, footerY() + 18, 0xFF241B1B);
             graphics.fill(x + 1, footerY() + 1, x + w - 1, footerY() + 17, 0xFF110E0E);
-            LivingWorldGuiStyle.drawCentered(graphics, font, "WORLD MENACE • NO SOCIAL OPTIONS", x, footerY(), w, 18, 0xFFFF7777);
+            LivingWorldGuiStyle.drawCentered(graphics, font, LWLang.string("screen.fighter.menace_no_social", "WORLD MENACE • NO SOCIAL OPTIONS"), x, footerY(), w, 18, 0xFFFF7777);
             return;
         }
         if (archivedReadOnly()) {
             int x = panelLeft + 12;
             int w = panelWidth - 24;
-            String label = "fallen".equals(archiveKind()) ? "PASSED AWAY • ARCHIVED PROFILE" : "WANTED DOSSIER • LAST KNOWN PROFILE";
+            String label = "fallen".equals(archiveKind()) ? LWLang.string("screen.fighter.archived_fallen", "PASSED AWAY • ARCHIVED PROFILE") : LWLang.string("screen.fighter.archived_wanted", "WANTED DOSSIER • LAST KNOWN PROFILE");
             LivingWorldGuiStyle.drawCentered(graphics, font, label, x, footerY(), w, 18, LivingWorldGuiStyle.MUTED);
             return;
         }
@@ -593,27 +607,29 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
             int w = Math.max(62, (total - gap * 2) / 3);
             int x = panelLeft + (panelWidth - (w * 3 + gap * 2)) / 2;
             String itStatus = instantTransmissionStatus();
-            String itLabel = "READY".equals(itStatus) ? "Instant Transmission"
-                    : itStatus.startsWith("Cooldown active") ? "IT • " + itStatus.substring("Cooldown active • ".length())
-                    : "Instant Transmission";
+            String itLabel = "READY".equals(itStatus)
+                    ? LWLang.string("screen.fighter.instant_transmission")
+                    : itStatus.startsWith("Cooldown active • ")
+                    ? LWLang.string("screen.fighter.instant_transmission_short", itStatus.substring("Cooldown active • ".length()))
+                    : LWLang.string("screen.fighter.instant_transmission");
             LivingWorldGuiStyle.drawButton(graphics, font, x, footerY(), w, 18, itLabel,
                     mouseX, mouseY, instantTransmissionReady(), false, false);
-            LivingWorldGuiStyle.drawDangerButton(graphics, font, x + w + gap, footerY(), w, 18, "Forget",
+            LivingWorldGuiStyle.drawDangerButton(graphics, font, x + w + gap, footerY(), w, 18, LWLang.string("screen.fighter.forget", "Forget"),
                     mouseX, mouseY, true);
-            LivingWorldGuiStyle.drawButton(graphics, font, x + (w + gap) * 2, footerY(), w, 18, "Back to People",
+            LivingWorldGuiStyle.drawButton(graphics, font, x + (w + gap) * 2, footerY(), w, 18, LWLang.string("screen.fighter.back_people", "Back to People"),
                     mouseX, mouseY, true, false, false);
             return;
         }
         if (profile.requestLocked() && !profile.supplyReceiver()) {
             int x = panelLeft + 12;
             int w = panelWidth - 24;
-            LivingWorldGuiStyle.drawCentered(graphics, font, "ON FACTION DUTY • SOCIAL ACTIONS UNAVAILABLE",
+            LivingWorldGuiStyle.drawCentered(graphics, font, LWLang.string("screen.fighter.faction_duty", "ON FACTION DUTY • SOCIAL ACTIONS UNAVAILABLE"),
                     x, footerY(), w, 18, LivingWorldGuiStyle.MUTED);
             return;
         }
         String[] actions = profile.supplyReceiver()
-                ? new String[]{"Deliver Supplies"}
-                : new String[]{"Talk", "Spar", "Go Along", profile.travellingCompanion() ? "Let go" : "Come Along", "Fusion", "Meditate", "Go Full Power"};
+                ? new String[]{LWLang.string("screen.fighter.action.deliver", "Deliver Supplies")}
+                : new String[]{LWLang.string("screen.fighter.action.talk", "Talk"), LWLang.string("screen.fighter.action.spar", "Spar"), LWLang.string("screen.fighter.action.go_along", "Go Along"), profile.travellingCompanion() ? LWLang.string("screen.fighter.action.let_go", "Let go") : LWLang.string("screen.fighter.action.come_along", "Come Along"), LWLang.string("screen.fighter.action.fusion", "Fusion"), LWLang.string("screen.fighter.action.meditate", "Meditate"), LWLang.string("screen.fighter.action.full_power", "Go Full Power")};
         int gap = 5;
         int cols = twoRowLiveFooter() ? (actions.length > 6 ? 4 : 3) : actions.length;
         int rows = (actions.length + cols - 1) / cols;
@@ -625,9 +641,9 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
             int row = i / cols, col = i % cols;
             int x = startX + col * (actionWidth + gap);
             int y = top + row * 20;
-            boolean fullPower = "Go Full Power".equals(actions[i]);
+            boolean fullPower = !profile.supplyReceiver() && i == actions.length - 1;
             boolean enabled = !fullPower || canGoFullPower();
-            boolean primary = "Deliver Supplies".equals(actions[i]);
+            boolean primary = profile.supplyReceiver();
             LivingWorldGuiStyle.drawButton(graphics, font, x, y, actionWidth, 18, actions[i],
                     mouseX, mouseY, enabled, false, primary);
             if (primary && LivingWorldGuiStyle.isInside(mouseX, mouseY, x, y, actionWidth, 18) && !profile.supplyRequestLine().isBlank()) {
@@ -714,7 +730,7 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
                     minecraft.setScreen(new ConfirmScreen(ok -> {
                         if (ok) LWNetwork.peopleMemoryAction("one", profile.fighterId());
                         else minecraft.setScreen(this);
-                    }, Component.literal("Forget this person?"), Component.literal("Their remembered profile will be removed from your People list.")));
+                    }, LWLang.text("screen.fighter.confirm_forget", "Forget this person?"), LWLang.text("screen.fighter.confirm_forget_body", "Their remembered profile will be removed from your People list.")));
                     return true;
                 }
                 if (LivingWorldGuiStyle.isInside(mouseX, mouseY, bx + (bw + gapFooter) * 2, footerY(), bw, 18)) {

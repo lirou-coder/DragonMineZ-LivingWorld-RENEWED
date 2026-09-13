@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterDialogue;
 import net.minecraft.resources.ResourceLocation;
@@ -123,7 +124,7 @@ public final class FighterGiftPickupManager {
         fighter.heal(Math.max(1.0F, fighter.getMaxHealth() * 0.035F));
         fighter.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
         if (fighter.getSpeech().isEmpty() && fighter.getRandom().nextFloat() < 0.72F) {
-            fighter.speak(fighter.getRandom().nextBoolean() ? "Oh, thanks. I could actually eat." : "For me? Thanks.", 72);
+            fighter.speakKey(fighter.getRandom().nextBoolean() ? "dialogue.gift.food_hungry" : "dialogue.gift.food_thanks", 72);
         }
         String bondKey = "LWFoodGiftBond_" + giver.getUUID();
         if (now - fighter.getLegacyData().getLong(bondKey) >= 20L * 60L * 12L) {
@@ -151,11 +152,11 @@ public final class FighterGiftPickupManager {
 
     private static String droppedGiftThanks(AmbientFighterEntity fighter) {
         return switch (fighter.getPersonality()) {
-            case HEROIC -> "Hey, thanks. I'll make good use of it.";
-            case CALM -> "Thanks. That's useful.";
-            case CAUTIOUS -> "For me? Thanks. I'll keep it close.";
-            case PROUD -> "...Useful. Thanks.";
-            case AGGRESSIVE -> "Nice. Thanks!";
+            case HEROIC -> LWLang.speechKey("dialogue.gift.equipment.heroic", "Hey, thanks. I'll make good use of it.");
+            case CALM -> LWLang.speechKey("dialogue.gift.equipment.calm", "Thanks. That's useful.");
+            case CAUTIOUS -> LWLang.speechKey("dialogue.gift.equipment.cautious", "For me? Thanks. I'll keep it close.");
+            case PROUD -> LWLang.speechKey("dialogue.gift.equipment.proud", "...Useful. Thanks.");
+            case AGGRESSIVE -> LWLang.speechKey("dialogue.gift.equipment.aggressive", "Nice. Thanks!");
         };
     }
 

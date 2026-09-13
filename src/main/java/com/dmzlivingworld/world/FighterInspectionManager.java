@@ -1,5 +1,8 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
+import com.dmzlivingworld.config.LivingWorldConfig;
+
 import com.dragonminez.common.util.CuriosUtil;
 import com.dragonminez.common.init.entities.sagas.SagaSaibamanEntity;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
@@ -23,6 +26,17 @@ import java.util.UUID;
 /** Builds the server-authoritative Shift+Right-click character panel snapshot. */
 public final class FighterInspectionManager {
     private FighterInspectionManager() {}
+
+    private static String profileText(String key, String fallback, Object... args) {
+        return LWLang.speechKey("profile.content." + key, fallback, args);
+    }
+
+    private static String labelText(String category, String fallback) {
+        if ("faction_name".equals(category)) return fallback == null ? "" : fallback;
+        String slug = fallback == null ? "unknown" : fallback.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        return LWLang.speechKey("label." + category + "." + slug, fallback == null ? "" : fallback);
+    }
 
     public static boolean isScouter(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
@@ -171,7 +185,7 @@ public final class FighterInspectionManager {
         String activeForm = fighter.isRacialFormActive() ? fighter.getRacialFormName()
                 : fighter.isKaiokenActive() ? "Kaioken x" + fighter.getKaiokenLevel()
                 : fighter.isAwakened() ? "Awakened" : "Base";
-        String goal = rememberedSnapshot ? FighterGoalManager.summaryStored(fighter) : FighterGoalManager.summary(fighter);
+        String goal = FighterGoalManager.localizedSummary(fighter, rememberedSnapshot);
         String goalProgress = rememberedSnapshot ? FighterGoalManager.progressStored(fighter) : FighterGoalManager.progress(fighter);
         String fightingStyle = FighterCombatDirector.signatureLabel(fighter);
         String techniques = FighterTechniqueManager.summary(fighter);
@@ -256,13 +270,13 @@ public final class FighterInspectionManager {
 
     private static List<String> buildMessages(AmbientFighterEntity fighter) {
         List<String> lines = new ArrayList<>();
-        lines.add("## Recent messages");
+        lines.add("## " + profileText("messages.heading", "Recent messages"));
         List<String> history = fighter.getDialogueHistory();
         if (history.isEmpty()) {
-            lines.add(". No remembered messages yet.");
+            lines.add(". " + profileText("messages.none", "No remembered messages yet."));
             return lines;
         }
-        lines.add("~ Newest first");
+        lines.add("~ " + profileText("messages.newest_first", "Newest first"));
         for (int i = history.size() - 1; i >= 0; i--) lines.add("* " + history.get(i));
         return lines;
     }
@@ -279,45 +293,50 @@ public final class FighterInspectionManager {
         List<String> lines = new ArrayList<>();
         if (RedRibbonExperimentManager.isExperiment(fighter)) return new ArrayList<>(RedRibbonExperimentManager.overviewLines(player, fighter));
         if (WorldMenaceManager.isHerobrine(fighter)) {
-            lines.add("!! HEROBRINE • WORLD MENACE");
-            lines.add("~ Hostile anomaly. Approach with caution.");
+            lines.add("!! " + profileText("overview.herobrine", "HEROBRINE • WORLD MENACE"));
+            lines.add("~ " + profileText("overview.hostile_anomaly", "Hostile anomaly. Approach with caution."));
             lines.addAll(WorldMenaceManager.dossierRoutineLines(player, fighter, rememberedSnapshot));
             return lines;
         }
 
         if (rememberedSnapshot && rememberedRecord != null) {
             long ageTicks = Math.max(0L, player.serverLevel().getGameTime() - rememberedRecord.getLong("LastSeen"));
-            String age = ageTicks < 24000L ? "today" : Math.max(1L, ageTicks / 24000L) + "d ago";
-            lines.add("~ LAST SEEN • " + age + " • " + FighterMemoryManager.rememberedWhereabouts(rememberedRecord));
+            String age = ageTicks < 24000L ? profileText("time.today", "today")
+                    : profileText("time.days_ago", "%sd ago", Math.max(1L, ageTicks / 24000L));
+            lines.add("~ " + profileText("overview.last_seen", "LAST SEEN • %s • %s", age,
+                    FighterMemoryManager.rememberedWhereabouts(rememberedRecord)));
             if (rememberedRecord.hasUUID("RecordId") && rememberedRecord.getString("PanelArchiveKind").isBlank()) {
                 // Functional metadata consumed by FighterProfileScreen's IT footer button.
                 // The client deliberately filters this line from the decluttered profile body.
                 lines.add("~ Instant Transmission: " + FighterInstantTransmissionManager.menuStatus(player));
             }
         } else {
-            lines.add("## Right Now");
+            lines.add("## " + profileText("overview.right_now", "Right Now"));
             lines.add("+ " + currentTask(fighter));
             if (FactionRequestManager.isAssignedSupplyReceiver(player, fighter)) {
-                lines.add("## Active Request");
+                lines.add("## " + profileText("overview.active_request", "Active Request"));
                 lines.add("+ " + FactionRequestManager.supplyProfileLine(player, fighter));
             }
         }
 
-        lines.add("## Person");
-        lines.add("* " + fighter.getPersonality().displayName() + " • " + fighter.getArchetype().displayName());
-        lines.add("* Mood: " + ReactiveWorldManager.profileSummary(fighter));
-        if (FighterScientistManager.isScientist(fighter)) lines.add("* Scientist • " + FighterScientistManager.currentMinions(fighter) + "/" + FighterScientistManager.maxMinions(fighter) + " active specimens");
+        lines.add("## " + profileText("overview.person", "Person"));
+        lines.add("* " + profileText("overview.personality_archetype_v2", "%s | %s",
+                labelText("personality", fighter.getPersonality().displayName()), labelText("archetype", fighter.getArchetype().displayName())));
+        lines.add("* " + profileText("overview.mood", "Mood: %s", localizedMood(fighter)));
+        if (FighterScientistManager.isScientist(fighter)) lines.add("* " + profileText("overview.scientist_v2", "Scientist | %s/%s active specimens", FighterScientistManager.currentMinions(fighter), FighterScientistManager.maxMinions(fighter)));
 
-        lines.add("## You & Them");
+        lines.add("## " + profileText("overview.you_and_them", "You & Them"));
         if (relationshipKnown) {
-            lines.add("* " + disposition.label() + " • " + relationshipStage + " • " + signed(relationship));
+            lines.add("* " + profileText("overview.relationship_v2", "%s | %s | %s", labelText("disposition", disposition.label()),
+                    labelText("relationship", relationshipStage), signed(relationship)));
             String lastBondEvent = FighterMemoryManager.lastBondEvent(player, fighter);
-            if (!lastBondEvent.isBlank()) lines.add(". " + lastBondEvent);
-        } else lines.add("* " + disposition.label());
+            if (!lastBondEvent.isBlank()) lines.add(". " + labelText("bond_event", lastBondEvent));
+        } else lines.add("* " + labelText("disposition", disposition.label()));
         if (fighter.isFactionMember()) {
             String factionName = fighter.getFactionDisplayName().isBlank() ? fighter.getFactionId() : fighter.getFactionDisplayName();
-            lines.add("* " + factionName + (fighter.getFactionTitle().isBlank() ? "" : " • " + fighter.getFactionTitle()));
-            if (!rememberedSnapshot && !factionRepLabel.isBlank()) lines.add(". Your standing: " + factionRepLabel + " • " + signed(factionRep));
+            lines.add("* " + profileText("overview.faction", "%s%s", labelText("faction_name", factionName),
+                    fighter.getFactionTitle().isBlank() ? "" : " | " + labelText("faction_role", fighter.getFactionTitle())));
+            if (!rememberedSnapshot && !factionRepLabel.isBlank()) lines.add(". " + profileText("overview.standing_v2", "Your standing: %s | %s", labelText("faction_standing", factionRepLabel), signed(factionRep)));
         }
 
         // Keep the decluttered Overview compact. The client exposes this factual activity history
@@ -328,19 +347,20 @@ public final class FighterInspectionManager {
         }
 
         if (!goal.isBlank()) {
-            lines.add("## Direction");
-            lines.add("+ " + goal + (goalProgress.isBlank() ? "" : " • " + goalProgress));
+            lines.add("## " + profileText("overview.direction", "Direction"));
+            lines.add("+ " + profileText("overview.goal", "%s%s", goal,
+                    goalProgress.isBlank() ? "" : " | " + labelText("goal_progress", goalProgress)));
         }
 
         List<String> connections = FighterNpcSocialManager.profileConnections(fighter);
         if (!connections.isEmpty() || !fighter.getRivalName().isBlank()) {
-            lines.add("## Connections");
+            lines.add("## " + profileText("overview.connections", "Connections"));
             int shown = 0;
             for (String connection : connections) {
                 if (shown++ >= 2) break;
                 lines.add("* " + connection);
             }
-            if (shown < 2 && !fighter.getRivalName().isBlank()) lines.add("* Rival: " + fighter.getRivalName());
+            if (shown < 2 && !fighter.getRivalName().isBlank()) lines.add("* " + profileText("overview.rival", "Rival: %s", fighter.getRivalName()));
         }
         return lines;
     }
@@ -349,27 +369,28 @@ public final class FighterInspectionManager {
         if (WorldMenaceManager.isHerobrine(fighter)) return WorldMenaceManager.dossierStoryLines(player, fighter);
         if (RedRibbonExperimentManager.isExperiment(fighter)) return RedRibbonExperimentManager.storyLines(player, fighter);
         List<String> lines = new ArrayList<>();
-        if (rememberedSnapshot) lines.add("~ This page is historical: it will not update until you meet this person again.");
-        lines.add("## Life & Legacy");
+        if (rememberedSnapshot) lines.add("~ " + profileText("story.historical", "This page is historical: it will not update until you meet this person again."));
+        lines.add("## " + profileText("story.life_legacy", "Life & Legacy"));
         lines.addAll(FighterMemoryManager.biographyLines(player, fighter));
 
-        lines.add("## Battle Record");
+        lines.add("## " + profileText("story.battle_record", "Battle Record"));
         int wins = fighter.getLegacyData().getInt("Wins");
         int losses = fighter.getLegacyData().getInt("Losses");
-        int kills = fighter.getLegacyData().getInt("Kills");
-        int deaths = fighter.getLegacyData().getInt("Deaths");
-        lines.add("* Record: " + wins + " wins / " + losses + " losses • lethal " + kills + "/" + deaths);
+        int deaths = fighter.getLegacyData().getInt("LWCombatLivesUsed");
+        lines.add("* " + profileText("story.record", "Record: %s wins / %s losses • lethal defeats %s/%s",
+                wins, losses, Math.min(deaths, LivingWorldConfig.npcCombatLives()), LivingWorldConfig.npcCombatLives()));
         if (fighter.getLegacyData().getInt("StrongestWinPower") > 0) {
-            lines.add("* Strongest victory: " + fighter.getLegacyData().getString("StrongestWinName")
-                    + " • PL " + fighter.getLegacyData().getInt("StrongestWinPower"));
+            lines.add("* " + profileText("story.strongest_victory", "Strongest victory: %s • PL %s",
+                    fighter.getLegacyData().getString("StrongestWinName"), fighter.getLegacyData().getInt("StrongestWinPower")));
         }
         if (fighter.getLegacyData().getInt("Fusions") > 0) {
-            lines.add("* Fusions: " + fighter.getLegacyData().getInt("Fusions")
-                    + " • last partner " + fighter.getLegacyData().getString("LastFusionPartner"));
+            lines.add("* " + profileText("story.fusions", "Fusions: %s • last partner %s",
+                    fighter.getLegacyData().getInt("Fusions"), fighter.getLegacyData().getString("LastFusionPartner")));
         }
         String lastOpponent = fighter.getLegacyData().getString("LastOpponent");
         if (!lastOpponent.isBlank()) {
-            lines.add("* Last battle: " + fighter.getLegacyData().getString("LastResult") + " vs " + lastOpponent);
+            lines.add("* " + profileText("story.last_battle", "Last battle: %s vs %s",
+                    labelText("battle_result", fighter.getLegacyData().getString("LastResult")), lastOpponent));
         }
         return lines;
     }
@@ -378,34 +399,37 @@ public final class FighterInspectionManager {
                                              String activeForm, String techniques, WorldFaction faction, boolean rememberedSnapshot) {
         List<String> lines = new ArrayList<>();
         boolean menace = WorldMenaceManager.isWorldMenace(fighter);
-        lines.add("## Combat");
+        lines.add("## " + profileText("combat.heading", "Combat"));
         long currentPower = FighterVisualPower.ofLong(fighter);
         long permanentPower = FighterVisualPower.scaleLong(fighter.getPermanentBattlePowerLong());
-        lines.add("* Current Power Level: " + BattlePowerDisplay.format(currentPower));
+        lines.add("* " + profileText("combat.current_power", "Current Power Level: %s", BattlePowerDisplay.format(currentPower)));
         if (currentPower != permanentPower)
-            lines.add("* Base permanent Power Level: " + BattlePowerDisplay.format(permanentPower) + " • temporary form/power state is included above");
-        lines.add(String.format(java.util.Locale.ROOT, "* Health %.1f • Melee %.1f • Ki %.1f • Speed %.3f",
-                fighter.getMaxHealth(), fighter.getAttributeValue(Attributes.ATTACK_DAMAGE), fighter.getKiBlastDamage(),
-                fighter.getAttributeValue(Attributes.MOVEMENT_SPEED)));
-        lines.add(String.format(java.util.Locale.ROOT, "* Defense: %.1f", fighter.getDefenseStat()));
-        lines.add("* Style: " + FighterCombatDirector.signatureLabel(fighter));
+            lines.add("* " + profileText("combat.base_power", "Base permanent Power Level: %s • temporary form/power state is included above", BattlePowerDisplay.format(permanentPower)));
+        lines.add("* " + profileText("combat.stats_v2", "Health %s | Melee %s | Ki %s | Speed %s",
+                String.format(java.util.Locale.ROOT, "%.1f", fighter.getMaxHealth()),
+                String.format(java.util.Locale.ROOT, "%.1f", fighter.getAttributeValue(Attributes.ATTACK_DAMAGE)),
+                String.format(java.util.Locale.ROOT, "%.1f", fighter.getKiBlastDamage()),
+                String.format(java.util.Locale.ROOT, "%.3f", fighter.getAttributeValue(Attributes.MOVEMENT_SPEED))));
+        lines.add("* " + profileText("combat.defense_v2", "Defense: %s", String.format(java.util.Locale.ROOT, "%.1f", fighter.getDefenseStat())));
+        lines.add("* " + profileText("combat.style", "Style: %s", FighterCombatDirector.signatureLabel(fighter)));
         if (RedRibbonExperimentManager.isExperiment(fighter)) {
-            lines.add("!! Engineered Red Ribbon combatant");
-            lines.add("* Observed calling Red Ribbon support when badly hurt.");
-            lines.add("* Repeated sightings confirm X-7 remains an active threat after defeat.");
+            lines.add("!! " + profileText("combat.engineered", "Engineered Red Ribbon combatant"));
+            lines.add("* " + profileText("combat.calls_support", "Observed calling Red Ribbon support when badly hurt."));
+            lines.add("* " + profileText("combat.x7_persistent", "Repeated sightings confirm X-7 remains an active threat after defeat."));
         } else if (WorldMenaceManager.isHerobrine(fighter)) {
-            lines.add("!! Persistent anomaly");
-            lines.add("* Returns after defeat with a stronger Power Level; its combat stats are recalculated from that power.");
-            lines.add("* Prefers to observe and engage from farther away than ordinary fighters.");
+            lines.add("!! " + profileText("combat.persistent_anomaly", "Persistent anomaly"));
+            lines.add("* " + profileText("combat.stronger_return", "Returns after defeat with a stronger Power Level; its combat stats are recalculated from that power."));
+            lines.add("* " + profileText("combat.observer", "Prefers to observe and engage from farther away than ordinary fighters."));
         } else {
-            lines.add("* Form: " + activeForm + " • " + fighter.getRank().displayName() + " " + fighter.getRace().displayName());
-            if (!scouter && !rememberedSnapshot) lines.add(". Exact combat readings normally require a DMZ scouter.");
+            lines.add("* " + profileText("combat.form", "Form: %s • %s %s", activeForm, fighter.getRank().displayName(), fighter.getRace().displayName()));
+            if (!scouter && !rememberedSnapshot) lines.add(". " + profileText("combat.scouter_required", "Exact combat readings normally require a DMZ scouter."));
         }
         if (!menace) {
-            lines.add("## Techniques");
-            lines.add("* " + techniques);
-            lines.add("## Equipment");
-            for (String line : FighterArsenalManager.detailedEquipment(fighter)) lines.add("* " + line);
+            lines.add("## " + profileText("combat.techniques", "Techniques"));
+            lines.add("* " + (techniques.equalsIgnoreCase("none") ? labelText("common", "None") : techniques));
+            lines.add("## " + profileText("combat.equipment", "Equipment"));
+            for (String line : FighterArsenalManager.detailedEquipment(fighter))
+                lines.add("* " + (line.equalsIgnoreCase("none") ? labelText("common", "None") : line));
         }
         return lines;
     }
@@ -421,41 +445,43 @@ public final class FighterInspectionManager {
     }
 
     private static String currentTask(AmbientFighterEntity fighter) {
-        if (fighter == null) return "Idle";
+        if (fighter == null) return LWLang.speechKey("profile.task.idle", "Idle");
         if (WorldMenaceManager.isHerobrine(fighter)) {
             String menace = WorldMenaceManager.moodSummary(fighter);
-            if (menace.startsWith("Watching")) return "Watching from a distance";
-            if (menace.startsWith("Hostile Silence")) return fighter.getTarget() != null ? "Hunting " + fighter.getTarget().getName().getString() : "Hunting";
-            if (menace.startsWith("Restless")) return "Roaming somewhere unknown";
-            return "Whereabouts deliberate";
+            if (menace.startsWith("Watching")) return LWLang.speechKey("profile.task.watching", "Watching from a distance");
+            if (menace.startsWith("Hostile Silence")) return fighter.getTarget() != null
+                    ? LWLang.speechKey("profile.task.hunting_target", "Hunting %s", fighter.getTarget().getName().getString())
+                    : LWLang.speechKey("profile.task.hunting", "Hunting");
+            if (menace.startsWith("Restless")) return LWLang.speechKey("profile.task.roaming_unknown", "Roaming somewhere unknown");
+            return LWLang.speechKey("profile.task.deliberate", "Whereabouts deliberate");
         }
-        if (SparManager.isFighterInSpar(fighter)) return "Sparring";
-        if (fighter.isMeditating()) return "Meditating • " + formatActivityTime(fighter.getMeditationElapsedTicks()) + " this session";
-        if (fighter.isSocialPowerDisplay()) return "Comparing power";
+        if (SparManager.isFighterInSpar(fighter)) return LWLang.speechKey("profile.task.sparring", "Sparring");
+        if (fighter.isMeditating()) return LWLang.speechKey("profile.task.meditating", "Meditating • %s this session", formatActivityTime(fighter.getMeditationElapsedTicks()));
+        if (fighter.isSocialPowerDisplay()) return LWLang.speechKey("profile.task.comparing_power", "Comparing power");
         String ambient = FighterAmbientActivityManager.currentActivity(fighter);
-        if (!ambient.isBlank()) return ambient;
+        if (!ambient.isBlank()) return labelText("activity", ambient);
         if (fighter.getTarget() != null && fighter.getTarget().isAlive())
-            return "Fighting " + fighter.getTarget().getName().getString();
+            return LWLang.speechKey("profile.task.fighting", "Fighting %s", fighter.getTarget().getName().getString());
         if (FactionRequestMissionManager.isAssigned(fighter)) {
             String role = FactionRequestMissionManager.missionRole(fighter);
             if (FactionRequestMissionManager.ROLE_PATROL.equals(role))
-                return fighter.isFlying() ? "Patrolling by air" : "On patrol";
-            if (FactionRequestMissionManager.ROLE_PROTECTED.equals(role)) return "Under protection";
-            if (FactionRequestMissionManager.ROLE_CAPTIVE.equals(role)) return "Being escorted";
+                return fighter.isFlying() ? LWLang.speechKey("profile.task.air_patrol", "Patrolling by air") : LWLang.speechKey("profile.task.patrol", "On patrol");
+            if (FactionRequestMissionManager.ROLE_PROTECTED.equals(role)) return LWLang.speechKey("profile.task.protected", "Under protection");
+            if (FactionRequestMissionManager.ROLE_CAPTIVE.equals(role)) return LWLang.speechKey("profile.task.escorted", "Being escorted");
         }
         String plan = FighterLifeJoinManager.activeLabel(fighter);
         if (!plan.isBlank()) return plan; // locomotion (including flight) must not replace the actual task label
-        if (PhysicalContinuityManager.isTransitioning(fighter)) return "Travelling";
-        if (FighterEnvironmentManager.isEscapingWater(fighter)) return "Swimming to shore";
-        if (fighter.isIdleFlightTravelling()) return "Flying somewhere";
-        if (fighter.isSocialPlayerApproach()) return "Coming over to talk";
+        if (PhysicalContinuityManager.isTransitioning(fighter)) return LWLang.speechKey("profile.task.travelling", "Travelling");
+        if (FighterEnvironmentManager.isEscapingWater(fighter)) return LWLang.speechKey("profile.task.swimming_to_shore", "Swimming to shore");
+        if (fighter.isIdleFlightTravelling()) return LWLang.speechKey("profile.task.flying_somewhere", "Flying somewhere");
+        if (fighter.isSocialPlayerApproach()) return LWLang.speechKey("profile.task.coming_to_talk", "Coming over to talk");
         String npcSocial = FighterNpcSocialManager.currentActivityLabel(fighter);
         if (!npcSocial.isBlank()) return npcSocial;
-        if (fighter.isSocialLifeActivity()) return "Spending time with someone";
+        if (fighter.isSocialLifeActivity()) return LWLang.speechKey("profile.task.socializing", "Spending time with someone");
         String intent = FighterIntentManager.summary(fighter);
-        if (!intent.isBlank()) return "Intent: " + intent;
-        if (!fighter.getNavigation().isDone()) return "Wandering";
-        return "Taking it easy";
+        if (!intent.isBlank()) return FighterIntentManager.localizedSummary(fighter);
+        if (!fighter.getNavigation().isDone()) return LWLang.speechKey("profile.task.wandering", "Wandering");
+        return LWLang.speechKey("profile.task.relaxing", "Taking it easy");
     }
 
     private static FighterRelationshipManager.Disposition rememberedDisposition(AmbientFighterEntity fighter, CompoundTag record) {
@@ -476,6 +502,25 @@ public final class FighterInspectionManager {
     private static void addEquipment(List<FighterProfilePacket.EquipmentEntry> out, String slot, ItemStack stack) {
         ItemStack shown = stack == null || FighterArsenalManager.isTemporaryActivityProp(stack) ? ItemStack.EMPTY : stack.copy();
         out.add(new FighterProfilePacket.EquipmentEntry(slot, shown));
+    }
+
+    private static String localizedMood(AmbientFighterEntity fighter) {
+        ReactiveWorldManager.Mood mood = ReactiveWorldManager.mood(fighter);
+        return profileText("mood.summary", "%s - %s", labelText("mood", mood.label()),
+                localizedMoodCause(ReactiveWorldManager.moodCause(fighter)));
+    }
+
+    private static String localizedMoodCause(String cause) {
+        if (cause == null || cause.isBlank()) return labelText("mood_cause", "recent events");
+        String[][] dynamic = {
+                {" being supportive", "being_supportive"}, {" getting under their skin", "getting_under_their_skin"},
+                {" falling in battle", "falling_in_battle"}, {" being defeated", "being_defeated"},
+                {"'s sudden power spike", "sudden_power_spike"}, {"'s power spike", "power_spike"}
+        };
+        for (String[] entry : dynamic) if (cause.endsWith(entry[0]))
+            return LWLang.speechKey("label.mood_cause.dynamic." + entry[1], "%s" + entry[0],
+                    cause.substring(0, cause.length() - entry[0].length()));
+        return labelText("mood_cause", cause);
     }
 
     private static String signed(int value) { return value > 0 ? "+" + value : Integer.toString(value); }

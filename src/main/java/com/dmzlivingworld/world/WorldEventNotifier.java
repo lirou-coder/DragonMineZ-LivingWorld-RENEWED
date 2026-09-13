@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldConfig;
 
 import net.minecraft.ChatFormatting;
@@ -23,16 +24,16 @@ public final class WorldEventNotifier {
             double distance = Math.sqrt(dx * dx + dz * dz);
             if (distance > LivingWorldConfig.worldEventAlertRadius()) continue;
             WorldEventNavigationManager.rememberLatest(player, pos, event);
-            String coords = "X " + pos.getX() + "  Y " + pos.getY() + "  Z " + pos.getZ();
-            player.displayClientMessage(Component.literal("LIVING WORLD • " + event).withStyle(ChatFormatting.GOLD), true);
-            Component track = Component.literal("  [Track]").withStyle(style -> style.withColor(ChatFormatting.AQUA)
+            Component coords = Component.translatable("dmzlivingworld.message.world_event.coordinates", pos.getX(), pos.getY(), pos.getZ());
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.world_event.actionbar", LWLang.speechEmbedded(event)).withStyle(ChatFormatting.GOLD), true);
+            Component track = Component.translatable("dmzlivingworld.message.world_event.track").withStyle(style -> style.withColor(ChatFormatting.AQUA)
                     .withUnderlined(true)
                     .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/lwtrack " + pos.getX() + " " + pos.getY() + " " + pos.getZ()))
-                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Show distance and direction"))));
-            player.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD)
-                    .append(Component.literal(event + " • ").withStyle(ChatFormatting.YELLOW))
-                    .append(Component.literal((detail == null || detail.isBlank() ? "" : detail + " • ")
-                            + coords + " • ~" + Math.max(0, Math.round(distance)) + " blocks away")
+                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.translatable("dmzlivingworld.message.world_event.track_hint"))));
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.prefix").withStyle(ChatFormatting.GOLD)
+                    .append(LWLang.speechEmbedded(event).copy().append(" • ").withStyle(ChatFormatting.YELLOW))
+                    .append((detail == null || detail.isBlank() ? Component.empty() : LWLang.speechEmbedded(detail).copy().append(" • "))
+                            .append(coords).append(Component.translatable("dmzlivingworld.message.world_event.distance", Math.max(0, Math.round(distance))))
                             .withStyle(ChatFormatting.GRAY)).append(track), false);
         }
     }

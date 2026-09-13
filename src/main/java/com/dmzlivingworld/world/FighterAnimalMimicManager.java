@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -71,26 +72,27 @@ public final class FighterAnimalMimicManager {
 
     private static String line(AmbientFighterEntity fighter, AnimalKind kind) {
         return switch (kind) {
-            case COW -> pick(fighter, "Moooo!! ...Okay, that one was pretty good.", "Moo. Hey, don't look at me like that.", "That cow makes it sound easy. Moooo!");
-            case PIG -> pick(fighter, "Oink oink! ...No? Tough crowd.", "Oink! I think the pig approves.", "I can do that too. Oink!");
-            case SHEEP -> pick(fighter, "Baa-aa! Hah, that one is fun.", "Baaa. Pretty convincing, right?", "That sheep has range. Baa!");
-            case CHICKEN -> pick(fighter, "Bawk bawk! ...I regret nothing.", "Bawk! Don't tell anyone I did that.", "That chicken sounded confident. Bawk bawk!");
-            case WOLF -> pick(fighter, "Awoooo! ...Okay, maybe not as intimidating.", "Awoo! I'm not starting a pack.", "That howl needed an answer. Awooo!");
-            case CAT -> pick(fighter, "Mrow. That cat definitely judged me.", "Meow! ...It looked better when the cat did it.", "Mrrp. Yeah, I know. Terrible impression.");
-            case HORSE -> pick(fighter, "Neeeigh! ...That was awful.", "Neigh! The horse is pretending it didn't hear me.");
-            case DONKEY -> pick(fighter, "Hee-haw! Hah!", "Hee-haw! Okay, that one actually hurt my throat.");
-            case MULE -> pick(fighter, "Hee-haw! Close enough?", "That mule has a very specific voice. Hee-haw!");
-            case GOAT -> pick(fighter, "Maa-aa! Don't headbutt me for that.", "Maa! ...We're friends now, right?");
-            case RABBIT -> pick(fighter, "...Do rabbits even make that much noise?", "Tiny thing, big attitude.");
-            case FOX -> pick(fighter, "Yip! Yeah, I heard you.", "Yip yip! That fox is absolutely laughing at me.");
-            case PANDA -> pick(fighter, "Hrrm! Living the easy life, huh?", "That panda has the right idea: eat, sit, repeat.");
-            case LLAMA -> pick(fighter, "Hrrr! Please don't spit at me.", "I can imitate you, but I'm skipping the spitting part.");
-            case PARROT -> pick(fighter, "Squawk! Two can play that game.", "Squawk! ...Wait, is it going to copy me now?");
+            case COW -> pick(fighter, kind, "Moooo!! ...Okay, that one was pretty good.", "Moo. Hey, don't look at me like that.", "That cow makes it sound easy. Moooo!");
+            case PIG -> pick(fighter, kind, "Oink oink! ...No? Tough crowd.", "Oink! I think the pig approves.", "I can do that too. Oink!");
+            case SHEEP -> pick(fighter, kind, "Baa-aa! Hah, that one is fun.", "Baaa. Pretty convincing, right?", "That sheep has range. Baa!");
+            case CHICKEN -> pick(fighter, kind, "Bawk bawk! ...I regret nothing.", "Bawk! Don't tell anyone I did that.", "That chicken sounded confident. Bawk bawk!");
+            case WOLF -> pick(fighter, kind, "Awoooo! ...Okay, maybe not as intimidating.", "Awoo! I'm not starting a pack.", "That howl needed an answer. Awooo!");
+            case CAT -> pick(fighter, kind, "Mrow. That cat definitely judged me.", "Meow! ...It looked better when the cat did it.", "Mrrp. Yeah, I know. Terrible impression.");
+            case HORSE -> pick(fighter, kind, "Neeeigh! ...That was awful.", "Neigh! The horse is pretending it didn't hear me.");
+            case DONKEY -> pick(fighter, kind, "Hee-haw! Hah!", "Hee-haw! Okay, that one actually hurt my throat.");
+            case MULE -> pick(fighter, kind, "Hee-haw! Close enough?", "That mule has a very specific voice. Hee-haw!");
+            case GOAT -> pick(fighter, kind, "Maa-aa! Don't headbutt me for that.", "Maa! ...We're friends now, right?");
+            case RABBIT -> pick(fighter, kind, "...Do rabbits even make that much noise?", "Tiny thing, big attitude.");
+            case FOX -> pick(fighter, kind, "Yip! Yeah, I heard you.", "Yip yip! That fox is absolutely laughing at me.");
+            case PANDA -> pick(fighter, kind, "Hrrm! Living the easy life, huh?", "That panda has the right idea: eat, sit, repeat.");
+            case LLAMA -> pick(fighter, kind, "Hrrr! Please don't spit at me.", "I can imitate you, but I'm skipping the spitting part.");
+            case PARROT -> pick(fighter, kind, "Squawk! Two can play that game.", "Squawk! ...Wait, is it going to copy me now?");
         };
     }
 
-    private static String pick(AmbientFighterEntity fighter, String... lines) {
-        return lines[fighter.getRandom().nextInt(lines.length)];
+    private static String pick(AmbientFighterEntity fighter, AnimalKind kind, String... lines) {
+        int index = fighter.getRandom().nextInt(lines.length);
+        return LWLang.speechKey("dialogue.animal_mimic." + kind.name().toLowerCase(java.util.Locale.ROOT) + "." + index, lines[index]);
     }
 
     private static boolean eligible(AmbientFighterEntity fighter, long now) {

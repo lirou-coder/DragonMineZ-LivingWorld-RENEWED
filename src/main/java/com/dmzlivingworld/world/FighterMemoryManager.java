@@ -1,17 +1,16 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
 import com.dmzlivingworld.entity.FighterRank;
 import com.dmzlivingworld.entity.RacialFormProfile;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -43,6 +42,21 @@ public final class FighterMemoryManager {
 
     private FighterMemoryManager() {}
 
+    private static String dossierText(String key, String fallback, Object... args) {
+        return LWLang.speechKey("screen.dossier.content." + key, fallback, args);
+    }
+
+    private static String profileText(String key, String fallback, Object... args) {
+        return LWLang.speechKey("profile.content." + key, fallback, args);
+    }
+
+    private static String labelText(String category, String fallback) {
+        if ("faction_name".equals(category)) return fallback == null ? "" : fallback;
+        String slug = fallback == null ? "unknown" : fallback.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        return LWLang.speechKey("label." + category + "." + slug, fallback == null ? "" : fallback);
+    }
+
     /** Clears the exact persistent directory used by the Remembered People screen. */
     public static void resetRememberedPeople(ServerPlayer player) {
         if (player == null) return;
@@ -68,7 +82,8 @@ public final class FighterMemoryManager {
         CompoundTag record = upsert(player, fighter, relationshipDelta, false, "Escaped your fight", false);
         if (record != null && fighter.getAlignment() == FighterAlignment.BAD) noteRivalryEncounter(player, fighter, record, false);
         if (fighter.getSpeech().isEmpty()) {
-            fighter.speak(fighter.getAlignment() == FighterAlignment.BAD ? "I'll remember you." : "We'll meet again.", 62);
+            fighter.speakKey(fighter.getAlignment() == FighterAlignment.BAD
+                    ? "dialogue.memory.departure.bad" : "dialogue.memory.departure.default", 62);
         }
     }
 
@@ -99,9 +114,8 @@ public final class FighterMemoryManager {
             rememberPlayerDefeat(player, fighter);
             return;
         }
-        if (event.getEntity() instanceof AmbientFighterEntity fighter && attacker instanceof ServerPlayer player) {
-            forgetIfKilled(player, fighter);
-        }
+        // FighterLegacyManager owns the life-budget decision and calls the memory cleanup only
+        // after it has conclusively classified this as a permanent death.
     }
 
     @SubscribeEvent
@@ -176,9 +190,9 @@ public final class FighterMemoryManager {
 
             if (force) {
                 String line;
-                if (record.getBoolean("Rescued")) line = "I remember you. You saved me.";
-                else if (record.getInt("Relationship") <= -20) line = "You again. Good.";
-                else line = "We meet again.";
+                if (record.getBoolean("Rescued")) line = LWLang.speechKey("dialogue.continuity.rescuer", "I remember you. You saved me.");
+                else if (record.getInt("Relationship") <= -20) line = LWLang.speechKey("dialogue.continuity.enemy", "You again. Good.");
+                else line = LWLang.speechKey("dialogue.continuity.met_again", "We meet again.");
                 fighter.speak(line, 78);
                 if (record.getInt("Relationship") <= -25 && fighter.getAlignment() == FighterAlignment.BAD) {
                     PeacekeeperManager.markNpcAggressor(player, fighter);
@@ -275,17 +289,19 @@ public final class FighterMemoryManager {
             int rel = record.getInt("Relationship");
             String bond = FighterRelationshipManager.relationshipStage(rel);
             String faction = profile.getString("FactionName");
-            String affiliation = faction.isBlank() ? "Independent" : faction;
+            String affiliation = faction.isBlank() ? labelText("affiliation", "Independent") : labelText("faction_name", faction);
             String title = profile.getString("LegacyTitle");
             String inspectMarker = record.hasUUID("RecordId") ? "@person:" + record.getUUID("RecordId") + "|" : "";
             long unseenDays = Math.max(0L, now - record.getLong("LastSeen")) / LIFE_DAY;
             String activity = compactActivity(record.getString("SeenActivity"));
-            String lastSeen = unseenDays <= 0L ? "today" : unseenDays == 1L ? "1d ago" : unseenDays + "d ago";
+            String lastSeen = unseenDays <= 0L ? dossierText("people.last_seen_today", "Last: today")
+                    : dossierText("people.last_seen_days", "Last: %sd", unseenDays);
             String prefix = rel >= 40 ? "+ " : rel < 0 ? "!! " : "* ";
-            out.add(inspectMarker + prefix + (title.isBlank() ? "" : title + " ") + profile.getString("Name")
-                    + " — " + bond + " • " + affiliation + (activity.isBlank() ? "" : " • " + activity) + " • " + lastSeen);
+            out.add(inspectMarker + prefix + dossierText("people.entry_v2", "%s%s - %s | %s%s | %s",
+                    title.isBlank() ? "" : title + " ", profile.getString("Name"), labelText("relationship", bond),
+                    affiliation, activity.isBlank() ? "" : " | " + labelText("activity", activity), lastSeen));
         }
-        if (out.isEmpty()) out.add(". You have not formed any lasting bonds yet. People appear here after enough shared history to remember each other.");
+        if (out.isEmpty()) out.add(". " + dossierText("people.none", "You have not formed any lasting bonds yet. People appear here after enough shared history to remember each other."));
         return out;
     }
 
@@ -357,10 +373,11 @@ public final class FighterMemoryManager {
             String name = profile.getString("Name");
             int rel = record.getInt("Relationship");
             long unseenDays = Math.max(0L, now - record.getLong("LastSeen")) / LIFE_DAY;
-            out.add(marker + "!! " + (epithet.isBlank() ? "" : epithet + " ") + name
-                    + " — " + FighterRelationshipManager.relationshipStage(rel)
-                    + " • last seen " + (unseenDays <= 0L ? "recently" : unseenDays + " day(s) ago")
-                    + " • remembered appearance");
+            String seen = unseenDays <= 0L ? dossierText("antagonists.recently", "recently")
+                    : dossierText("antagonists.days_ago", "%s day(s) ago", unseenDays);
+            out.add(marker + "!! " + dossierText("antagonists.person_entry_v2", "%s%s - %s | last seen %s | remembered appearance",
+                    epithet.isBlank() ? "" : epithet + " ", name,
+                    labelText("relationship", FighterRelationshipManager.relationshipStage(rel)), seen));
         }
         return out;
     }
@@ -413,17 +430,19 @@ public final class FighterMemoryManager {
                 long now = player.getServer().overworld().getGameTime();
                 long first = record.getLong("FirstSeen");
                 long knownDays = first <= 0L ? 0L : Math.max(0L, now - first) / LIFE_DAY;
-                out.add("* Known since day " + dayNumber(first) + " • " + knownDays + " day(s) of shared history • met "
-                        + Math.max(1, record.getInt("Encounters")) + "x");
+                out.add("* " + profileText("legacy.known_since", "Known since day %s | %s day(s) of shared history | met %sx",
+                        dayNumber(first), knownDays, Math.max(1, record.getInt("Encounters"))));
             }
         }
 
-        out.add("* Training sessions: " + fighter.getTrainingSessions() + " • completed goals: " + FighterGoalManager.completedCount(fighter));
+        out.add("* " + profileText("legacy.training", "Training sessions: %s | completed goals: %s",
+                fighter.getTrainingSessions(), FighterGoalManager.completedCount(fighter)));
         int given = legacy.getInt("InterventionsGiven");
         int received = legacy.getInt("InterventionsReceived");
-        if (given > 0 || received > 0) out.add("* Bond interventions: gave " + given + " • received " + received);
+        if (given > 0 || received > 0) out.add("* " + profileText("legacy.interventions", "Bond interventions: gave %s | received %s", given, received));
         String threat = OrganicThreatManager.statusLabel(fighter);
-        if (!threat.isBlank()) out.add("!! " + threat + " • recognition comes from existing record/power, not bonus scaling");
+        if (!threat.isBlank()) out.add("!! " + dossierText("legacy.threat_recognition",
+                "%s • recognition comes from existing record/power, not bonus scaling", threat));
 
         ListTag timeline = legacy.getList("Timeline", Tag.TAG_COMPOUND);
         java.util.Set<String> timed = new java.util.HashSet<>();
@@ -434,7 +453,7 @@ public final class FighterMemoryManager {
                 String text = row.getString("Text");
                 if (text.isBlank()) continue;
                 timed.add(text);
-                out.add(". Day " + dayNumber(row.getLong("Tick")) + " — " + text);
+                out.add(". " + profileText("legacy.day_event", "Day %s - %s", dayNumber(row.getLong("Tick")), localizedLegacyEvent(text)));
             }
         }
 
@@ -444,10 +463,60 @@ public final class FighterMemoryManager {
         for (int i = events.size() - 1; i >= 0 && earlierAdded < 4; i--) {
             String text = events.getString(i);
             if (text.isBlank() || timed.contains(text)) continue;
-            out.add(". Earlier — " + text);
+            out.add(". " + profileText("legacy.earlier", "Earlier - %s", localizedLegacyEvent(text)));
             earlierAdded++;
         }
         return out;
+    }
+
+    /** Converts the persisted, parameterized legacy journal without translating proper NPC/item names. */
+    static String localizedLegacyEvent(String text) {
+        if (text == null || text.isBlank()) return "";
+        if (text.equals("Joined a group meditation")) return LWLang.speechKey("legacy.event.group_meditation", text);
+        if (text.equals("Learned flight through training")) return LWLang.speechKey("legacy.event.learned_flight", text);
+        if (text.equals("Changed hairstyle")) return LWLang.speechKey("legacy.event.changed_hairstyle", text);
+        if (text.equals("Changed outfit")) return LWLang.speechKey("legacy.event.changed_outfit", text);
+        if (text.equals("Became recognized as a major world threat")) return LWLang.speechKey("legacy.event.major_world_threat", text);
+        if (text.startsWith("Completed goal: ")) {
+            String goal = text.substring("Completed goal: ".length());
+            return LWLang.speechKey("legacy.event.completed_goal", "Completed goal: %s",
+                    FighterGoalManager.localizedResult(goal));
+        }
+        if (text.startsWith("Became wanted after ")) {
+            String crime = text.substring("Became wanted after ".length());
+            return LWLang.speechKey("legacy.event.became_wanted", "Became wanted after %s",
+                    WantedManager.localizedCrime(crime));
+        }
+        String[][] prefixes = {
+                {"Meditated with ", "meditated_with"},
+                {"Accepted a spar with ", "accepted_spar"}, {"Fused with ", "fused_with"},
+                {"Formed a rivalry with ", "formed_rivalry"}, {"Learned ", "learned"},
+                {"Unlocked passive skill: ", "unlocked_passive"}, {"Inherited ", "inherited"},
+                {"Received ", "received"}, {"Defeated ", "defeated"}, {"Lost to ", "lost_to"},
+                {"Intervened to protect ", "intervened_to_protect"}, {"Promoted from ", "promoted"},
+                {"Unlocked ", "unlocked_training"}, {"Accepted a Senzu Bean from ", "accepted_senzu"},
+                {"Accepted ", "accepted"}, {"Understood the theory behind ", "understood_theory"},
+                {"Advanced Saibaman research to refinement ", "saibaman_research"},
+                {"Lost Saibaman specimen ", "lost_saibaman"}, {"Attempted fusion with ", "attempted_fusion"},
+                {"Rarely fused with ", "rare_fusion"}, {"Killed non-combatant ", "killed_non_combatant"},
+                {"Killed ally ", "killed_ally"}, {"Killed ", "killed"}, {"Set a rematch with ", "set_rematch"},
+                {"Completed a long practice spar with ", "long_practice_duel"}
+        };
+        for (String[] entry : prefixes) if (text.startsWith(entry[0])) {
+            String value = text.substring(entry[0].length());
+            if ((entry[1].equals("defeated") || entry[1].equals("lost_to")) && value.endsWith(" in a lethal fight"))
+                return LWLang.speechKey("legacy.event." + entry[1] + "_lethal", entry[0] + "%s in a lethal fight",
+                        value.substring(0, value.length() - " in a lethal fight".length()));
+            if ((entry[1].equals("defeated") || entry[1].equals("lost_to")) && value.endsWith(" against a stronger opponent"))
+                return LWLang.speechKey("legacy.event." + entry[1] + "_stronger", entry[0] + "%s against a stronger opponent",
+                        value.substring(0, value.length() - " against a stronger opponent".length()));
+            return LWLang.speechKey("legacy.event." + entry[1], entry[0] + "%s", value);
+        }
+        if (text.startsWith("Completed ") && text.endsWith(" training sessions")) {
+            String count = text.substring("Completed ".length(), text.length() - " training sessions".length());
+            return LWLang.speechKey("legacy.event.training_sessions", "Completed %s training sessions", count);
+        }
+        return text;
     }
 
     private static long dayNumber(long tick) {
@@ -775,19 +844,16 @@ public final class FighterMemoryManager {
         saveRoot(owner, root);
     }
 
-    private static void forgetIfKilled(ServerPlayer player, AmbientFighterEntity fighter) {
+    static void forgetPermanentlyKilled(ServerPlayer player, AmbientFighterEntity fighter) {
         UUID recordId = fighter.getMemoryRecordId();
         if (recordId == null) return;
         CompoundTag root = getRoot(player);
         ListTag list = root.getList(RIVALS_KEY, Tag.TAG_COMPOUND);
         int index = findRecordIndex(list, recordId);
         if (index < 0) return;
-        String name = list.getCompound(index).getCompound("Profile").getString("Name");
         list.remove(index);
         root.put(RIVALS_KEY, list);
         saveRoot(player, root);
-        player.displayClientMessage(Component.literal(name + " is dead. It may only come back with a wish...")
-                .withStyle(ChatFormatting.DARK_GRAY), false);
     }
 
     private static boolean isRecordAlreadyLoaded(ServerPlayer player, UUID recordId) {

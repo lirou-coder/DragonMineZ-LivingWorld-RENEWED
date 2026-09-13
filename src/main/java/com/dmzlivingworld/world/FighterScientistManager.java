@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dragonminez.common.init.MainEntities;
 import com.dragonminez.common.init.entities.sagas.SagaSaibamanEntity;
@@ -105,21 +106,21 @@ public final class FighterScientistManager {
 
 
     public static String potencyRange(AmbientFighterEntity fighter) {
-        if (!isScientist(fighter)) return "Unknown";
+        if (!isScientist(fighter)) return LWLang.speechKey("profile.scientist.unknown", "Unknown");
         int formula = formulaProgress(fighter);
         int bp = Math.max(1, fighter.getPermanentBattlePower());
         double low = 0.24D + formula * 0.008D, high = 0.40D + formula * 0.010D;
         int lowBp = Math.max(1200, (int)Math.round(bp * low));
         int highBp = Math.max(lowBp, (int)Math.round(bp * high));
-        return lowBp + "–" + highBp + " PL";
+        return LWLang.speechKey("profile.scientist.potency_pl", "%s–%s PL", lowBp, highBp);
     }
 
     public static String potencyPercentRange(AmbientFighterEntity fighter) {
-        if (!isScientist(fighter)) return "Unknown";
+        if (!isScientist(fighter)) return LWLang.speechKey("profile.scientist.unknown", "Unknown");
         int formula = formulaProgress(fighter);
         double low = (0.24D + formula * 0.008D) * 100.0D;
         double high = (0.40D + formula * 0.010D) * 100.0D;
-        return formatPercent(low) + "–" + formatPercent(high) + " of the Scientist's Power Level";
+        return LWLang.speechKey("profile.scientist.potency_percent", "%s–%s of the Scientist's PL", formatPercent(low), formatPercent(high));
     }
 
     private static String formatPercent(double value) {
@@ -134,13 +135,14 @@ public final class FighterScientistManager {
         int seeds = availableSeeds(fighter), capacity = maxSeeds(fighter), formula = formulaProgress(fighter);
         long cooldown = Math.max(0L, fighter.getLegacyData().getLong(NEXT_DEPLOY) - fighter.level().getGameTime());
         java.util.List<String> out = new java.util.ArrayList<>();
-        out.add("## Saibaman Research");
-        out.add("* Active specimens: " + active + " / " + maxActive);
-        out.add("* Viable specimens: " + seeds + " / " + capacity);
-        out.add("* Research: " + researchStage(formula));
-        out.add("* Formula potency: " + potencyPercentRange(fighter));
-        out.add("* Expected specimen Power Level: " + potencyRange(fighter));
-        out.add(cooldown <= 0 ? "+ Deployment: READY" : ". Deployment ready in " + Math.max(1L, (cooldown + 19L) / 20L) + " sec");
+        out.add("## " + LWLang.speechKey("profile.scientist.heading", "Saibaman Research"));
+        out.add("* " + LWLang.speechKey("profile.scientist.active", "Active specimens: %s / %s", active, maxActive));
+        out.add("* " + LWLang.speechKey("profile.scientist.viable", "Viable specimens: %s / %s", seeds, capacity));
+        out.add("* " + LWLang.speechKey("profile.scientist.research", "Research: %s", researchStage(formula)));
+        out.add("* " + LWLang.speechKey("profile.scientist.formula", "Formula potency: %s", potencyPercentRange(fighter)));
+        out.add("* " + LWLang.speechKey("profile.scientist.expected", "Expected specimen PL: %s", potencyRange(fighter)));
+        out.add(cooldown <= 0 ? "+ " + LWLang.speechKey("profile.scientist.ready", "Deployment: READY")
+                : ". " + LWLang.speechKey("profile.scientist.cooldown", "Deployment ready in %s sec", Math.max(1L, (cooldown + 19L) / 20L)));
         return out;
     }
 
@@ -171,7 +173,7 @@ public final class FighterScientistManager {
                 legacy.putInt(FORMULA_PROGRESS, formula);
                 fighter.recordLegacyEvent("Advanced Saibaman research to refinement " + formula);
                 if (fighter.getSpeech().isEmpty() && (formula == 6 || formula == 12 || formula == 18 || formula == 24 || formula == 30))
-                    fighter.speak("The cultivation model just opened up another possibility.", 72);
+        fighter.speakKey("dialogue.scientist.cultivation_discovery", 72);
             }
             legacy.putInt(RESEARCH_INSIGHT, insight);
         }
@@ -184,12 +186,12 @@ public final class FighterScientistManager {
     }
 
     private static String researchStage(int p) {
-        if (p >= 30) return "mastered cultivation program";
-        if (p >= 24) return "advanced adaptive specimens";
-        if (p >= 18) return "high-output cultivation";
-        if (p >= 12) return "stable field program";
-        if (p >= 6) return "developing variants";
-        return "experimental cultivation";
+        if (p >= 30) return LWLang.speechKey("profile.scientist.stage.mastered", "mastered cultivation program");
+        if (p >= 24) return LWLang.speechKey("profile.scientist.stage.advanced", "advanced adaptive specimens");
+        if (p >= 18) return LWLang.speechKey("profile.scientist.stage.high_output", "high-output cultivation");
+        if (p >= 12) return LWLang.speechKey("profile.scientist.stage.stable", "stable field program");
+        if (p >= 6) return LWLang.speechKey("profile.scientist.stage.developing", "developing variants");
+        return LWLang.speechKey("profile.scientist.stage.experimental", "experimental cultivation");
     }
 
     public static boolean forceScientist(AmbientFighterEntity fighter) {
@@ -296,7 +298,8 @@ public final class FighterScientistManager {
             long nextReaction = master.getLegacyData().getLong(NEXT_DEATH_REACTION);
             if (now >= nextReaction && master.getSpeech().isEmpty() && master.getRandom().nextFloat() < 0.46F) {
                 LivingEntity killer = minion.getLastHurtByMob();
-                String targetNote = killer == null ? "" : " " + killer.getName().getString() + " exceeded its tolerance.";
+                String targetNote = killer == null ? "" : LWLang.speechKey("dialogue.scientist.specimen_loss.target_note",
+                        " %s exceeded its tolerance.", killer.getName().getString());
                 String[] reactions = {
                         "Specimen loss confirmed. Updating the failure model.",
                         "Interesting. That phenotype collapsed faster than projected.",
@@ -305,7 +308,9 @@ public final class FighterScientistManager {
                         "That death is data too. Annoying data, but data.",
                         "I was afraid that trait would fail under real combat load."
                 };
-                master.speak(reactions[master.getRandom().nextInt(reactions.length)] + targetNote, 76);
+                int reaction = master.getRandom().nextInt(reactions.length);
+                master.speak(LWLang.speechKey("dialogue.scientist.specimen_loss." + reaction,
+                        reactions[reaction] + "%s", targetNote), 76);
                 master.getLegacyData().putLong(NEXT_DEATH_REACTION, now + 240L + master.getRandom().nextInt(361));
             }
         }
@@ -384,7 +389,8 @@ public final class FighterScientistManager {
                     "Specimen released. Watching reaction latency and damage tolerance.",
                     "Let's see whether the latest cultivation ratio actually improved combat stability."
             };
-            fighter.speak(lines[fighter.getRandom().nextInt(lines.length)], 68);
+            int line = fighter.getRandom().nextInt(lines.length);
+            fighter.speak(LWLang.speechKey("dialogue.scientist.deployment." + line, lines[line]), 68);
         }
     }
 

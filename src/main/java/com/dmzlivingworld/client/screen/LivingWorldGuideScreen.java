@@ -1,5 +1,6 @@
 package com.dmzlivingworld.client.screen;
 
+import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.network.LWNetwork;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -19,34 +20,34 @@ public final class LivingWorldGuideScreen extends Screen implements LivingWorldS
     private record VisualLine(FormattedCharSequence text, int color, int gapBefore) {}
 
     private static final List<Chapter> CHAPTERS = List.of(
-            chapter("Getting Started", "The basics",
+            chapter("getting_started", "Getting Started", "The basics",
                     "Living World adds persistent Dragon Mine Z fighters who live, grow and remember what happens.",
                     "* L — open Living World.",
                     "* Fighter Interact + Right-click a Living World fighter — open their character panel.",
                     "* Talk, travel and shared experiences build personal relationships over time.",
                     "* Fighters can train, fight, join factions, form bonds and pursue their own goals."),
-            chapter("People", "Characters you have met",
+            chapter("people", "People", "Characters you have met",
                     "* People shows fighters your character knows and the last information you learned about them.",
                     "* Fighter Interact + Right-click shows their identity, story, combat information and actions.",
                     "* Friends may travel, meditate or fight beside you depending on the situation and their personality.",
                     "* Remembered fighters can be used for Instant Transmission when your Dragon Mine Z skill can reach them."),
-            chapter("Factions & Requests", "Work that exists for a reason",
+            chapter("factions_requests", "Factions & Requests", "Work that exists for a reason",
                     "* Factions remember your reputation and may treat you differently from individual members.",
                     "* Requests appear only when a faction currently needs outside help.",
                     "* Factions → Active Quest always shows who issued your current request.",
                     "* The active quest HUD gives live direction, progress and the next objective.",
                     "* Supply requests name the exact receiver and exact items needed."),
-            chapter("Travel", "Go with people",
+            chapter("travel", "Travel", "Go with people",
                     "* Go Along lets you accompany something a fighter is already doing.",
                     "* Come Along asks a fighter to travel with you for a while.",
                     "* Travelling fighters use their real movement and flight abilities and can defend themselves naturally.",
                     "* L → Companion manages your current travelling companion."),
-            chapter("Fusion & Meditation", "Shared Dragon Mine Z systems",
+            chapter("fusion_meditation", "Fusion & Meditation", "Shared Dragon Mine Z systems",
                     "* Fighter Interact + Right-click → Fusion starts a compatible Fusion Dance with that fighter.",
                     "* Normal Dragon Mine Z requirements, power limits and cooldowns still apply.",
                     "* M — start or stop meditation.",
                     "* Friendly fighters can sometimes meditate with you, and deeper meditation can provide configured training rewards."),
-            chapter("NPC Objectives", "Helping a fighter reach their goal",
+            chapter("npc_objectives", "NPC Objectives", "Helping a fighter reach their goal",
                     "Every remembered or faction-affiliated fighter can be pursuing one personal goal at a time. Their character panel shows the current goal and its progress under Story.",
                     "## Defeat a Rival",
                     ". Rivalries form on their own through repeated encounters; you cannot create or assign one directly.",
@@ -76,7 +77,7 @@ public final class LivingWorldGuideScreen extends Screen implements LivingWorldS
                     ". Any real training or meditation session counts toward the total.",
                     ". Accompanying them with Go Along while they train, or simply giving them time, completes this goal.",
                     ". If a fighter currently has no goal listed, they are between ambitions and will pick a new one on their own."),
-            chapter("Controls & Settings", "Quick reference",
+            chapter("controls_settings", "Controls & Settings", "Quick reference",
                     "* L — Living World menu.",
                     "* Fighter Interact + Right-click — inspect a fighter (the modifier is configurable).",
                     "* M — meditation.",
@@ -95,7 +96,7 @@ public final class LivingWorldGuideScreen extends Screen implements LivingWorldS
     private int navWidth;
 
     private LivingWorldGuideScreen() {
-        super(Component.literal("Living World — Guide"));
+        super(LWLang.text("screen.guide.title", "Living World — Guide"));
     }
 
     public static void open() {
@@ -128,8 +129,14 @@ public final class LivingWorldGuideScreen extends Screen implements LivingWorldS
     private int contentRight() { return panelLeft + panelWidth - 12; }
     private int closeX() { return panelLeft + panelWidth - 40; }
 
-    private static Chapter chapter(String title, String subtitle, String... lines) {
-        return new Chapter(title, subtitle, List.of(lines));
+    private static Chapter chapter(String key, String title, String subtitle, String... lines) {
+        List<String> localized = new ArrayList<>(lines.length);
+        for (int i = 0; i < lines.length; i++)
+            localized.add(LWLang.string("screen.guide.chapter." + key + ".line." + i, lines[i]));
+        return new Chapter(
+                LWLang.string("screen.guide.chapter." + key + ".title", title),
+                LWLang.string("screen.guide.chapter." + key + ".subtitle", subtitle),
+                List.copyOf(localized));
     }
 
     private void selectChapter(int index) {
@@ -174,11 +181,11 @@ public final class LivingWorldGuideScreen extends Screen implements LivingWorldS
 
         boolean compact = panelWidth < 360;
         int titleW = Math.max(24, panelWidth - (compact ? 62 : 130));
-        LivingWorldGuiStyle.drawFitted(graphics, font, "DRAGON MINE Z: LIVING WORLD", panelLeft + 13, panelTop + 10,
+        LivingWorldGuiStyle.drawFitted(graphics, font, LWLang.string("screen.guide.header", "DRAGON MINE Z: LIVING WORLD"), panelLeft + 13, panelTop + 10,
                 titleW, 0xFFFFE29A);
-        if (panelHeight >= 190) LivingWorldGuiStyle.drawFitted(graphics, font, "Player Guide", panelLeft + 13, panelTop + 26,
+        if (panelHeight >= 190) LivingWorldGuiStyle.drawFitted(graphics, font, LWLang.string("screen.guide.player_guide", "Player Guide"), panelLeft + 13, panelTop + 26,
                 titleW, LivingWorldGuiStyle.MUTED);
-        if (!compact) LivingWorldGuiStyle.drawChip(graphics, font, "GUIDE", closeX() - 74, panelTop + 8, 66, 20, LivingWorldGuiStyle.BLUE);
+        if (!compact) LivingWorldGuiStyle.drawChip(graphics, font, LWLang.string("screen.guide.badge", "GUIDE"), closeX() - 74, panelTop + 8, 66, 20, LivingWorldGuiStyle.BLUE);
         LivingWorldGuiStyle.drawButton(graphics, font, closeX(), panelTop + 8, 25, 20, "×",
                 mouseX, mouseY, true, false, false);
 
@@ -187,7 +194,7 @@ public final class LivingWorldGuideScreen extends Screen implements LivingWorldS
         drawContent(graphics);
 
         int backW = panelWidth < 260 ? 46 : 64;
-        LivingWorldGuiStyle.drawButton(graphics, font, panelLeft + panelWidth - 12 - backW, footerY(), backW, 18, "Back",
+        LivingWorldGuiStyle.drawButton(graphics, font, panelLeft + panelWidth - 12 - backW, footerY(), backW, 18, LWLang.string("screen.guide.back", "Back"),
                 mouseX, mouseY, true, false, false);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
@@ -196,8 +203,8 @@ public final class LivingWorldGuideScreen extends Screen implements LivingWorldS
         int top = bodyTop();
         int height = bodyBottom() - top;
         LivingWorldGuiStyle.drawInsetPanel(graphics, navX(), top, navWidth, height);
-        LivingWorldGuiStyle.drawFitted(graphics, font, "CHAPTERS", navX() + 8, top + 9, navWidth - 16, LivingWorldGuiStyle.GOLD);
-        LivingWorldGuiStyle.drawFitted(graphics, font, "Quick reference", navX() + 8, top + 22, navWidth - 16, LivingWorldGuiStyle.MUTED);
+        LivingWorldGuiStyle.drawFitted(graphics, font, LWLang.string("screen.guide.chapters", "CHAPTERS"), navX() + 8, top + 9, navWidth - 16, LivingWorldGuiStyle.GOLD);
+        LivingWorldGuiStyle.drawFitted(graphics, font, LWLang.string("screen.guide.quick_reference", "Quick reference"), navX() + 8, top + 22, navWidth - 16, LivingWorldGuiStyle.MUTED);
         for (int i = 0; i < CHAPTERS.size(); i++) {
             LivingWorldGuiStyle.drawButton(graphics, font, navX() + 7, navButtonY(i), navButtonWidth(), navButtonHeight(),
                     CHAPTERS.get(i).title(), mouseX, mouseY, true, i == chapterIndex, false);

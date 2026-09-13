@@ -182,7 +182,7 @@ public final class FighterSpecialItemManager {
         fighter.getLegacyData().putLong(FRUIT_PROP_END, now + 30L);
         fighter.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(MainItems.MIGHT_TREE_FRUIT.get()));
         fighter.swing(net.minecraft.world.InteractionHand.OFF_HAND, true);
-        fighter.speak(fighter.getRandom().nextBoolean() ? "This should give me an edge." : "Let's see what this fruit can do.", 65);
+        fighter.speakKey(fighter.getRandom().nextBoolean() ? "dialogue.special_item.edge" : "dialogue.special_item.fruit", 65);
         fighter.flareAura(70);
     }
 

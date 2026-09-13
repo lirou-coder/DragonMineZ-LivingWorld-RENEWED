@@ -1,5 +1,7 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.client.LWLang;
+
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.network.FactionRequestTrackerPacket;
@@ -226,7 +228,7 @@ public final class FactionRequestManager {
         // Removed mission families are terminal on upgrade. R42 supports only the stable
         // supply requests and Patrol.
         if (!isSupportedRequestType(type)) {
-            notify(player, "This legacy faction request type is not enabled in the current build. It was cleared without a cooldown.");
+            notifyKey(player, "legacy_type_disabled");
             clearRequest(player);
             return;
         }
@@ -302,8 +304,7 @@ public final class FactionRequestManager {
         }
         req.putBoolean("Started", false); req.putBoolean("R27ActorMigration", true); resetPresence(req);
         saveRequest(player, req);
-        if (retired > 0) notify(player, "Living World retired " + retired + " old request-only stand-in" + (retired == 1 ? "" : "s")
-                + ". This request will now use an available faction member already in the world.");
+        if (retired > 0) notifyKey(player, retired == 1 ? "standin_retired.one" : "standin_retired.many", retired);
     }
 
     private static void tickRescue(ServerPlayer player, ServerLevel level, long now, CompoundTag req,
@@ -317,7 +318,7 @@ public final class FactionRequestManager {
         if (p.entityId != null && FactionRequestMissionManager.residentFallenOrDeparted(level, victim, p.entityId)) {
             store.markDead(level, p, now, "the captive did not survive until extraction");
             FactionManager.adjustReputation(player, ally, -2);
-            notify(player, "Rescue failed: " + p.name + " is no longer alive/available. No substitute prisoner will be created.");
+            notifyKey(player, "rescue.unavailable", p.name);
             setCooldown(player, ally, now + 24000L); clearRequest(player); return;
         }
 
@@ -330,14 +331,14 @@ public final class FactionRequestManager {
         if (captive != null && !isRealFactionMember(level, victim, captive)) {
             if (!req.getBoolean("LegacySyntheticPrisonerNotified")) {
                 req.putBoolean("LegacySyntheticPrisonerNotified", true); saveRequest(player, req);
-                notify(player, "This older rescue referenced a disposable stand-in. Living World will not replace it with another fake person; the request has been retired without a cooldown.");
+                notifyKey(player, "rescue.legacy_retired");
             }
             clearRequest(player); return;
         }
         if (captive == null) {
             if (!req.getBoolean("CaptiveWaitNotified")) {
                 req.putBoolean("CaptiveWaitNotified", true); saveRequest(player, req);
-                notify(player, "The real captive is currently unloaded. The mission is waiting for that exact UUID rather than spawning a duplicate.");
+                notifyKey(player, "rescue.captive_unloaded");
             }
             return;
         }
@@ -354,7 +355,7 @@ public final class FactionRequestManager {
             if (!captive.isAlive() || captive.isDefeated()) {
                 store.markDead(level, p, now, "killed during the rescue escape");
                 FactionManager.adjustReputation(player, ally, -3);
-                notify(player, "Rescue failed: " + captive.getFighterName() + " died during the escape. There is no replacement captive.");
+                notifyKey(player, "rescue.escape_death", captive.getFighterName());
                 setCooldown(player, ally, now + 30000L); clearRequest(player); return;
             }
             double dp = player.distanceTo(captive);
@@ -374,8 +375,8 @@ public final class FactionRequestManager {
             FighterMemoryManager.rememberRescue(player, captive);
             captive.speak(FactionRequestDialogue.success("RESCUE", now ^ captive.getUUID().getMostSignificantBits()), 82);
             finishSuccess(player, req, reward,
-                    captive.getFighterName() + " made it home alive and the exact rescued resident returned to faction custody.",
-                    "The rescued resident returns to " + ally.name() + " manpower and the faction gains momentum."); return;
+                    resultView("rescue.summary", "%s made it home alive and the exact rescued resident returned to faction custody.", captive.getFighterName()),
+                    resultView("rescue.impact", "The rescued resident returns to %s manpower and the faction gains momentum.", ally.name())); return;
         }
 
         captive.setCaptive(true);
@@ -392,7 +393,7 @@ public final class FactionRequestManager {
             captive.speak(FactionRequestDialogue.start("RESCUE", now ^ captive.getUUID().getLeastSignificantBits()), 76);
             AmbientFighterEntity voice = guards.isEmpty() ? null : guards.get(0);
             if (voice != null) voice.speak(FactionRequestDialogue.pressure("RESCUE", now), 68);
-            notify(player, "The captive and guards are all real residents. Break the fixed guard roster, then physically escort " + captive.getFighterName() + " home.");
+            notifyKey(player, "rescue.started", captive.getFighterName());
             return;
         }
         FactionRequestMissionManager.applyMoraleBreak(level, req, captor, "RescueGuards");
@@ -404,8 +405,8 @@ public final class FactionRequestManager {
                 FactionRequestMissionManager.ROLE_OPERATIVE);
         req.putBoolean("RescueFreed", true); resetPresence(req);
         captive.speak(FactionRequestDialogue.pressure("RESCUE", now ^ 0x4A71L), 76);
-        objectiveToast(player, "Captive freed — escort " + captive.getFighterName() + " back to " + ally.name() + ".");
-        notify(player, "The guards are broken. The mission is not over: get the same freed resident back to the land-safe faction handoff.");
+        objectiveToastKey(player, "rescue_freed", captive.getFighterName(), ally.name());
+        notifyKey(player, "rescue.guards_broken");
         saveRequest(player, req);
     }
 
@@ -467,7 +468,7 @@ public final class FactionRequestManager {
 
         if (!req.contains("PatrolRoute", Tag.TAG_LIST) || patrolRendezvous(req) == null) {
             if (!preparePatrolAcceptance(player, level, req, faction)) {
-                notify(player, "Patrol cannot assemble: no available patrol leader could reach a safe rendezvous. The request has been released without a cooldown.");
+                notifyKey(player, "patrol.assemble_failed");
                 clearRequest(player);
                 return;
             }
@@ -493,7 +494,7 @@ public final class FactionRequestManager {
                 FactionManager.adjustReputation(player, faction, recovery ? -1 : -2);
                 data.adjustMomentum(faction, -0.012F);
                 data.addHistory(faction, now, requestTitle(req) + " failed when its fixed patrol roster was lost, yielded or withdrew. No replacements were committed.");
-                notify(player, "Patrol failed: the committed patrol can no longer continue. No replacement patrol will take their place.");
+                notifyKey(player, "patrol.roster_lost");
                 setCooldown(player, faction, now + 26000L); clearRequest(player);
             }
             return;
@@ -521,7 +522,7 @@ public final class FactionRequestManager {
                 req.putInt("PatrolAmbushLeg", Math.min(route.size() - 1, 1 + player.getRandom().nextInt(Math.max(1, route.size() - 1))));
             }
             leader.speak(FactionMissionFlavor.patrolJoin(recovery, now ^ leader.getUUID().getLeastSignificantBits()), 82);
-            notify(player, "Patrol started with " + FactionRequestMissionManager.rosterSize(req, "Patrol") + " " + faction.name() + " fighters. Follow the marked leader; each route checkpoint advances only when you and that same patrol arrive together.");
+            notifyKey(player, "patrol.started", FactionRequestMissionManager.rosterSize(req, "Patrol"), faction.name());
             saveRequest(player, req); return;
         }
 
@@ -549,7 +550,7 @@ public final class FactionRequestManager {
                 if (FactionRequestMissionManager.rosterSize(req, "PatrolAmbush") > 0) {
                     FactionRequestMissionManager.lockRoster(req, "PatrolAmbush"); req.putBoolean("PatrolAmbushTriggered", true); req.putBoolean("PatrolAmbushResolved", false);
                     leader.speak(FactionMissionFlavor.patrolAmbush(now), 78);
-                    notify(player, threat.name() + " committed an ambush team. Defend the patrol; no reinforcements will appear.");
+                    notifyKey(player, "patrol.ambush", threat.name());
                     saveRequest(player, req); return;
                 }
             }
@@ -564,19 +565,19 @@ public final class FactionRequestManager {
             if (patrolBroken && !enemyBroken) {
                 FactionManager.adjustReputation(player, faction, recovery ? -1 : -3); data.adjustMomentum(faction, -0.018F);
                 data.addHistory(faction, now, requestTitle(req) + " ended when the real patrol broke under an ambush.");
-                notify(player, "Patrol failed: your faction's committed roster broke first. The mission will not refill the team.");
+                notifyKey(player, "patrol.friendly_roster_broken");
                 setCooldown(player, faction, now + 32000L); clearRequest(player); return;
             }
             if (!enemyBroken) { saveRequest(player, req); return; }
             if (patrolBroken) {
-                notify(player, "The ambush was stopped, but the patrol itself can no longer continue. The operation ends without replacement fighters.");
+                notifyKey(player, "patrol.ambush_stopped_but_lost");
                 data.addHistory(faction, now, requestTitle(req) + " survived an ambush tactically but lost its ability to continue the route.");
                 setCooldown(player, faction, now + 28000L); clearRequest(player); return;
             }
             req.putBoolean("PatrolAmbushResolved", true);
             if (threat != null) { data.adjustMomentum(faction, recovery ? 0.008F : 0.012F); data.adjustMomentum(threat, -0.010F); data.adjustRelation(faction, threat, -2, now, null); data.addHistory(faction, now, "A real " + threat.name() + " ambush roster was broken during " + requestTitle(req) + "."); }
             leader.speak(FactionMissionFlavor.patrolResume(now ^ 0x5A17L), 76);
-            notify(player, "The ambush team has yielded, withdrawn or fallen. The surviving patrol resumes its route.");
+            notifyKey(player, "patrol.ambush_resolved");
         }
 
         boolean leaderAtWaypoint = leader.distanceToSqr(waypoint.getX() + 0.5D, waypoint.getY(), waypoint.getZ() + 0.5D) <= 18.0D * 18.0D;
@@ -603,7 +604,7 @@ public final class FactionRequestManager {
             req.putInt("PatrolLeg", leg + 1); CompoundTag next = route.getCompound(leg + 1);
             req.putDouble("PatrolX", next.getInt("X") + 0.5D); req.putInt("PatrolY", next.getInt("Y")); req.putDouble("PatrolZ", next.getInt("Z") + 0.5D);
             leader.speak(FactionRequestDialogue.start(req.getString("Type"), now ^ (leg * 7919L)), 64);
-            objectiveToast(player, "Patrol checkpoint " + (leg + 1) + " / " + route.size() + " complete — move with the surviving patrol."); saveRequest(player, req); return;
+            objectiveToastKey(player, "patrol_checkpoint", leg + 1, route.size()); saveRequest(player, req); return;
         }
         settlePatrolFlight(patrol);
         req.putBoolean("PatrolAirborne", false);
@@ -611,9 +612,9 @@ public final class FactionRequestManager {
         data.addHistory(faction, now, recovery ? "A fixed resident recovery patrol completed its route with outside support." : "A fixed resident patrol completed its full route with outside support.");
         setCooldown(player, faction, now + 30000L + player.getRandom().nextInt(30001)); leader.speak(FactionMissionFlavor.patrolFinish(req.getBoolean("PatrolAmbushTriggered"), now), 84);
         finishSuccess(player, req, reward,
-                faction.name() + " patrol completed every route checkpoint with the surviving real patrol roster.",
-                req.getBoolean("PatrolAmbushTriggered") ? "The ambush outcome and patrol survival are recorded in faction history; surviving members return to normal life."
-                        : "The full patrol route is recorded in faction history; surviving members return to normal life.");
+                resultView("patrol.summary", "%s patrol completed every route checkpoint with the surviving real patrol roster.", faction.name()),
+                req.getBoolean("PatrolAmbushTriggered") ? resultView("patrol.impact_ambush", "The ambush outcome and patrol survival are recorded in faction history; surviving members return to normal life.")
+                        : resultView("patrol.impact", "The full patrol route is recorded in faction history; surviving members return to normal life."));
     }
 
     /** Returns true when this patrol tick is consumed by a natural contact or a contact-caused failure. */
@@ -652,10 +653,8 @@ public final class FactionRequestManager {
                     req.putBoolean("PatrolContactResolved", false);
                     req.putString("PatrolContactFaction", contactFaction.id());
                     leader.speak(FactionRequestDialogue.pressure("PATROL", now ^ first.getUUID().getLeastSignificantBits()), 72);
-                    notify(player, "Contact! " + contactFaction.name() + " fighters were encountered on the route. "
-                            + committed + " rival fighter" + (committed == 1 ? " is" : "s are")
-                            + " engaging your patrol. No reinforcements will appear.");
-                    objectiveToast(player, "PATROL CONTACT — defend the patrol and stay with its surviving members");
+                    notifyKey(player, committed == 1 ? "patrol.contact.one" : "patrol.contact.many", contactFaction.name(), committed);
+                    objectiveToastKey(player, "patrol_contact");
                     saveRequest(player, req);
                 }
             }
@@ -671,7 +670,7 @@ public final class FactionRequestManager {
             FactionManager.adjustReputation(player, faction, -3);
             data.adjustMomentum(faction, -0.014F);
             data.addHistory(faction, now, requestTitle(req) + " failed after a genuine route contact broke the committed patrol.");
-            notify(player, "Patrol failed: the patrol broke during route contact. No replacement members will appear.");
+            notifyKey(player, "patrol.contact_failed");
             setCooldown(player, faction, now + 32000L);
             clearRequest(player);
             return true;
@@ -679,7 +678,7 @@ public final class FactionRequestManager {
         if (!enemyBroken) { saveRequest(player, req); return true; }
         if (patrolBroken) {
             data.addHistory(faction, now, requestTitle(req) + " survived a route contact but had no viable patrol left to continue.");
-            notify(player, "The rival contact is broken, but your patrol cannot continue. The operation ends without replacement fighters.");
+            notifyKey(player, "patrol.contact_won_but_lost");
             setCooldown(player, faction, now + 28000L);
             clearRequest(player);
             return true;
@@ -691,7 +690,7 @@ public final class FactionRequestManager {
             data.addHistory(faction, now, "A real " + enemyFaction.name() + " route contact was broken during " + requestTitle(req) + ".");
         }
         leader.speak(FactionMissionFlavor.patrolResume(now ^ 0x31A7L), 72);
-        notify(player, "Route contact resolved. The surviving patrol reforms and continues; the rival residents are not replaced.");
+        notifyKey(player, "patrol.contact_resolved");
         saveRequest(player, req);
         return false;
     }
@@ -709,7 +708,7 @@ public final class FactionRequestManager {
             boolean fly = playerFlying && capable && worthwhile;
             req.putBoolean("PatrolLegFlight", fly);
             req.putBoolean("PatrolAirborne", fly);
-            if (fly) notify(player, "The patrol is flight-capable and you started this leg airborne. They are taking an aerial route; stay near the leader until the next checkpoint.");
+            if (fly) notifyKey(player, "patrol.aerial_route");
         }
         return req.getBoolean("PatrolLegFlight");
     }
@@ -780,8 +779,8 @@ public final class FactionRequestManager {
         req.putUUID("PatrolLeader", replacement.getUUID());
         req.putString("PatrolLeaderName", replacement.getFighterName());
         if (player != null && !replacement.getFighterName().equals(oldName)) {
-            notify(player, (oldName.isBlank() ? "The patrol leader" : oldName)
-                    + " can no longer lead. " + replacement.getFighterName() + " is taking point.");
+            notifyKey(player, "patrol.leader_replaced", oldName.isBlank()
+                    ? Component.translatable("dmzlivingworld.message.faction_request.patrol.default_leader") : oldName, replacement.getFighterName());
         }
         return replacement;
     }
@@ -886,8 +885,10 @@ public final class FactionRequestManager {
 
     private static String supplyReceiverLabel(CompoundTag req, WorldFaction faction) {
         String name = req == null ? "" : req.getString("SupplyReceiverName");
-        if (name.isBlank()) return faction == null ? "the marked faction receiver" : "the marked " + faction.name() + " receiver";
-        return name + (faction == null ? "" : " of " + faction.name());
+        if (name.isBlank()) return faction == null
+                ? auxiliaryView("receiver.marked", "the marked faction receiver")
+                : auxiliaryView("receiver.marked_faction", "the marked %s receiver", faction.name());
+        return faction == null ? name : auxiliaryView("receiver.of_faction", "%s of %s", name, faction.name());
     }
 
     /** Supply work is handed to one exact persistent faction resident; the request never creates or suppresses a clerk. */
@@ -903,17 +904,15 @@ public final class FactionRequestManager {
             String oldName = req.getString("SupplyReceiverName");
             clearSupplyReceiverIdentity(req);
             if (!commitSupplyReceiverBinding(player, level, req, faction)) {
-                notify(player, "Supply request cancelled without a cooldown: " + faction.name()
-                        + " no longer has an available faction member to receive the shipment.");
+                notifyKey(player, "supply.cancelled_no_member", faction.name());
                 clearRequest(player);
                 return;
             }
-            notify(player, (oldName.isBlank() ? "The original receiver" : oldName)
-                    + " is no longer available. " + faction.name() + " reassigned the shipment to "
-                    + req.getString("SupplyReceiverName") + ". The compass now tracks the new receiver.");
+            notifyKey(player, "supply.receiver_reassigned", oldName.isBlank()
+                            ? Component.translatable("dmzlivingworld.message.faction_request.supply.original_receiver") : oldName,
+                    faction.name(), req.getString("SupplyReceiverName"));
         } else if (!commitSupplyReceiverBinding(player, level, req, faction)) {
-            notify(player, "Supply request cancelled without a cooldown: no available " + faction.name()
-                    + " resident is available to receive the shipment.");
+            notifyKey(player, "supply.cancelled_no_resident", faction.name());
             clearRequest(player);
             return;
         }
@@ -930,13 +929,11 @@ public final class FactionRequestManager {
             String oldName = req.getString("SupplyReceiverName");
             clearSupplyReceiverIdentity(req);
             if (!commitSupplyReceiverBinding(player, level, req, faction)) {
-                notify(player, "Supply request cancelled without a cooldown: " + faction.name()
-                        + " has nobody else available to receive the shipment.");
+                notifyKey(player, "supply.cancelled_no_replacement", faction.name());
                 clearRequest(player);
                 return;
             }
-            notify(player, oldName + " can no longer receive the shipment. New receiver: "
-                    + req.getString("SupplyReceiverName") + ". The compass has updated.");
+            notifyKey(player, "supply.new_receiver", oldName, req.getString("SupplyReceiverName"));
             return;
         }
 
@@ -954,9 +951,7 @@ public final class FactionRequestManager {
         req.putBoolean("Started", true);
         if (!req.getBoolean("MissionStartSpoken")) {
             req.putBoolean("MissionStartSpoken", true);
-            notify(player, req.getString("SupplyReceiverName") + " is the receiver for " + faction.name()
-                    + ". Gather the listed goods, follow the live compass, and RIGHT-CLICK "
-                    + req.getString("SupplyReceiverName") + " to hand them over.");
+            notifyKey(player, "supply.started", req.getString("SupplyReceiverName"), faction.name(), req.getString("SupplyReceiverName"));
         }
         saveRequest(player, req);
     }
@@ -976,7 +971,7 @@ public final class FactionRequestManager {
             FactionManager.adjustReputation(player, faction, -2);
             FactionWorldData.get(level).addHistory(faction, now, requestTitle(req) + " ended early after " + lost
                     + " assigned trainee" + (lost == 1 ? " became" : "s became") + " unavailable. The roster was not refilled.");
-            notify(player, "Training assignment failed: an assigned real trainee died or left before completing the drill. The fixed roster will not be replaced.");
+            notifyKey(player, "training.assignment_failed");
             setCooldown(player, faction, now + 24000L); clearRequest(player); return;
         }
         java.util.function.Predicate<AmbientFighterEntity> preferred = officerAssignment
@@ -1016,8 +1011,8 @@ public final class FactionRequestManager {
                 if (speaker != null) speaker.speak(FactionRequestDialogue.success(type, now), 78);
                 setCooldown(player, faction, now + (officerAssignment ? 42000L : 36000L));
                 finishSuccess(player, req, reward,
-                        faction.name() + " completed the training assignment with the same real trainees who began it.",
-                        "The trained residents gain readiness/growth and the faction records the completed drill.");
+                        resultView("training.summary", "%s completed the training assignment with the same real trainees who began it.", faction.name()),
+                        resultView("training.impact", "The trained residents gain readiness/growth and the faction records the completed drill."));
             }
             return;
         }
@@ -1025,8 +1020,7 @@ public final class FactionRequestManager {
         if (!req.getBoolean("MissionStartSpoken")) {
             trainee.speak(FactionRequestDialogue.start(type, now ^ trainee.getUUID().getLeastSignificantBits()), 76);
             req.putBoolean("MissionStartSpoken", true);
-            notify(player, faction.name() + " assigned a fixed roster of " + FactionRequestMissionManager.rosterSize(req, "TrainingTeam")
-                    + " real members. Each person spars once; nobody is replaced if hurt or killed.");
+            notifyKey(player, "training.roster_assigned", faction.name(), FactionRequestMissionManager.rosterSize(req, "TrainingTeam"));
         }
         saveRequest(player, req);
     }
@@ -1040,7 +1034,7 @@ public final class FactionRequestManager {
             if (observation == null || !isPracticalQuestLand(level, observation)) observation = targetSite;
             req.putDouble("ReconX", observation.getX() + 0.5D); req.putInt("ReconY", observation.getY()); req.putDouble("ReconZ", observation.getZ() + 0.5D);
             req.putInt("ReconSuspicion", 0); req.putInt("ReconCalm", 100); resetPresence(req); saveRequest(player, req);
-            objectiveToast(player, "Recon point assigned — observe the marked faction members without being identified."); return;
+            objectiveToastKey(player, "recon_assigned"); return;
         }
         BlockPos observation = new BlockPos((int)Math.floor(req.getDouble("ReconX")), req.getInt("ReconY"), (int)Math.floor(req.getDouble("ReconZ")));
         if (FactionRequestMissionManager.rosterSize(req, "ReconObservers") == 0 && distanceSqTo(observation, player) > 140.0D * 140.0D) return;
@@ -1053,19 +1047,19 @@ public final class FactionRequestManager {
         if (guards.isEmpty() && !securityBroken) return; // same real observers are merely unloaded
         if (securityBroken && !req.getBoolean("ReconSecurityBrokenNotified")) {
             req.putBoolean("ReconSecurityBrokenNotified", true);
-            notify(player, "The fixed observation roster has been neutralized. Recon can continue, but the violent outcome reduces its value; nobody replaces them.");
+            notifyKey(player, "recon.roster_neutralized");
         }
         boolean visible = !securityBroken && guards.stream().anyMatch(g -> canCovertGuardSee(level, g, player,
                 g.getFactionRole().id() >= FactionRole.ENFORCER.id() ? 48.0D : 40.0D));
         int suspicion = Math.max(0, req.getInt("ReconSuspicion"));
         suspicion = visible ? Math.min(100, suspicion + (player.isShiftKeyDown() ? 26 : 40)) : Math.max(0, suspicion - 45); req.putInt("ReconSuspicion", suspicion);
         if (suspicion >= 100 && !guards.isEmpty()) {
-            if (!req.getBoolean("ReconDetected")) { notify(player, "The real patrol identified you. Break line of sight before continuing."); guards.get(0).speak(FactionRequestDialogue.pressure("RECON", now), 64); }
+            if (!req.getBoolean("ReconDetected")) { notifyKey(player, "recon.detected"); guards.get(0).speak(FactionRequestDialogue.pressure("RECON", now), 64); }
             req.putBoolean("ReconDetected", true); req.putInt("ReconCalm", 0);
             for (AmbientFighterEntity guard : guards) { guard.getPersistentData().putBoolean("LWRequestAlerted", true); guard.setStoryRole(AmbientFighterEntity.STORY_ENEMY); guard.setTarget(player); PeacekeeperManager.markNpcAggressor(player, guard); }
         } else if (req.getBoolean("ReconDetected")) {
             if (!visible) req.putInt("ReconCalm", req.getInt("ReconCalm") + 20); else req.putInt("ReconCalm", 0);
-            if (req.getInt("ReconCalm") >= 120 || securityBroken) { req.putBoolean("ReconDetected", false); req.putInt("ReconSuspicion", 0); clearQuestAggression(guards, player); notify(player, "You shook the patrol. Resume observation."); }
+            if (req.getInt("ReconCalm") >= 120 || securityBroken) { req.putBoolean("ReconDetected", false); req.putInt("ReconSuspicion", 0); clearQuestAggression(guards, player); notifyKey(player, "recon.escaped"); }
         }
         double dx=player.getX()-req.getDouble("ReconX"), dz=player.getZ()-req.getDouble("ReconZ");
         if (dx*dx+dz*dz<=24.0D*24.0D && !req.getBoolean("ReconDetected")) req.putInt("Presence", req.getInt("Presence")+20);
@@ -1076,9 +1070,9 @@ public final class FactionRequestManager {
         AmbientFighterEntity voice = FactionRequestMissionManager.firstLoaded(level, req, "ReconObservers"); if (voice != null) voice.speak(FactionRequestDialogue.success("RECON",now),70);
         setCooldown(player,faction,now+30000L+player.getRandom().nextInt(24001));
         finishSuccess(player, req, reward,
-                faction.name() + " received the reconnaissance report after observing " + FactionRequestMissionManager.rosterSize(req,"ReconObservers") + " real residents.",
-                req.getInt("ReconCasualties") == 0 ? "Clean reconnaissance improved faction momentum without casualties."
-                        : req.getInt("ReconCasualties") + " real observer casualties are recorded; the reduced payout reflects the compromised mission.");
+                resultView("recon.summary", "%s received the reconnaissance report after observing %s real residents.", faction.name(), FactionRequestMissionManager.rosterSize(req,"ReconObservers")),
+                req.getInt("ReconCasualties") == 0 ? resultView("recon.impact_clean", "Clean reconnaissance improved faction momentum without casualties.")
+                        : resultView("recon.impact_casualties", "%s real observer casualties are recorded; the reduced payout reflects the compromised mission.", req.getInt("ReconCasualties")));
     }
 
     private static void tickProtectOfficer(ServerPlayer player, ServerLevel level, long now, CompoundTag req, WorldFaction faction) {
@@ -1089,7 +1083,7 @@ public final class FactionRequestManager {
         if (assigned != null && FactionRequestMissionManager.residentFallenOrDeparted(level, faction, assigned)) {
             FactionManager.adjustReputation(player, faction, -3); data.adjustMomentum(faction, -0.018F);
             data.addHistory(faction, now, "Protection detail failed because its assigned real officer was killed or left before completion.");
-            notify(player, "Protection failed: the assigned officer is no longer available. The mission will not substitute another person."); setCooldown(player, faction, now + 24000L); clearRequest(player); return;
+            notifyKey(player, "protect.officer_unavailable"); setCooldown(player, faction, now + 24000L); clearRequest(player); return;
         }
         AmbientFighterEntity officer = reserveRealMember(player, level, req, faction, "ProtectedOfficer", sourceSite,
                 FactionRequestMissionManager.SIDE_ALLY, FactionRequestMissionManager.ROLE_PROTECTED,
@@ -1105,11 +1099,11 @@ public final class FactionRequestManager {
                 FactionRequestMissionManager.SIDE_ENEMY, FactionRequestMissionManager.ROLE_COMBAT, f -> !f.isNonCombatant());
         if (!mandatoryRosterReady(player, level, req, enemy, "ProtectAttackers", sourceSite)) return;
         FactionRequestMissionManager.lockRoster(req,"ProtectedOfficer"); FactionRequestMissionManager.lockRoster(req,"ProtectAttackers");
-        if (!req.getBoolean("Started")) { req.putBoolean("Started",true); officer.speak(FactionRequestDialogue.start("PROTECT",now),76); notify(player,"Protect officer " + officer.getFighterName() + ". The enemy force is fixed; break it before the officer is killed, defeated or forced to withdraw."); saveRequest(player,req); return; }
+        if (!req.getBoolean("Started")) { req.putBoolean("Started",true); officer.speak(FactionRequestDialogue.start("PROTECT",now),76); notifyKey(player,"protect.started", officer.getFighterName()); saveRequest(player,req); return; }
         if (!officer.isAlive() || officer.isDefeated() || officer.isCaptive() || FactionRequestMissionManager.isYielded(officer) || FactionRequestMissionManager.isRetreated(officer)) {
             FactionManager.adjustReputation(player,faction,-3); data.adjustMomentum(faction,-0.018F);
             data.addHistory(faction,now,"A protection detail failed when officer " + officer.getFighterName() + " was neutralized.");
-            notify(player,"Protection failed: " + officer.getFighterName() + " was neutralized before the attackers broke."); setCooldown(player,faction,now+24000L); clearRequest(player); return;
+            notifyKey(player,"protect.neutralized", officer.getFighterName()); setCooldown(player,faction,now+24000L); clearRequest(player); return;
         }
         FactionRequestMissionManager.applyMoraleBreak(level,req,enemy,"ProtectAttackers");
         if (!FactionRequestMissionManager.rosterNeutralized(level,req,enemy,"ProtectAttackers")) { saveRequest(player,req); return; }
@@ -1117,8 +1111,8 @@ public final class FactionRequestManager {
         data.adjustMomentum(faction, 0.018F); data.adjustMomentum(enemy, -0.012F); data.addHistory(faction,now,"Real officer " + officer.getFighterName() + " survived after the committed attack roster broke.");
         officer.speak(FactionRequestDialogue.success("PROTECT",now),80); setCooldown(player,faction,now+42000L);
         finishSuccess(player, req, reward,
-                "Officer " + officer.getFighterName() + " survived and the committed attack roster was broken.",
-                "The officer returns to normal duty; allied momentum rises and enemy momentum falls.");
+                resultView("protect.summary", "Officer %s survived and the committed attack roster was broken.", officer.getFighterName()),
+                resultView("protect.impact", "The officer returns to normal duty; allied momentum rises and enemy momentum falls."));
     }
 
     private static void tickCaptureTarget(ServerPlayer player, ServerLevel level, long now, CompoundTag req, WorldFaction faction) {
@@ -1129,10 +1123,10 @@ public final class FactionRequestManager {
 
         if (req.getBoolean("CaptureSecured")) {
             PrisonerWorldData.Prisoner prisoner = PrisonerWorldData.get(level).byId(req.getString("CapturePrisoner"));
-            if (prisoner == null || !prisoner.active() || prisoner.entityId == null) { notify(player,"Capture failed: the prisoner record is no longer active."); clearRequest(player); return; }
+            if (prisoner == null || !prisoner.active() || prisoner.entityId == null) { notifyKey(player,"capture.record_inactive"); clearRequest(player); return; }
             if (FactionRequestMissionManager.residentFallenOrDeparted(level, enemy, prisoner.entityId)) {
                 PrisonerWorldData.get(level).markDead(level, prisoner, now, "killed during capture transport");
-                FactionManager.adjustReputation(player, faction, -3); notify(player,"Capture failed: the prisoner died during transport. No substitute will appear."); setCooldown(player,faction,now+30000L); clearRequest(player); return;
+                FactionManager.adjustReputation(player, faction, -3); notifyKey(player,"capture.transport_death"); setCooldown(player,faction,now+30000L); clearRequest(player); return;
             }
             AmbientFighterEntity target = entity(level, prisoner.entityId); if (target == null) return;
             target.setCaptive(false); target.setStoryRole(AmbientFighterEntity.STORY_CAPTIVE);
@@ -1146,12 +1140,12 @@ public final class FactionRequestManager {
             data.adjustMomentum(faction,0.012F); data.adjustMomentum(enemy,-0.014F); data.addHistory(faction,now,"The same real prisoner " + target.getFighterName() + " was escorted alive to faction custody.");
             setCooldown(player,faction,now+48000L+player.getRandom().nextInt(30001));
             finishSuccess(player, req, reward,
-                    target.getFighterName()+" was subdued and escorted alive to the faction handoff as the same persistent prisoner.",
-                    "The prisoner remains physically tied to future rescue/release outcomes; allied momentum rises and enemy momentum falls."); return;
+                    resultView("capture.summary", "%s was subdued and escorted alive to the faction handoff as the same persistent prisoner.", target.getFighterName()),
+                    resultView("capture.impact", "The prisoner remains physically tied to future rescue/release outcomes; allied momentum rises and enemy momentum falls.")); return;
         }
 
         boolean elite="ELITE_CAPTURE".equals(req.getString("Type")); UUID assigned=FactionRequestMissionManager.rosterId(req,"CaptureTarget",0);
-        if (assigned != null && FactionRequestMissionManager.residentFallenOrDeparted(level,enemy,assigned)) { notify(player,"Capture failed: the marked target died or left before being subdued. The request will not choose a replacement."); setCooldown(player,faction,now+30000L); clearRequest(player); return; }
+        if (assigned != null && FactionRequestMissionManager.residentFallenOrDeparted(level,enemy,assigned)) { notifyKey(player,"capture.target_unavailable"); setCooldown(player,faction,now+30000L); clearRequest(player); return; }
         AmbientFighterEntity target = reserveRealMember(player,level,req,enemy,"CaptureTarget",targetSite,
                 FactionRequestMissionManager.SIDE_ENEMY,FactionRequestMissionManager.ROLE_CAPTURE_TARGET,
                 elite ? f -> !f.isNonCombatant() && f.getFactionRole().id()>=FactionRole.ENFORCER.id() : f -> !f.isNonCombatant());
@@ -1169,8 +1163,8 @@ public final class FactionRequestManager {
             if (approachX * approachX + approachZ * approachZ > 18.0D * 18.0D) { saveRequest(player, req); return; }
             req.putBoolean("CaptureEncountered", true); req.putBoolean("Started", true);
             target.speak(FactionRequestDialogue.start(req.getString("Type"),now),76);
-            notify(player,"Target reached: " + target.getFighterName() + ". Step 2/3: use Friendly Fist to subdue them without killing them.");
-            objectiveToast(player, "Capture step 2/3 — Friendly Fist " + target.getFighterName() + ".");
+            notifyKey(player,"capture.target_reached", target.getFighterName());
+            objectiveToastKey(player, "capture_step", target.getFighterName());
             saveRequest(player,req); return;
         }
     }
@@ -1181,7 +1175,7 @@ public final class FactionRequestManager {
         BlockPos site=ensureFactionLandSite(player,level,req,targetFaction,"TargetSite"); if(site==null)return;
         UUID locked = FactionRequestMissionManager.rosterId(req,"HuntTarget",0);
         if (locked != null && FactionRequestMissionManager.residentFallenOrDeparted(level,targetFaction,locked)) {
-            notify(player,"Mercenary contract voided: the marked target died or left through another event. The contract will not retarget someone else."); setCooldown(player,employer,now+18000L); clearRequest(player); return;
+            notifyKey(player,"mercenary.contract_voided"); setCooldown(player,employer,now+18000L); clearRequest(player); return;
         }
         FactionRole wanted=FactionRole.byId(req.getInt("TargetRole")); String wantedName=req.getString("TargetName");
         java.util.function.Predicate<AmbientFighterEntity> match=f->!f.isNonCombatant() && (wanted==FactionRole.LEADER ? f.isFactionLeader() || (!wantedName.isBlank()&&wantedName.equals(f.getFighterName())) : f.getFactionRole()==wanted);
@@ -1192,14 +1186,14 @@ public final class FactionRequestManager {
         final UUID huntTargetId = target.getUUID();
         int escorts=Math.max(0,Math.min(3,req.getInt("EscortNeed"))); FactionRequestMissionManager.ensureRoster(player,level,req,targetFaction,"HuntEscorts",escorts,site,FactionRequestMissionManager.SIDE_ENEMY,FactionRequestMissionManager.ROLE_COMBAT,f->!f.isNonCombatant()&&!f.getUUID().equals(huntTargetId));
         FactionRequestMissionManager.lockRoster(req,"HuntTarget"); FactionRequestMissionManager.lockRoster(req,"HuntEscorts");
-        if(!req.getBoolean("Started")){req.putBoolean("Started",true);target.speak(FactionRequestDialogue.start("MERCENARY_HUNT",now),76);notify(player,"Named contract confirmed on " + target.getFighterName() + ". No duplicate target can replace them.");saveRequest(player,req);return;}
+        if(!req.getBoolean("Started")){req.putBoolean("Started",true);target.speak(FactionRequestDialogue.start("MERCENARY_HUNT",now),76);notifyKey(player,"mercenary.hunt_confirmed", target.getFighterName());saveRequest(player,req);return;}
         if(FactionRequestMissionManager.isYielded(target)||FactionRequestMissionManager.isRetreated(target)||target.isDefeated()){
             int reward=Math.max(1,rewardRep(req,16)-3); FactionManager.adjustReputation(player,employer,reward); FactionManager.propagatePlayerFactionConsequence(player,employer,reward);
             data.addHistory(employer,now,"Mercenary target " + target.getFighterName() + " was forced to yield and abandon the field rather than killed."); target.speak(FactionRequestDialogue.yield("MERCENARY_HUNT",now),72);
             setCooldown(player,employer,now+48000L);
             finishSuccess(player, req, reward,
-                    "The named target " + target.getFighterName() + " surrendered and abandoned the field.",
-                    "The real target survives; the employer pays a reduced reward and records the non-lethal contract resolution.");
+                    resultView("mercenary_hunt_yield.summary", "The named target %s surrendered and abandoned the field.", target.getFighterName()),
+                    resultView("mercenary_hunt_yield.impact", "The real target survives; the employer pays a reduced reward and records the non-lethal contract resolution."));
         } else saveRequest(player,req);
     }
 
@@ -1209,12 +1203,12 @@ public final class FactionRequestManager {
         UUID operativeId=FactionRequestMissionManager.rosterId(req,"ExtractionOperative",0);
         if(operativeId!=null&&FactionRequestMissionManager.residentFallenOrDeparted(level,employer,operativeId)){
             FactionManager.adjustReputation(player,employer,-2);data.adjustMomentum(employer,-0.010F);data.addHistory(employer,now,"Extraction failed because the assigned real operative was killed or departed before reaching home.");
-            notify(player,"Extraction failed: the operative is no longer available. The mission will not substitute someone else.");setCooldown(player,employer,now+30000L);clearRequest(player);return;
+            notifyKey(player,"extraction.operative_unavailable");setCooldown(player,employer,now+30000L);clearRequest(player);return;
         }
         AmbientFighterEntity agent=reserveRealMember(player,level,req,employer,"ExtractionOperative",hostileSite,FactionRequestMissionManager.SIDE_ALLY,FactionRequestMissionManager.ROLE_OPERATIVE,f->!f.isNonCombatant());
         if(agent==null)return;
         if(agent.isCaptive()||agent.isDefeated()||FactionRequestMissionManager.isYielded(agent)||FactionRequestMissionManager.isRetreated(agent)){
-            FactionManager.adjustReputation(player,employer,-2);notify(player,"Extraction failed: "+agent.getFighterName()+" was recaptured or neutralized before reaching home.");setCooldown(player,employer,now+30000L);clearRequest(player);return;
+            FactionManager.adjustReputation(player,employer,-2);notifyKey(player,"extraction.neutralized",agent.getFighterName());setCooldown(player,employer,now+30000L);clearRequest(player);return;
         }
         req.putUUID("TargetEntity",agent.getUUID());req.putString("TargetName",agent.getFighterName());req.putDouble("AgentX",agent.getX());req.putDouble("AgentZ",agent.getZ());
         // The exact operative is known immediately, but hostile guards do not activate off-screen before the player
@@ -1223,26 +1217,26 @@ public final class FactionRequestManager {
         FactionRequestMissionManager.ensureRoster(player,level,req,hostile,"ExtractionGuards",Math.max(2,Math.min(4,req.getInt("EscortNeed"))),hostileSite,FactionRequestMissionManager.SIDE_ENEMY,FactionRequestMissionManager.ROLE_COMBAT,f->!f.isNonCombatant());
         if(!mandatoryRosterReady(player, level, req, hostile, "ExtractionGuards", hostileSite))return;
         FactionRequestMissionManager.lockRoster(req,"ExtractionOperative");FactionRequestMissionManager.lockRoster(req,"ExtractionGuards");
-        if(!req.getBoolean("Started")){req.putBoolean("Started",true);resetPresence(req);agent.speak(FactionRequestDialogue.start("MERCENARY_EXTRACTION",now),82);notify(player,"Extraction contact: "+agent.getFighterName()+". Get them home safely; the guards and pursuers are committed teams and will not be replaced.");saveRequest(player,req);return;}
-        if(!agent.isAlive()){FactionManager.adjustReputation(player,employer,-2);notify(player,"Extraction failed: "+agent.getFighterName()+" was killed.");setCooldown(player,employer,now+30000L);clearRequest(player);return;}
+        if(!req.getBoolean("Started")){req.putBoolean("Started",true);resetPresence(req);agent.speak(FactionRequestDialogue.start("MERCENARY_EXTRACTION",now),82);notifyKey(player,"extraction.contact",agent.getFighterName());saveRequest(player,req);return;}
+        if(!agent.isAlive()){FactionManager.adjustReputation(player,employer,-2);notifyKey(player,"extraction.killed",agent.getFighterName());setCooldown(player,employer,now+30000L);clearRequest(player);return;}
         double da=player.distanceTo(agent);if(da>4.0D&&da<110.0D&&(now%20L==0L||agent.getNavigation().isDone()))agent.getNavigation().moveTo(player,1.10D);
         if(req.getBoolean("ExtractionPursuitPlanned")&&!req.getBoolean("ExtractionPursuitTriggered")&&distanceSqTo(hostileSite,player)>=260.0D*260.0D&&distanceSqTo(homeSite,player)>=220.0D*220.0D&&da<=36.0D){
             FactionRequestMissionManager.ensureRoster(player,level,req,hostile,"ExtractionPursuit",3,player.blockPosition(),FactionRequestMissionManager.SIDE_ENEMY,FactionRequestMissionManager.ROLE_COMBAT,f->!f.isNonCombatant());
-            if(FactionRequestMissionManager.rosterSize(req,"ExtractionPursuit")>0){FactionRequestMissionManager.lockRoster(req,"ExtractionPursuit");req.putBoolean("ExtractionPursuitTriggered",true);req.putInt("ExtractionPursuitCalm",0);agent.speak(FactionRequestDialogue.pressure("MERCENARY_EXTRACTION",now),72);notify(player,hostile.name()+" committed a pursuit team. Break contact or break their morale; no reinforcements are coming.");}
+            if(FactionRequestMissionManager.rosterSize(req,"ExtractionPursuit")>0){FactionRequestMissionManager.lockRoster(req,"ExtractionPursuit");req.putBoolean("ExtractionPursuitTriggered",true);req.putInt("ExtractionPursuitCalm",0);agent.speak(FactionRequestDialogue.pressure("MERCENARY_EXTRACTION",now),72);notifyKey(player,"extraction.pursuit",hostile.name());}
         }
         if(req.getBoolean("ExtractionPursuitTriggered")&&!req.getBoolean("ExtractionPursuitResolved")){
             FactionRequestMissionManager.applyMoraleBreak(level,req,hostile,"ExtractionPursuit");boolean broken=FactionRequestMissionManager.rosterNeutralized(level,req,hostile,"ExtractionPursuit");
             boolean closePursuer=FactionRequestMissionManager.loadedActiveRoster(level,req,"ExtractionPursuit").stream().anyMatch(f->f.distanceToSqr(player)<=160.0D*160.0D);
             if(!closePursuer)req.putInt("ExtractionPursuitCalm",req.getInt("ExtractionPursuitCalm")+20);else req.putInt("ExtractionPursuitCalm",0);
-            if(broken||req.getInt("ExtractionPursuitCalm")>=200){if(!broken)FactionRequestMissionManager.withdrawRoster(level,req,"ExtractionPursuit");req.putBoolean("ExtractionPursuitResolved",true);agent.speak(FactionRequestDialogue.success("MERCENARY_EXTRACTION",now^0x72A1L),68);objectiveToast(player,broken?"Pursuit force broken — continue the extraction.":"Pursuit shaken — continue the extraction.");}
+            if(broken||req.getInt("ExtractionPursuitCalm")>=200){if(!broken)FactionRequestMissionManager.withdrawRoster(level,req,"ExtractionPursuit");req.putBoolean("ExtractionPursuitResolved",true);agent.speak(FactionRequestDialogue.success("MERCENARY_EXTRACTION",now^0x72A1L),68);objectiveToastKey(player,broken?"pursuit_broken":"pursuit_shaken");}
         }
         boolean playerHome=distanceSqTo(homeSite,player)<=150.0D*150.0D;double ax=agent.getX()-(homeSite.getX()+0.5D),az=agent.getZ()-(homeSite.getZ()+0.5D);boolean agentHome=ax*ax+az*az<=150.0D*150.0D;
         if(playerHome&&agentHome&&da<=28.0D)req.putInt("Presence",req.getInt("Presence")+20);else req.putInt("Presence",Math.max(0,req.getInt("Presence")-10));
         if(req.getInt("Presence")<Math.min(40,Math.max(20,req.getInt("ReturnNeed")))){saveRequest(player,req);return;}
         int reward=rewardRep(req,16);FactionManager.adjustReputation(player,employer,reward);FactionManager.propagatePlayerFactionConsequence(player,employer,reward);data.adjustMomentum(employer,0.014F);data.adjustMomentum(hostile,-0.006F);data.addHistory(employer,now,"Real operative "+agent.getFighterName()+" was extracted alive from "+hostile.name()+" territory.");agent.speak(FactionRequestDialogue.success("MERCENARY_EXTRACTION",now),82);setCooldown(player,employer,now+48000L+player.getRandom().nextInt(24001));
         finishSuccess(player, req, reward,
-                "Operative " + agent.getFighterName() + " was extracted alive and returned to the employer faction.",
-                "Employer momentum increases, hostile momentum falls slightly, and the same operative returns to normal faction life.");
+                resultView("mercenary_extraction.summary", "Operative %s was extracted alive and returned to the employer faction.", agent.getFighterName()),
+                resultView("mercenary_extraction.impact", "Employer momentum increases, hostile momentum falls slightly, and the same operative returns to normal faction life."));
     }
 
     /**
@@ -1341,8 +1335,7 @@ public final class FactionRequestManager {
         // member at the real faction site. That person remains part of the faction after the request.
         if (giver == null) giver = materializeIntelMissionGiver(player, level, req, employer, meeting);
         if (giver == null) {
-            notify(player, "Intelligence request unavailable: " + employer.name()
-                    + " could not field a real mission handler at its faction site.");
+            notifyKey(player, "intel.unavailable", employer.name());
             return false;
         }
         FactionRequestMissionManager.lockRoster(req, "IntelMissionGiver");
@@ -1386,8 +1379,7 @@ public final class FactionRequestManager {
         FactionRequestMissionManager.lockRoster(req, "IntelMissionGiver");
         if (expected != null && !expected.equals(giver.getUUID()) && !req.getBoolean("IntelGiverReassignedNotified")) {
             req.putBoolean("IntelGiverReassignedNotified", true);
-            notify(player, "Your original intelligence handler became unavailable. " + giver.getFighterName()
-                    + " is taking over the same briefing/report role.");
+            notifyKey(player, "intel.handler_reassigned", giver.getFighterName());
         }
         req.putUUID("IntelMissionGiver", giver.getUUID());
         req.putString("IntelMissionGiverName", giver.getFighterName());
@@ -1446,9 +1438,8 @@ public final class FactionRequestManager {
         resetPresence(req);
         ensureFactionLandSite(player, level, req, target, "TargetSite");
         giver.speak(FactionRequestDialogue.briefing("MERCENARY_INTEL", now ^ giver.getUUID().getLeastSignificantBits()), 108);
-        notify(player, giver.getFighterName() + " briefed you on " + target.name()
-                + ". Reach each marked listening position, stay hidden while the local members talk, and return to this same person with the report.");
-        objectiveToast(player, "INTELLIGENCE GAIN • briefing complete • infiltrate " + target.name() + " without being seen");
+        notifyKey(player, "intel.briefed", giver.getFighterName(), target.name());
+        objectiveToastKey(player, "intel_briefing_complete", target.name());
         saveRequest(player, req);
     }
 
@@ -1474,8 +1465,8 @@ public final class FactionRequestManager {
             req.putDouble("IntelMissionGiverX", giver.getX()); req.putDouble("IntelMissionGiverZ", giver.getZ());
             if (player.distanceToSqr(giver) <= 18.0D * 18.0D && !req.getBoolean("IntelBriefReminder")) {
                 req.putBoolean("IntelBriefReminder", true);
-                giver.speak("You're here for the intelligence job. Talk to me before you move on their base.", 82);
-                objectiveToast(player, "BRIEFING • right-click " + giver.getFighterName());
+                giver.speakKey("dialogue.faction_request.intel.briefing_reminder", 82);
+                objectiveToastKey(player, "intel_briefing_interact", giver.getFighterName());
             }
             saveRequest(player, req);
             return;
@@ -1502,7 +1493,7 @@ public final class FactionRequestManager {
                 req.remove("IntelScenePreparedPoint");
                 resetPresence(req);
                 saveRequest(player, req);
-                objectiveToast(player, "Observation " + point + " / " + pointNeed + " marked — get within 10 blocks. Crouching matters on exposed ground; the timer is shown on the HUD.");
+                objectiveToastKey(player, "intel_observation_marked", point, pointNeed);
                 return;
             }
 
@@ -1558,11 +1549,9 @@ public final class FactionRequestManager {
                 int original = FactionRequestMissionManager.rosterSize(req, "IntelObservers");
                 String observerNames = observers.stream().map(AmbientFighterEntity::getFighterName)
                         .collect(java.util.stream.Collectors.joining(", "));
-                notify(player, scenario.name() + ": " + scenario.brief() + " Stay within 10 blocks for "
-                        + secondsRemaining(req.getInt("Presence"), requiredPresence(req, 600)) + "s of clean observation. "
-                        + "Security team (" + observers.size() + "/" + original + " active): " + observerNames
-                        + ". This is the committed security team; casualties are not replaced.");
-                objectiveToast(player, "Observation " + point + " / " + pointNeed + " • 10-block listening zone • crouch/use cover if exposed");
+                notifyKey(player, "intel.observation_started", scenario.name(), scenario.brief(),
+                        secondsRemaining(req.getInt("Presence"), requiredPresence(req, 600)), observers.size(), original, observerNames);
+                objectiveToastKey(player, "intel_listening_zone", point, pointNeed);
                 saveRequest(player, req);
                 return;
             }
@@ -1570,7 +1559,7 @@ public final class FactionRequestManager {
             if (securityBroken && !req.getBoolean("IntelSecurityBrokenNotified")) {
                 req.putBoolean("IntelSecurityBrokenNotified", true);
                 req.putBoolean("IntelCompromised", true);
-                notify(player, "All assigned observers are neutralized. Observation can continue, but the operation is fully compromised and no replacement NPC will appear.");
+                notifyKey(player, "intel.observers_neutralized");
             }
 
             double ox = req.getDouble("ObjectiveX"), oz = req.getDouble("ObjectiveZ");
@@ -1596,8 +1585,8 @@ public final class FactionRequestManager {
                     req.putInt("Presence", -20);
                     req.putBoolean("IntelCompromised", true);
                     if (spotter != null) spotter.speak(FactionMissionFlavor.pick(scenario.detected(), now), 78);
-                    notify(player, "SPOTTED during " + scenario.name() + ". That listening attempt was broken. Escape line of sight for 6 seconds, then return and listen again.");
-                    objectiveToast(player, "SPOTTED • progress broken • lose line of sight for 6s");
+                    notifyKey(player, "intel.spotted", scenario.name());
+                    objectiveToastKey(player, "intel_spotted");
                 }
                 for (AmbientFighterEntity guard : observers) {
                     guard.getPersistentData().putBoolean("LWRequestAlerted", true);
@@ -1612,7 +1601,7 @@ public final class FactionRequestManager {
                     clearQuestAggression(observers, player);
                     AmbientFighterEntity voice = observers.isEmpty() ? null : observers.get(0);
                     if (voice != null) voice.speak(FactionMissionFlavor.pick(scenario.searching(), now), 66);
-                    notify(player, "Pursuit lost. Return to the observation marker; your clean observation timer can resume.");
+                    notifyKey(player, "intel.pursuit_lost");
                 }
             }
 
@@ -1645,13 +1634,13 @@ public final class FactionRequestManager {
                 FactionRequestMissionManager.releaseRoster(level, req, "IntelObservers");
                 req.putInt("SeriesStage", 2);
                 resetPresence(req);
-                objectiveToast(player, "INTEL COMPLETE • return to " + giver.getFighterName() + " and report");
-                notify(player, "Collection complete. Return to the same mission giver, " + giver.getFighterName()
-                        + ", and right-click them to deliver the intelligence report. There is no automatic proximity handoff.");
+                objectiveToastKey(player, "intel_complete", giver.getFighterName());
+                notifyKey(player, "intel.collection_complete", giver.getFighterName());
             } else {
                 FactionMissionFlavor.IntelScenario next = FactionMissionFlavor.intelScenario(req.getInt("IntelScenarioSeed"), point);
-                objectiveToast(player, "NEXT: observation " + point + " / " + pointNeed + " • " + next.name());
-                notify(player, "Relocate to the newly marked " + next.name() + " point. The same surviving security residents rotate there; anyone killed stays permanently absent.");
+                String scenarioName = localizedIntelScenario(next);
+                objectiveToastKey(player, "intel_next", point, pointNeed, scenarioName);
+                notifyKey(player, "intel.relocate", scenarioName);
             }
             saveRequest(player, req);
             return;
@@ -1664,9 +1653,9 @@ public final class FactionRequestManager {
         req.putDouble("IntelMissionGiverX", giver.getX());
         req.putDouble("IntelMissionGiverZ", giver.getZ());
         if (!req.getBoolean("IntelReturnSpoken") && player.distanceToSqr(giver) <= 24.0D * 24.0D) {
-            giver.speak("You made it back. Give me the report when you're ready.", 82);
+            giver.speakKey("dialogue.faction_request.intel.report_ready", 82);
             req.putBoolean("IntelReturnSpoken", true);
-            objectiveToast(player, "REPORT • right-click " + giver.getFighterName());
+            objectiveToastKey(player, "intel_report", giver.getFighterName());
         }
         saveRequest(player, req);
     }
@@ -1690,9 +1679,9 @@ public final class FactionRequestManager {
             contact.setStoryRole(AmbientFighterEntity.STORY_NONE);
         }
         finishSuccess(player, req, reward,
-                employer.name() + " accepted the completed field-intelligence report on " + target.name() + ".",
-                casualties > 0 ? casualties + " real casualties were recorded; the compromised operation reduced the payout and hardened enemy security."
-                        : "The collection remained clean; employer momentum improves and the full intelligence value is recorded.");
+                resultView("mercenary_intel.summary", "%s accepted the completed field-intelligence report on %s.", employer.name(), target.name()),
+                casualties > 0 ? resultView("mercenary_intel.impact_casualties", "%s real casualties were recorded; the compromised operation reduced the payout and hardened enemy security.", casualties)
+                        : resultView("mercenary_intel.impact_clean", "The collection remained clean; employer momentum improves and the full intelligence value is recorded."));
     }
 
     private static void tickMercenarySabotage(ServerPlayer player, ServerLevel level, long now, CompoundTag req, WorldFaction employer) {
@@ -1713,8 +1702,8 @@ public final class FactionRequestManager {
             setCooldown(player, employer, now + 42000L + player.getRandom().nextInt(24001));
             speakMissionSuccess(level, req, "SabotageSecurity");
             finishSuccess(player, req, reward,
-                    "All disruption points were completed and you escaped the supply route.",
-                    target.name() + " lost " + disrupted + " real supplies. Surviving guards remain the same persistent faction members; casualties are permanent."); return;
+                    resultView("mercenary_sabotage.summary", "All disruption points were completed and you escaped the supply route."),
+                    resultView("mercenary_sabotage.impact", "%s lost %s real supplies. Surviving guards remain the same persistent faction members; casualties are permanent.", target.name(), disrupted)); return;
         }
         if (!req.contains("SabotageRoute", Tag.TAG_LIST)) {
             ListTag route = new ListTag(); BlockPos cursor = site;
@@ -1744,9 +1733,8 @@ public final class FactionRequestManager {
         if (!req.getBoolean("Started")) {
             req.putBoolean("Started", true); req.putBoolean("DebugImmediate", false); resetPresence(req);
             if (!security.isEmpty()) security.get(0).speak(FactionRequestDialogue.start("MERCENARY_SABOTAGE", now), 72);
-            objectiveToast(player, "Interdiction 1 / " + route.size() + " — reach the first disruption point.");
-            notify(player, "Supply-route security is a fixed roster of real " + target.name() + " members. Disrupt all " + route.size()
-                    + " route points, then escape; nobody will reinforce or replace the guards.");
+            objectiveToastKey(player, "interdiction_first", route.size());
+            notifyKey(player, "sabotage.started", target.name(), route.size());
             saveRequest(player, req); return;
         }
 
@@ -1761,7 +1749,7 @@ public final class FactionRequestManager {
                     g.setTarget(player); PeacekeeperManager.markNpcAggressor(player, g);
                 }
                 spot.speak(FactionRequestDialogue.pressure("MERCENARY_SABOTAGE", now), 70);
-                notify(player, "Alarm raised. The same route guards are engaging; there is no reinforcement wave to wait out.");
+                notifyKey(player, "sabotage.alarm");
             }
         }
         FactionRequestMissionManager.applyMoraleBreak(level, req, target, "SabotageSecurity");
@@ -1778,7 +1766,7 @@ public final class FactionRequestManager {
         if (completedNode < route.size()) {
             req.putInt("SabotageNode", completedNode); req.putInt("SabotageWork", 0);
             CompoundTag next = route.getCompound(completedNode);
-            objectiveToast(player, "Interdiction " + completedNode + " / " + route.size() + " complete — relocate to the next route point.");
+            objectiveToastKey(player, "interdiction_next", completedNode, route.size());
             AmbientFighterEntity voice = security.stream().filter(AmbientFighterEntity::isAlive).findFirst().orElse(null);
             if (voice != null) voice.speak(FactionRequestDialogue.pressure("MERCENARY_SABOTAGE", now ^ completedNode * 6151L), 62);
             saveRequest(player, req); return;
@@ -1791,21 +1779,21 @@ public final class FactionRequestManager {
         data.addHistory(employer, now, "A three-point supply interdiction disrupted " + target.name() + " for " + disrupted
                 + " supplies using a fixed real security roster; " + req.getInt("SabotageCasualties") + " guards were killed.");
         req.putBoolean("SabotageDone", true); req.putInt("SabotageDisrupted", disrupted); resetPresence(req);
-        objectiveToast(player, "Supply route disabled — escape 300 blocks clear.");
-        notify(player, "All route points are disrupted. Escape 300 blocks clear; surviving security remains on duty.");
+        objectiveToastKey(player, "interdiction_escape");
+        notifyKey(player, "sabotage.escape");
         saveRequest(player, req);
     }
 
     private static void tickFrontline(ServerPlayer player, ServerLevel level, long now, CompoundTag req, WorldFaction faction) {
         WorldFaction enemy=FactionWorldData.get(level).byId(req.getString("Target"));if(enemy==null){clearRequest(player);return;}BlockPos site=ensureFactionLandSite(player,level,req,enemy,"TargetSite");if(site==null||(!req.getBoolean("Started")&&distanceSqTo(site,player)>120.0D*120.0D))return;
-        if(!req.getBoolean("Started")){if(!ensureCombatOperation(player,level,req,faction,enemy,site,5,6))return;req.putBoolean("Started",true);saveRequest(player,req);notify(player,"Frontline force committed: one fixed roster on each side. Break enemy morale; there are no waves and no replacements.");return;}
+        if(!req.getBoolean("Started")){if(!ensureCombatOperation(player,level,req,faction,enemy,site,5,6))return;req.putBoolean("Started",true);saveRequest(player,req);notifyKey(player,"frontline.started");return;}
         FactionRequestMissionManager.applyMoraleBreak(level,req,enemy,"Enemies");FactionRequestMissionManager.applyMoraleBreak(level,req,faction,"Allies");
         boolean enemyBroken=FactionRequestMissionManager.rosterNeutralized(level,req,enemy,"Enemies"),allyBroken=FactionRequestMissionManager.rosterNeutralized(level,req,faction,"Allies");
-        if(allyBroken&&!enemyBroken){FactionManager.adjustReputation(player,faction,-2);notify(player,"Frontline failed: the committed allied roster broke first.");setCooldown(player,faction,now+36000L);clearRequest(player);return;}
+        if(allyBroken&&!enemyBroken){FactionManager.adjustReputation(player,faction,-2);notifyKey(player,"frontline.failed");setCooldown(player,faction,now+36000L);clearRequest(player);return;}
         if(!enemyBroken){saveRequest(player,req);return;}int reward=rewardRep(req,18);FactionManager.adjustReputation(player,faction,reward);FactionManager.propagatePlayerFactionConsequence(player,faction,reward);int supplyLoss=Math.min(4,FactionWorldData.get(level).supplies(enemy));FactionWorldData.get(level).adjustMomentum(faction,0.035F);FactionWorldData.get(level).adjustMomentum(enemy,-0.045F);FactionWorldData.get(level).addSupplies(enemy,-supplyLoss);FactionWorldData.get(level).addHistory(faction,now,"A single fixed frontline force broke "+enemy.name()+" without artificial reinforcement waves.");speakMissionSuccess(level,req,"Allies");setCooldown(player,faction,now+54000L+player.getRandom().nextInt(24001));
         finishSuccess(player, req, reward,
-                "The fixed frontline force broke " + enemy.name() + " without reinforcement waves.",
-                "Survivors return to normal life; casualties remain real. " + enemy.name() + " lost " + supplyLoss + " supplies and significant momentum.");
+                resultView("frontline.summary", "The fixed frontline force broke %s without reinforcement waves.", enemy.name()),
+                resultView("frontline.impact", "Survivors return to normal life; casualties remain real. %s lost %s supplies and significant momentum.", enemy.name(), supplyLoss));
     }
 
     private static void tickWarReadiness(ServerPlayer player, ServerLevel level, long now, CompoundTag req, WorldFaction faction) {
@@ -1829,7 +1817,7 @@ public final class FactionRequestManager {
                 req.putDouble("ReadinessReconZ", observation.getZ() + 0.5D);
                 resetPresence(req);
                 req.putInt("ReadinessCalm", 0);
-                objectiveToast(player, "READINESS RECON • exact observation point marked • get within 24 blocks");
+                objectiveToastKey(player, "readiness_marked");
                 saveRequest(player, req);
                 return;
             }
@@ -1861,7 +1849,7 @@ public final class FactionRequestManager {
                 }
                 req.putBoolean("ReadinessScenePrepared", true);
                 if (!scouts.isEmpty()) scouts.get(0).speak(FactionRequestDialogue.start("WAR_READINESS", now), 72);
-                notify(player, "Observe the marked deployment point from within 24 blocks. Clean observation time remaining is shown on the HUD; if scouts spot you, the timer pauses until you lose them for 5 seconds.");
+                notifyKey(player, "readiness.observe");
                 saveRequest(player, req);
                 return;
             }
@@ -1869,7 +1857,7 @@ public final class FactionRequestManager {
             if (scoutsBroken && !req.getBoolean("ReadinessObserversBroken")) {
                 req.putBoolean("ReadinessObserversBroken", true);
                 req.putInt("SeriesRepPenalty", Math.max(req.getInt("SeriesRepPenalty"), 3));
-                notify(player, "The real deployment scout roster has been neutralized. Recon can continue, but no replacements appear and the violent approach reduces the final reputation reward.");
+                notifyKey(player, "readiness.scouts_neutralized");
             }
 
             boolean atPoint = player.distanceToSqr(observation.getX() + 0.5D, observation.getY(), observation.getZ() + 0.5D) <= 24.0D * 24.0D;
@@ -1883,14 +1871,14 @@ public final class FactionRequestManager {
                     scout.getPersistentData().putBoolean("LWRequestAlerted", true); scout.setTarget(player); PeacekeeperManager.markNpcAggressor(player, scout);
                 }
                 if (!scouts.isEmpty()) scouts.get(0).speak(FactionRequestDialogue.pressure("WAR_READINESS", now), 76);
-                notify(player, "SPOTTED by the deployment scouts. Observation is paused. Break line of sight for 5 seconds; the HUD shows the clear timer.");
-                objectiveToast(player, "SPOTTED • break line of sight • 5s clear required");
+                notifyKey(player, "readiness.spotted");
+                objectiveToastKey(player, "readiness_spotted");
             } else if (!seen && req.getBoolean("ReadinessSpotted")) {
                 req.putInt("ReadinessCalm", req.getInt("ReadinessCalm") + 20);
                 if (req.getInt("ReadinessCalm") >= 100 || scoutsBroken) {
                     req.putBoolean("ReadinessSpotted", false); req.putInt("ReadinessCalm", 0);
                     clearQuestAggression(scouts, player);
-                    notify(player, "Deployment scouts lost you. Return within 24 blocks of the marked point to resume observation.");
+                    notifyKey(player, "readiness.escaped");
                 }
             } else if (seen) req.putInt("ReadinessCalm", 0);
 
@@ -1900,8 +1888,8 @@ public final class FactionRequestManager {
                 req.putInt("SeriesStage", 3); req.putBoolean("Started", false); resetPresence(req);
                 req.remove("MissionStartSpoken"); req.remove("ReadinessScenePrepared");
                 req.remove("ReadinessReconX"); req.remove("ReadinessReconY"); req.remove("ReadinessReconZ");
-                objectiveToast(player, "READINESS RECON COMPLETE • go to the marked mobilization staging point");
-                notify(player, "Recon complete. The final stage commits actual residents on both sides. Reach the exact staging marker; then the compass will track the nearest active enemy automatically.");
+                objectiveToastKey(player, "readiness_complete");
+                notifyKey(player, "readiness.recon_complete");
             }
             saveRequest(player, req);
             return;
@@ -1911,7 +1899,7 @@ public final class FactionRequestManager {
         if (!req.getBoolean("Started")) {
             if (!ensureCombatOperation(player, level, req, faction, enemy, site, 4, 5 + Math.min(2, req.getInt("ReadinessCasualties")))) return;
             req.putBoolean("Started", true); saveRequest(player, req);
-            notify(player, "Mobilization rosters are assembled. You do NOT need to search the region: the compass now tracks the nearest active enemy. Break their fixed force before your own roster breaks.");
+            notifyKey(player, "readiness.mobilization");
             return;
         }
         FactionRequestMissionManager.applyMoraleBreak(level, req, enemy, "Enemies");
@@ -1921,7 +1909,7 @@ public final class FactionRequestManager {
         if (allyBroken && !enemyBroken) {
             FactionManager.adjustReputation(player, faction, -3); data.adjustMomentum(faction, -0.020F);
             data.addHistory(faction, now, "War readiness failed when the committed mobilization roster broke first.");
-            notify(player, "War Readiness failed: the allied fixed roster broke first. No replacement force will appear.");
+            notifyKey(player, "readiness.failed");
             setCooldown(player, faction, now + 36000L); clearRequest(player); return;
         }
         if (!enemyBroken) { saveRequest(player, req); return; }
@@ -1932,11 +1920,11 @@ public final class FactionRequestManager {
     private static void tickRecoveryLine(ServerPlayer player, ServerLevel level, long now, CompoundTag req, WorldFaction faction) {
         int stage=Math.max(1,req.getInt("SeriesStage"));if(stage<=1){tickSupplyReceiver(player,level,now,req,faction);return;}BlockPos site=ensureFactionLandSite(player,level,req,faction,"SourceSite");if(site==null||distanceSqTo(site,player)>120.0D*120.0D)return;
         FactionRequestMissionManager.ensureRoster(player,level,req,faction,"RecoveryTeam",4,site,FactionRequestMissionManager.SIDE_ALLY,FactionRequestMissionManager.ROLE_PATROL,f->!f.isNonCombatant());if(!mandatoryRosterReady(player, level, req, faction, "RecoveryTeam", site))return;FactionRequestMissionManager.lockRoster(req,"RecoveryTeam");
-        List<AmbientFighterEntity> team=FactionRequestMissionManager.loadedActiveRoster(level,req,"RecoveryTeam");if(team.isEmpty()){if(FactionRequestMissionManager.rosterNeutralized(level,req,faction,"RecoveryTeam")){FactionManager.adjustReputation(player,faction,-2);FactionWorldData.get(level).adjustMomentum(faction,-0.015F);FactionWorldData.get(level).addHistory(faction,now,"Faction Recovery failed when its fixed resident team could no longer continue.");notify(player,"Faction Recovery failed: the real recovery team was neutralized or withdrew. No replacements will be assigned.");setCooldown(player,faction,now+30000L);clearRequest(player);}return;}
-        AmbientFighterEntity leader=team.get(0);if(!req.getBoolean("Started")){req.putBoolean("Started",true);req.putInt("RecoveryCheckpoints",0);leader.speak(FactionRequestDialogue.start("RECOVERY_LINE",now),76);notify(player,"Recovery team assembled from real residents. Escort this same surviving team through three regroup checkpoints.");saveRequest(player,req);return;}
+        List<AmbientFighterEntity> team=FactionRequestMissionManager.loadedActiveRoster(level,req,"RecoveryTeam");if(team.isEmpty()){if(FactionRequestMissionManager.rosterNeutralized(level,req,faction,"RecoveryTeam")){FactionManager.adjustReputation(player,faction,-2);FactionWorldData.get(level).adjustMomentum(faction,-0.015F);FactionWorldData.get(level).addHistory(faction,now,"Faction Recovery failed when its fixed resident team could no longer continue.");notifyKey(player,"recovery.failed");setCooldown(player,faction,now+30000L);clearRequest(player);}return;}
+        AmbientFighterEntity leader=team.get(0);if(!req.getBoolean("Started")){req.putBoolean("Started",true);req.putInt("RecoveryCheckpoints",0);leader.speak(FactionRequestDialogue.start("RECOVERY_LINE",now),76);notifyKey(player,"recovery.started");saveRequest(player,req);return;}
         if(!req.contains("RecoveryX")){BlockPos next=AmbientFighterSpawner.findSafeGroundAround(level,leader.blockPosition(),player.getRandom(),45,85,64);if(next==null||!isPracticalQuestLand(level,next))next=site;req.putDouble("RecoveryX",next.getX()+0.5D);req.putInt("RecoveryY",next.getY());req.putDouble("RecoveryZ",next.getZ()+0.5D);saveRequest(player,req);return;}
         double x=req.getDouble("RecoveryX"),z=req.getDouble("RecoveryZ");if(leader.distanceToSqr(x,req.getInt("RecoveryY"),z)>8.0D*8.0D&&(now%20L==0L||leader.getNavigation().isDone()))leader.getNavigation().moveTo(x,req.getInt("RecoveryY"),z,1.0D);for(int i=1;i<team.size();i++)if(team.get(i).distanceToSqr(leader)>10.0D*10.0D)team.get(i).getNavigation().moveTo(leader,1.05D);
-        if(leader.distanceToSqr(x,req.getInt("RecoveryY"),z)<=10.0D*10.0D&&player.distanceToSqr(leader)<=36.0D*36.0D){int done=req.getInt("RecoveryCheckpoints")+1;req.putInt("RecoveryCheckpoints",done);req.remove("RecoveryX");req.remove("RecoveryY");req.remove("RecoveryZ");objectiveToast(player,"Recovery checkpoint "+done+" / 3 secured.");if(done>=3){leader.speak(FactionRequestDialogue.success("RECOVERY_LINE",now),78);completeSeries(player,level,now,req,faction,"A fixed real resident recovery team regrouped successfully after three escorted checkpoints.");return;}}saveRequest(player,req);
+        if(leader.distanceToSqr(x,req.getInt("RecoveryY"),z)<=10.0D*10.0D&&player.distanceToSqr(leader)<=36.0D*36.0D){int done=req.getInt("RecoveryCheckpoints")+1;req.putInt("RecoveryCheckpoints",done);req.remove("RecoveryX");req.remove("RecoveryY");req.remove("RecoveryZ");objectiveToastKey(player,"recovery_checkpoint",done);if(done>=3){leader.speak(FactionRequestDialogue.success("RECOVERY_LINE",now),78);completeSeries(player,level,now,req,faction,"A fixed real resident recovery team regrouped successfully after three escorted checkpoints.");return;}}saveRequest(player,req);
     }
 
     private static void completeSeries(ServerPlayer player, ServerLevel level, long now, CompoundTag req, WorldFaction faction, String history) {
@@ -1945,8 +1933,8 @@ public final class FactionRequestManager {
         if (supply > 0) FactionWorldData.get(level).addSupplies(faction, supply);
         FactionWorldData.get(level).addHistory(faction, now, history); setCooldown(player, faction, now + 54000L + player.getRandom().nextInt(30001));
         finishSuccess(player, req, reward, supply,
-                requestTitle(req) + " completed every required stage in order.",
-                history);
+                resultView("series.summary", "%s completed every required stage in order.", requestTitle(req)),
+                resultView("series.impact", "%s", history));
     }
 
     private static int rewardRep(CompoundTag req, int fallback) {
@@ -1973,40 +1961,40 @@ public final class FactionRequestManager {
 
     public static ActiveQuestView activeQuestView(ServerPlayer player) {
         if (player == null || !(player.level() instanceof ServerLevel level))
-            return new ActiveQuestView(false, 0, "", "", "No active faction request", "", "", "", "", "");
+            return new ActiveQuestView(false, 0, "", "", screenView("no_active.title", "No active faction request"), "", "", "", "", "");
         CompoundTag req = request(player);
         if (!req.getString("Type").isBlank() && !isSupportedRequestType(req.getString("Type"))) {
             clearRequest(player);
             req = request(player);
         }
         if (req.getString("Type").isBlank())
-            return new ActiveQuestView(false, 0, "", "", "No active faction request",
-                    "Accept a request from any known faction and it will be listed here.", "", "", "",
-                    "You can always return to Factions → Active Quest instead of remembering which faction issued it.");
+            return new ActiveQuestView(false, 0, "", "", screenView("no_active.title", "No active faction request"),
+                    screenView("no_active.description", "Accept a request from any known faction and it will be listed here."), "", "", "",
+                    screenView("no_active.note", "You can always return to Factions → Active Quest instead of remembering which faction issued it."));
         FactionWorldData data = FactionWorldData.get(level);
         WorldFaction source = data.byId(req.getString("Source"));
         WorldFaction target = data.byId(req.getString("Target"));
-        if (source == null) return new ActiveQuestView(false, 0, "", "", "Old request unavailable",
-                "The issuing faction no longer exists in the current world state.", "", "", "", "");
+        if (source == null) return new ActiveQuestView(false, 0, "", "", screenView("old_unavailable.title", "Old request unavailable"),
+                screenView("old_unavailable.description", "The issuing faction no longer exists in the current world state."), "", "", "", "");
         if (isSupplyRequest(req) && !commitSupplyReceiverBinding(player, level, req, source)) {
             clearRequest(player);
-            return new ActiveQuestView(false, 0, "", "", "Supply request cancelled",
-                    "The faction no longer has an available member who can receive the shipment. No cooldown was applied.", "", "", "", "");
+            return new ActiveQuestView(false, 0, "", "", screenView("supply_cancelled.title", "Supply request cancelled"),
+                    screenView("supply_cancelled.description", "The faction no longer has an available member who can receive the shipment. No cooldown was applied."), "", "", "", "");
         }
         String receiverNote = isSupplyRequest(req)
-                ? "GIVE TO: " + supplyReceiverLabel(req, source) + " • Shift+Right-click them for the LW profile and use Deliver Supplies, or ordinary right-click for a quick hand-in. The live compass tracks them. • " + supplyHistoryNote(player, source)
+                ? screenView("active.supply_note", "GIVE TO: %s • Shift+Right-click them for the LW profile and use Deliver Supplies, or ordinary right-click for a quick hand-in. The live compass tracks them. • %s", supplyReceiverLabel(req, source), supplyHistoryNote(player, source))
                 : ("PATROL".equals(req.getString("Type"))
-                    ? "FIELD REQUEST: Meet " + (req.getString("PatrolLeaderName").isBlank() ? "the marked patrol leader" : req.getString("PatrolLeaderName"))
-                        + ", then travel with that same roster. The tracker follows the leader/checkpoint and switches to any active combat contact."
+                    ? screenView("active.patrol_note", "FIELD REQUEST: Meet %s, then travel with that same roster. The tracker follows the leader/checkpoint and switches to any active combat contact.",
+                            req.getString("PatrolLeaderName").isBlank() ? screenView("marked_patrol_leader", "the marked patrol leader") : req.getString("PatrolLeaderName"))
                     : ("MERCENARY_INTEL".equals(req.getString("Type"))
                         ? (!req.getBoolean("IntelBriefed")
-                            ? "INTELLIGENCE: Meet " + (req.getString("IntelMissionGiverName").isBlank() ? "the marked mission giver" : req.getString("IntelMissionGiverName")) + " in person and right-click them for the briefing."
+                            ? screenView("active.intel_briefing", "INTELLIGENCE: Meet %s in person and right-click them for the briefing.", req.getString("IntelMissionGiverName").isBlank() ? screenView("marked_mission_giver", "the marked mission giver") : req.getString("IntelMissionGiverName"))
                             : (Math.max(1, req.getInt("SeriesStage")) == 1
-                                ? "INTELLIGENCE: Complete every marked listening position unseen. A guard with real line of sight attacks immediately and breaks that point's current progress."
-                                : "INTELLIGENCE: Return to the same mission giver and right-click them to deliver the report."))
-                        : seriesNote(req, "Accepted request • issued by " + source.name() + ".")));
+                                ? screenView("active.intel_infiltration", "INTELLIGENCE: Complete every marked listening position unseen. A guard with real line of sight attacks immediately and breaks that point's current progress.")
+                                : screenView("active.intel_report", "INTELLIGENCE: Return to the same mission giver and right-click them to deliver the report.")))
+                        : seriesNote(req, screenView("active.accepted", "Accepted request • issued by %s.", source.name()))));
         return new ActiveQuestView(true, source.slot(), source.name(), target == null ? "" : target.name(),
-                requestTitle(req), requestDescription(req, source, level), requestDifficulty(req), requestReward(req),
+                requestTitleView(req), requestDescription(req, source, level), requestDifficultyView(req), requestReward(req),
                 requestProgress(player, req), withNeedReason(req, receiverNote));
     }
 
@@ -2040,7 +2028,7 @@ public final class FactionRequestManager {
 
     public static RequestView requestView(ServerPlayer player, WorldFaction faction) {
         if (player == null || faction == null || !(player.level() instanceof ServerLevel level))
-            return new RequestView(0, "Faction", "Unknown", 0, false, false, false, "", "No request", "", "", "", "", 0L, false, false, false, "", List.of());
+            return new RequestView(0, screenView("faction", "Faction"), screenView("unknown", "Unknown"), 0, false, false, false, "", screenView("no_request", "No request"), "", "", "", "", 0L, false, false, false, "", List.of());
         long now = level.getServer().overworld().getGameTime();
         int rep = FactionManager.getReputation(player, faction);
         CompoundTag active = request(player);
@@ -2057,42 +2045,41 @@ public final class FactionRequestManager {
             boolean same = source != null && source.id().equals(faction.id());
             String type = active.getString("Type");
             return new RequestView(faction.slot(), faction.name(), FactionManager.reputationLabel(rep), rep,
-                    same, !same, same, same ? type : "", same ? requestTitle(active) : "Request unavailable",
-                    same ? requestDescription(active, faction, level) : "You already accepted work for " + (source == null ? "another faction" : source.name()) + ".",
-                    same ? requestDifficulty(active) : "", same ? requestReward(active) : "",
-                    same ? requestProgress(player, active) : "Finish or abandon your active request first.", 0L,
+                    same, !same, same, same ? type : "", same ? requestTitleView(active) : LWLang.speechKey("faction_request.title.unavailable", "Request unavailable"),
+                    same ? requestDescription(active, faction, level) : screenView("already_accepted", "You already accepted work for %s.", source == null ? screenView("another_faction", "another faction") : source.name()),
+                    same ? requestDifficultyView(active) : "", same ? requestReward(active) : "",
+                    same ? requestProgress(player, active) : screenView("finish_first", "Finish or abandon your active request first."), 0L,
                     false, same, same && isSupplyRequest(active), same && isSupplyRequest(active)
-                            ? withNeedReason(active, "GIVE TO: " + supplyReceiverLabel(active, faction) + " • Shift+Right-click for their LW profile → Deliver Supplies; ordinary right-click also works. The live compass tracks them. • " + supplyHistoryNote(player, faction))
+                            ? withNeedReason(active, screenView("supply_note", "GIVE TO: %s • Shift+Right-click for their LW profile → Deliver Supplies; ordinary right-click also works. The live compass tracks them. • %s", supplyReceiverLabel(active, faction), supplyHistoryNote(player, faction)))
                             : (same ? ("PATROL".equals(type)
-                                    ? withNeedReason(active, "FIELD REQUEST: Meet " + (active.getString("PatrolLeaderName").isBlank() ? "the marked patrol leader" : active.getString("PatrolLeaderName"))
-                                            + ", stay with the patrol, and complete the route together. Hostile contact is not guaranteed.")
-                                    : seriesNote(active, "Accepted request"))
-                                    : "One active faction request is allowed at a time."),
+                                    ? withNeedReason(active, screenView("patrol_note", "FIELD REQUEST: Meet %s, stay with the patrol, and complete the route together. Hostile contact is not guaranteed.", active.getString("PatrolLeaderName").isBlank() ? screenView("marked_patrol_leader", "the marked patrol leader") : active.getString("PatrolLeaderName")))
+                                    : seriesNote(active, screenView("accepted_request", "Accepted request")))
+                                    : screenView("one_active", "One active faction request is allowed at a time.")),
                     same && isSupplyRequest(active) ? supplyItemSnapshots(active) : List.of());
         }
         long ready = cooldown(player, faction);
         if (ready > now) {
             long seconds = Math.max(1L, (ready - now + 19L) / 20L);
             return new RequestView(faction.slot(), faction.name(), FactionManager.reputationLabel(rep), rep,
-                    false, false, false, "", "No request available", "This faction is not ready to offer more work yet.",
-                    "", "", "Cooldown • " + formatSeconds(seconds), seconds, false, false, false,
-                    "Completed/abandoned work is deliberately paced to prevent reputation grinding.", List.of());
+                    false, false, false, "", screenView("none_available.title", "No request available"), screenView("none_available.cooldown_description", "This faction is not ready to offer more work yet."),
+                    "", "", screenView("cooldown", "Cooldown • %s", formatSeconds(seconds)), seconds, false, false, false,
+                    screenView("cooldown_note", "Completed/abandoned work is deliberately paced to prevent reputation grinding."), List.of());
         }
         CompoundTag offer = ensureOffer(player, faction, level, now);
         String type = offer.getString("Type");
         long refreshMs = offer.getLong("RefreshAtMs");
         long remaining = Math.max(0L, (refreshMs - System.currentTimeMillis() + 999L) / 1000L);
         if (type.isBlank()) return new RequestView(faction.slot(), faction.name(), FactionManager.reputationLabel(rep), rep,
-                false, false, false, "", "No request available", "This faction does not currently need outside help, or has chosen to handle its present pressure internally.",
-                "", "", "Board reassesses in " + formatSeconds(remaining), remaining, false, false, false,
-                "Requests are need-driven, not guaranteed. Different factions reassess their boards on different schedules.", List.of());
+                false, false, false, "", screenView("none_available.title", "No request available"), screenView("none_available.description", "This faction does not currently need outside help, or has chosen to handle its present pressure internally."),
+                "", "", screenView("board_reassesses", "Board reassesses in %s", formatSeconds(remaining)), remaining, false, false, false,
+                screenView("board_note", "Requests are need-driven, not guaranteed. Different factions reassess their boards on different schedules."), List.of());
         return new RequestView(faction.slot(), faction.name(), FactionManager.reputationLabel(rep), rep,
-                false, false, true, type, requestTitle(offer), requestDescription(offer, faction, level), requestDifficulty(offer),
+                false, false, true, type, requestTitleView(offer), requestDescription(offer, faction, level), requestDifficultyView(offer),
                 requestReward(offer), offerBoardProgress(player, offer, remaining), remaining, true, false, isSupplyRequest(offer),
                 withNeedReason(offer, isSupplyRequest(offer)
-                        ? seriesNote(offer, rep <= FactionManager.HOSTILE_REP ? "This is reconciliation work: material reparations can rebuild standing without another fight."
-                                : "This request exists because of the faction's current circumstances.") + " • " + supplyHistoryNote(player, faction)
-                        : "FIELD REQUEST: A patrol team will assemble when accepted. Travel may stay quiet, encounter rival fighters along the route, or escalate into an ambush if current faction pressure supports one."),
+                        ? screenView("offer.supply_note", "%s • %s", seriesNote(offer, rep <= FactionManager.HOSTILE_REP ? screenView("reconciliation", "This is reconciliation work: material reparations can rebuild standing without another fight.")
+                                : screenView("current_circumstances", "This request exists because of the faction's current circumstances.")), supplyHistoryNote(player, faction))
+                        : screenView("offer.patrol_note", "FIELD REQUEST: A patrol team will assemble when accepted. Travel may stay quiet, encounter rival fighters along the route, or escalate into an ambush if current faction pressure supports one.")),
                 isSupplyRequest(offer) ? supplyItemSnapshots(offer) : List.of());
     }
 
@@ -2127,7 +2114,7 @@ public final class FactionRequestManager {
                 clearRequest(player);
                 clearOffer(player, faction);
                 setCooldown(player, faction, now + 72000L); // cannot accept/abandon to reroll instantly
-                notify(player, "You stepped away from " + faction.name() + "'s request. New work will take time to appear.");
+                notifyKey(player, "offer.abandoned", faction.name());
             }
             return;
         }
@@ -2151,29 +2138,27 @@ public final class FactionRequestManager {
         if (needsOtherFaction(wanted) && (target == null || target.id().equals(faction.id()))) { clearOffer(player, faction); return; }
         if (isSupplyType(wanted) && !bindSupplyReceiverIdentity(offer, faction, level)) {
             clearOffer(player, faction);
-            notify(player, "That supply request expired because no real faction receiver is currently available.");
+            notifyKey(player, "offer.supply_expired");
             return;
         }
         setRequest(player, wanted, faction, target == null ? faction : target, prisoner, Long.MAX_VALUE);
         CompoundTag active = request(player); copyOfferParameters(offer, active); active.putBoolean("GuiRequest", true); active.putInt("Progress", 0); resetPresence(active);
         if (isSupplyType(wanted) && !commitSupplyReceiverBinding(player, level, active, faction)) {
             clearRequest(player); clearOffer(player, faction);
-            notify(player, "Request not accepted: no available faction member could receive the shipment. You were not given a cooldown.");
+            notifyKey(player, "offer.supply_not_accepted");
             return;
         }
         if (target != null && !target.id().equals(faction.id())) ensureFactionLandSite(player, level, active, target, "TargetSite");
         if ("PATROL".equals(wanted) && !preparePatrolAcceptance(player, level, active, faction)) {
             clearRequest(player); clearOffer(player, faction);
-            notify(player, "Request not accepted: no available patrol leader could reach a safe rendezvous. You were not given a cooldown.");
+            notifyKey(player, "offer.patrol_not_accepted");
             return;
         }
         clearOffer(player, faction);
         if (isSupplyType(wanted)) {
-            notify(player, "Accepted: " + requestTitle(wanted) + " for " + faction.name() + ". Deliver " + exactSupplySummary(active, false)
-                    + " to " + active.getString("SupplyReceiverName") + "; Shift+Right-click them and choose Deliver Supplies. The live compass tracks the receiver.");
+            notifyKey(player, "offer.supply_accepted", requestTitle(wanted), faction.name(), exactSupplySummary(active, false), active.getString("SupplyReceiverName"));
         } else if ("PATROL".equals(wanted)) {
-            notify(player, "Accepted: Patrol Support for " + faction.name() + ". Meet " + active.getString("PatrolLeaderName")
-                    + " at the marked rendezvous. The live compass stays locked to that patrol leader until the patrol starts.");
+            notifyKey(player, "offer.patrol_accepted", faction.name(), active.getString("PatrolLeaderName"));
         }
     }
 
@@ -2271,6 +2256,34 @@ public final class FactionRequestManager {
         return requestTitle(type);
     }
 
+    private static String requestTitleView(String type) {
+        String normalized = type == null || type.isBlank() ? "default" : type.toLowerCase(java.util.Locale.ROOT);
+        return LWLang.speechKey("faction_request.title." + normalized, requestTitle(type));
+    }
+
+    private static String requestTitleView(CompoundTag req) {
+        if (req == null) return requestTitleView("");
+        String type = req.getString("Type");
+        if ("WAR_READINESS".equals(type)) return LWLang.speechKey("faction_request.title.war_readiness_stage",
+                "War Readiness — %s/3", Math.max(1, req.getInt("SeriesStage")));
+        if ("RECOVERY_LINE".equals(type)) return LWLang.speechKey("faction_request.title.recovery_line_stage",
+                "Faction Recovery — %s/2", Math.max(1, req.getInt("SeriesStage")));
+        if ("MERCENARY_INTEL".equals(type)) {
+            String phase = !req.getBoolean("IntelBriefed") ? "briefing"
+                    : Math.max(1, req.getInt("SeriesStage")) == 1 ? "infiltration" : "report";
+            return LWLang.speechKey("faction_request.title.mercenary_intel_" + phase, requestTitle(req));
+        }
+        if ("MERCENARY_HUNT".equals(type) && FactionRole.byId(req.getInt("TargetRole")) == FactionRole.LEADER)
+            return LWLang.speechKey("faction_request.title.mercenary_hunt_leader", requestTitle(req));
+        return requestTitleView(type);
+    }
+
+    private static String requestDifficultyView(CompoundTag req) {
+        String value = requestDifficulty(req);
+        String key = value.toLowerCase(java.util.Locale.ROOT).replace(' ', '_');
+        return value.isBlank() ? "" : LWLang.speechKey("faction_request.difficulty." + key, value);
+    }
+
     private static String requestDescription(String type, WorldFaction faction, ServerLevel level) {
         CompoundTag temp = new CompoundTag(); temp.putString("Type", type); initializeRequirements(temp, type, RandomSource.create());
         return requestDescription(temp, faction, level);
@@ -2282,40 +2295,46 @@ public final class FactionRequestManager {
         int observationSeconds = Math.max(1, requiredPresence(req, 600) / 20);
         if ("WAR_READINESS".equals(type)) {
             int stage = Math.max(1, req.getInt("SeriesStage"));
-            if (stage == 1) return "Stage 1/3: deliver " + food + " food and " + ore + " useful materials to an actual " + faction.name() + " receiver. The stockpile changes their real supplies.";
-            if (stage == 2) return "Stage 2/3: observe a fixed group of real enemy residents without being identified. Cover and line of sight matter; if spotted, lose them before observation resumes.";
-            return "Stage 3/3: join a single fixed mobilization roster of real faction members. Break the committed enemy force by defeat, surrender, capture or morale withdrawal; nobody respawns as a quest replacement.";
+            if (stage == 1) return descriptionView("war_readiness.1", "Stage 1/3: deliver %s food and %s useful materials to an actual %s receiver. The stockpile changes their real supplies.", food, ore, faction.name());
+            if (stage == 2) return descriptionView("war_readiness.2", "Stage 2/3: observe a fixed group of real enemy residents without being identified. Cover and line of sight matter; if spotted, lose them before observation resumes.");
+            return descriptionView("war_readiness.3", "Stage 3/3: join a single fixed mobilization roster of real faction members. Break the committed enemy force by defeat, surrender, capture or morale withdrawal; nobody respawns as a quest replacement.");
         }
         if ("RECOVERY_LINE".equals(type)) {
             int stage = Math.max(1, req.getInt("SeriesStage"));
-            if (stage == 1) return "Stage 1/2: stabilize the faction through a physical handoff to a real member: " + food + " food" + (ore > 0 ? " and " + ore + " materials" : "") + ".";
-            return "Stage 2/2: escort the same fixed team of real residents through three regroup checkpoints. Their survival and the completed route affect faction recovery.";
+            if (stage == 1) return ore > 0
+                    ? descriptionView("recovery_line.1_with_materials", "Stage 1/2: stabilize the faction through a physical handoff to a real member: %s food and %s materials.", food, ore)
+                    : descriptionView("recovery_line.1_food", "Stage 1/2: stabilize the faction through a physical handoff to a real member: %s food.", food);
+            return descriptionView("recovery_line.2", "Stage 2/2: escort the same fixed team of real residents through three regroup checkpoints. Their survival and the completed route affect faction recovery.");
         }
         return switch(type) {
             case "MERCENARY_HUNT" -> mercenaryHuntDescription(req, faction, level);
             case "MERCENARY_EXTRACTION" -> mercenaryExtractionDescription(req, faction, level);
             case "MERCENARY_INTEL" -> mercenaryIntelDescription(req, faction, level);
             case "MERCENARY_SABOTAGE" -> mercenarySabotageDescription(req, faction, level);
-            case "REPARATIONS" -> supplyDescription(req, faction, level, "Material restitution", "They are accepting a concrete shipment instead of another escalation.");
-            case "PROVISIONS" -> supplyDescription(req, faction, level, "Provision shortage", "Their stores are low enough to request a specific food shipment.");
-            case "MATERIALS" -> supplyDescription(req, faction, level, "Material shortage", "Their reserve needs specific construction/training material.");
-            case "WAR_STOCKPILE" -> supplyDescription(req, faction, level, "Wartime stockpile", "Active conflict has created a specific stockpile order.");
-            case "TRAINING" -> "Meet one actual " + faction.name() + " fighter and complete a sanctioned spar. That exact fighter receives the normal Living World training growth and then returns to their life.";
-            case "TRAIN_RECRUIT" -> "Train a fixed roster of " + required + " real resident fighter" + (required == 1 ? "" : "s") + ". Each person spars once; injured or killed trainees are never replaced just to satisfy the request.";
-            case "TRAIN_OFFICER" -> "Run serious sanctioned drills with a fixed roster of " + required + " experienced real faction member" + (required == 1 ? "" : "s") + ". Their existing ranks, stats and identities are preserved.";
-            case "PATROL" -> "Meet the marked " + faction.name() + " patrol and travel checkpoint-to-checkpoint with their leader. They normally travel on foot, but flight-capable members can cross water and obstacles by air. Rival fighters may be encountered along the route, and pressure can trigger an ambush. There are no reinforcement waves; surrender, retreat and casualties matter.";
-            case "RECOVERY" -> "Escort a weakened fixed resident patrol through a shorter recovery route. The goal is to bring the same people through the route, not remain inside a timer radius.";
-            case "RESCUE" -> "Recover the exact persistent faction member currently held captive. Their guards are real members of the captor faction; break that fixed guard force and free the same UUID—no prisoner or guard doubles exist.";
-            case "DEFEND" -> "Defend faction territory with one committed roster of real allies against one fixed real attacking force. The operation ends when the attack is genuinely broken, and its outcome changes faction momentum/supplies.";
-            case "ASSAULT" -> "Take part in a real wartime strike using fixed resident rosters. Break the opposing force through defeat, surrender or withdrawal; the attack damages real enemy momentum and supplies instead of advancing an arbitrary timer.";
-            case "RETALIATION" -> "Join a fixed counterstrike after faction losses. Neutralize the committed opposing force; casualties are real, survivors can yield or withdraw, and the result changes faction pressure and relations.";
-            case "FRONTLINE" -> "Fight one decisive frontline engagement between fixed real faction rosters. There are no artificial waves: whichever committed force breaks first determines the outcome and faction momentum changes accordingly.";
-            case "RECON" -> "Observe a fixed group of actual rival residents for about " + observationSeconds + " seconds of clean intelligence. They must truly see and identify you to raise pursuit; cover, facing and crouching matter, and killed observers are permanent casualties.";
-            case "PROTECT" -> "Protect one actual faction officer from a fixed real enemy attack roster. The mission ends when that force breaks or the real officer dies; their survival improves faction momentum.";
-            case "CAPTURE" -> "Subdue one specific real hostile faction member with Friendly Fist. The same UUID becomes a physical prisoner and is removed from available manpower until rescued, released or otherwise resolved.";
-            case "ELITE_CAPTURE" -> "Take one specific high-ranking real enemy member alive with Friendly Fist while up to " + escorts + " real escort" + (escorts == 1 ? "" : "s") + " defend them. Killing the marked target fails the request.";
-            default -> "Help with a current faction need using the actual people and simulated state involved; request actors are never manufactured stand-ins.";
+            case "REPARATIONS" -> supplyDescription(req, faction, level, auxiliaryView("supply_state.reparations", "Material restitution"), auxiliaryView("supply_context.reparations", "They are accepting a concrete shipment instead of another escalation."));
+            case "PROVISIONS" -> supplyDescription(req, faction, level, auxiliaryView("supply_state.provisions", "Provision shortage"), auxiliaryView("supply_context.provisions", "Their stores are low enough to request a specific food shipment."));
+            case "MATERIALS" -> supplyDescription(req, faction, level, auxiliaryView("supply_state.materials", "Material shortage"), auxiliaryView("supply_context.materials", "Their reserve needs specific construction/training material."));
+            case "WAR_STOCKPILE" -> supplyDescription(req, faction, level, auxiliaryView("supply_state.war_stockpile", "Wartime stockpile"), auxiliaryView("supply_context.war_stockpile", "Active conflict has created a specific stockpile order."));
+            case "TRAINING" -> descriptionView("training", "Meet one actual %s fighter and complete a sanctioned spar. That exact fighter receives the normal Living World training growth and then returns to their life.", faction.name());
+            case "TRAIN_RECRUIT" -> descriptionView(required == 1 ? "train_recruit.one" : "train_recruit.many", "Train a fixed roster of %s real resident fighter%s. Each person spars once; injured or killed trainees are never replaced just to satisfy the request.", required, required == 1 ? "" : "s");
+            case "TRAIN_OFFICER" -> descriptionView(required == 1 ? "train_officer.one" : "train_officer.many", "Run serious sanctioned drills with a fixed roster of %s experienced real faction member%s. Their existing ranks, stats and identities are preserved.", required, required == 1 ? "" : "s");
+            case "PATROL" -> descriptionView("patrol", "Meet the marked %s patrol and travel checkpoint-to-checkpoint with their leader. They normally travel on foot, but flight-capable members can cross water and obstacles by air. Rival fighters may be encountered along the route, and pressure can trigger an ambush. There are no reinforcement waves; surrender, retreat and casualties matter.", faction.name());
+            case "RECOVERY" -> descriptionView("recovery", "Escort a weakened fixed resident patrol through a shorter recovery route. The goal is to bring the same people through the route, not remain inside a timer radius.");
+            case "RESCUE" -> descriptionView("rescue", "Recover the exact persistent faction member currently held captive. Their guards are real members of the captor faction; break that fixed guard force and free the same UUID—no prisoner or guard doubles exist.");
+            case "DEFEND" -> descriptionView("defend", "Defend faction territory with one committed roster of real allies against one fixed real attacking force. The operation ends when the attack is genuinely broken, and its outcome changes faction momentum/supplies.");
+            case "ASSAULT" -> descriptionView("assault", "Take part in a real wartime strike using fixed resident rosters. Break the opposing force through defeat, surrender or withdrawal; the attack damages real enemy momentum and supplies instead of advancing an arbitrary timer.");
+            case "RETALIATION" -> descriptionView("retaliation", "Join a fixed counterstrike after faction losses. Neutralize the committed opposing force; casualties are real, survivors can yield or withdraw, and the result changes faction pressure and relations.");
+            case "FRONTLINE" -> descriptionView("frontline", "Fight one decisive frontline engagement between fixed real faction rosters. There are no artificial waves: whichever committed force breaks first determines the outcome and faction momentum changes accordingly.");
+            case "RECON" -> descriptionView("recon", "Observe a fixed group of actual rival residents for about %s seconds of clean intelligence. They must truly see and identify you to raise pursuit; cover, facing and crouching matter, and killed observers are permanent casualties.", observationSeconds);
+            case "PROTECT" -> descriptionView("protect", "Protect one actual faction officer from a fixed real enemy attack roster. The mission ends when that force breaks or the real officer dies; their survival improves faction momentum.");
+            case "CAPTURE" -> descriptionView("capture", "Subdue one specific real hostile faction member with Friendly Fist. The same UUID becomes a physical prisoner and is removed from available manpower until rescued, released or otherwise resolved.");
+            case "ELITE_CAPTURE" -> descriptionView(escorts == 1 ? "elite_capture.one" : "elite_capture.many", "Take one specific high-ranking real enemy member alive with Friendly Fist while up to %s real escort%s defend them. Killing the marked target fails the request.", escorts, escorts == 1 ? "" : "s");
+            default -> descriptionView("default", "Help with a current faction need using the actual people and simulated state involved; request actors are never manufactured stand-ins.");
         };
+    }
+
+    private static String descriptionView(String key, String fallback, Object... args) {
+        return LWLang.speechKey("faction_request.description." + key, fallback, args);
     }
 
     private static String requestDifficulty(String type) { return switch(type) {
@@ -2334,35 +2353,50 @@ public final class FactionRequestManager {
     }
 
     private static String requestReward(String type) { return switch(type) {
-        case "TRAINING" -> "+5 reputation"; case "PROVISIONS" -> "+8 reputation + faction supplies";
-        case "PATROL", "TRAIN_RECRUIT", "RECON" -> "+8 reputation";
-        case "MERCENARY_INTEL" -> "+12 reputation"; case "MERCENARY_EXTRACTION" -> "+16 reputation"; case "MERCENARY_HUNT" -> "+18 reputation";
-        case "MERCENARY_SABOTAGE" -> "+13 reputation + disrupts rival supplies";
-        case "MATERIALS", "REPARATIONS" -> "+10 reputation + faction supplies";
-        case "RECOVERY" -> "+11 reputation"; case "DEFEND", "ASSAULT", "PROTECT", "TRAIN_OFFICER" -> "+12 reputation";
-        case "RETALIATION", "CAPTURE" -> "+14 reputation"; case "WAR_STOCKPILE" -> "+16 reputation + major supplies"; case "RESCUE" -> "+22 reputation";
-        case "FRONTLINE", "ELITE_CAPTURE" -> "+18 reputation"; case "WAR_READINESS" -> "+20 reputation + major supplies"; case "RECOVERY_LINE" -> "+14 reputation + supplies";
-        default -> "Faction reputation"; }; }
+        case "TRAINING" -> rewardView("reputation", "+5 reputation", 5);
+        case "PROVISIONS" -> rewardView("reputation_supplies", "+8 reputation + faction supplies", 8);
+        case "PATROL", "TRAIN_RECRUIT", "RECON" -> rewardView("reputation", "+8 reputation", 8);
+        case "MERCENARY_INTEL", "DEFEND", "ASSAULT", "PROTECT", "TRAIN_OFFICER" -> rewardView("reputation", "+12 reputation", 12);
+        case "MERCENARY_EXTRACTION" -> rewardView("reputation", "+16 reputation", 16);
+        case "WAR_STOCKPILE" -> rewardView("reputation_major_supplies", "+16 reputation + major supplies", 16);
+        case "MERCENARY_HUNT", "FRONTLINE", "ELITE_CAPTURE" -> rewardView("reputation", "+18 reputation", 18);
+        case "MERCENARY_SABOTAGE" -> rewardView("reputation_disrupt", "+13 reputation + disrupts rival supplies", 13);
+        case "MATERIALS", "REPARATIONS" -> rewardView("reputation_supplies", "+10 reputation + faction supplies", 10);
+        case "RECOVERY" -> rewardView("reputation", "+11 reputation", 11);
+        case "RETALIATION", "CAPTURE" -> rewardView("reputation", "+14 reputation", 14);
+        case "RESCUE" -> rewardView("reputation", "+22 reputation", 22);
+        case "WAR_READINESS" -> rewardView("reputation_major_supplies", "+20 reputation + major supplies", 20);
+        case "RECOVERY_LINE" -> rewardView("reputation_supplies", "+14 reputation + supplies", 14);
+        default -> LWLang.speechKey("faction_request.reward.faction_reputation", "Faction reputation"); }; }
+
+    private static String rewardView(String key, String fallback, Object... args) {
+        return LWLang.speechKey("faction_request.reward." + key, fallback, args);
+    }
 
     private static String requestReward(CompoundTag req) {
-        if (req == null) return "Faction reputation";
+        if (req == null) return LWLang.speechKey("faction_request.reward.faction_reputation", "Faction reputation");
         int storedRep = req.getInt("RepReward"); if (storedRep <= 0) return requestReward(req.getString("Type"));
         int rep = rewardRep(req, storedRep);
-        if ("MERCENARY_SABOTAGE".equals(req.getString("Type"))) return "+" + rep + " reputation + disrupts rival supplies";
+        if ("MERCENARY_SABOTAGE".equals(req.getString("Type"))) return rewardView("reputation_disrupt", "+%s reputation + disrupts rival supplies", rep);
         int supplies = req.getInt("SupplyReward");
-        return "+" + rep + " reputation" + (supplies > 0 ? " + " + supplies + " faction supplies" : "");
+        return supplies > 0 ? rewardView("reputation_supply_amount", "+%s reputation + %s faction supplies", rep, supplies)
+                : rewardView("reputation", "+%s reputation", rep);
     }
 
     private static String seriesNote(CompoundTag req, String fallback) {
         if (req == null) return fallback;
         String type = req.getString("Type");
-        if ("WAR_READINESS".equals(type)) return "Serial request • all 3 stages must be completed in order. Most faction requests remain one-off.";
-        if ("RECOVERY_LINE".equals(type)) return "Serial request • stabilize supplies, then remain with the faction while it regroups.";
-        if ("MERCENARY_INTEL".equals(type)) return "Three-part operation • meet the mission giver for the briefing, complete every listening position unseen, then return to the same person and report.";
-        if ("MERCENARY_HUNT".equals(type)) return "Targeted contract • the named person is the objective. Killing them has normal real consequences with their faction; a rare contract can name the faction leader.";
-        if ("MERCENARY_EXTRACTION".equals(type)) return "Extraction contract • the operative must survive the trip home. Fighting pursuers is optional; getting the person out is the objective.";
-        if ("MERCENARY_SABOTAGE".equals(type)) return "Interdiction contract • stay in hostile territory long enough to disrupt real faction supplies. The patrol creates pressure, but no kill is required.";
+        if ("WAR_READINESS".equals(type)) return noteView("war_readiness", "Serial request • all 3 stages must be completed in order. Most faction requests remain one-off.");
+        if ("RECOVERY_LINE".equals(type)) return noteView("recovery_line", "Serial request • stabilize supplies, then remain with the faction while it regroups.");
+        if ("MERCENARY_INTEL".equals(type)) return noteView("mercenary_intel", "Three-part operation • meet the mission giver for the briefing, complete every listening position unseen, then return to the same person and report.");
+        if ("MERCENARY_HUNT".equals(type)) return noteView("mercenary_hunt", "Targeted contract • the named person is the objective. Killing them has normal real consequences with their faction; a rare contract can name the faction leader.");
+        if ("MERCENARY_EXTRACTION".equals(type)) return noteView("mercenary_extraction", "Extraction contract • the operative must survive the trip home. Fighting pursuers is optional; getting the person out is the objective.");
+        if ("MERCENARY_SABOTAGE".equals(type)) return noteView("mercenary_sabotage", "Interdiction contract • stay in hostile territory long enough to disrupt real faction supplies. The patrol creates pressure, but no kill is required.");
         return fallback;
+    }
+
+    private static String noteView(String key, String fallback, Object... args) {
+        return LWLang.speechKey("faction_request.note." + key, fallback, args);
     }
 
 
@@ -2371,7 +2405,28 @@ public final class FactionRequestManager {
         String reason = req.getString("NeedReason");
         if (reason.isBlank()) return note == null ? "" : note;
         String base = note == null ? "" : note.trim();
-        return (base.isBlank() ? "" : base + " • ") + "Why now: " + reason;
+        return base.isBlank() ? noteView("why_now", "Why now: %s", reason)
+                : noteView("with_reason", "%s • Why now: %s", base, reason);
+    }
+
+    private static String progressView(String key, String fallback, Object... args) {
+        return LWLang.speechKey("faction_request.progress." + key, fallback, args);
+    }
+
+    private static String auxiliaryView(String key, String fallback, Object... args) {
+        return LWLang.speechKey("faction_request.auxiliary." + key, fallback, args);
+    }
+
+    private static String screenView(String key, String fallback, Object... args) {
+        return LWLang.speechKey("faction_request.view." + key, fallback, args);
+    }
+
+    private static String objectiveView(String key, String fallback, Object... args) {
+        return LWLang.speechKey("faction_request.objective." + key, fallback, args);
+    }
+
+    private static String stepView(String key, String fallback, Object... args) {
+        return LWLang.speechKey("faction_request.step." + key, fallback, args);
     }
 
     private static String requestProgress(CompoundTag req) {
@@ -2379,88 +2434,101 @@ public final class FactionRequestManager {
         if ("WAR_READINESS".equals(type)) {
             int stage = Math.max(1, req.getInt("SeriesStage"));
             if (stage == 1) return supplyProgress(req, "Stage 1/3 • real receiver handoff");
-            if (stage == 2) return "Stage 2/3 • real deployment scouts • " + (req.getBoolean("ReadinessSpotted") ? "SPOTTED — break contact" : "observe without identification");
-            return "Stage 3/3 • fixed mobilization roster engaged • no reinforcement waves";
+            if (stage == 2) return progressView(req.getBoolean("ReadinessSpotted") ? "war_readiness.2_spotted" : "war_readiness.2_hidden",
+                    req.getBoolean("ReadinessSpotted") ? "Stage 2/3 • real deployment scouts • SPOTTED — break contact" : "Stage 2/3 • real deployment scouts • observe without identification");
+            return progressView("war_readiness.3", "Stage 3/3 • fixed mobilization roster engaged • no reinforcement waves");
         }
         if ("RECOVERY_LINE".equals(type)) {
             int stage = Math.max(1, req.getInt("SeriesStage"));
             if (stage == 1) return supplyProgress(req, "Stage 1/2 • real receiver handoff");
-            return "Stage 2/2 • recovery checkpoints " + Math.min(3, req.getInt("RecoveryCheckpoints")) + " / 3 • fixed resident team";
+            return progressView("recovery_line.2", "Stage 2/2 • recovery checkpoints %s / 3 • fixed resident team", Math.min(3, req.getInt("RecoveryCheckpoints")));
         }
         if ("MERCENARY_HUNT".equals(type)) {
             String name = req.getString("TargetName"); FactionRole role = FactionRole.byId(req.getInt("TargetRole"));
-            return req.getBoolean("Started") ? "Real target confirmed • " + (name.isBlank() ? role.name().toLowerCase(java.util.Locale.ROOT) : name) + " • no substitute target"
-                    : "Contract target is being bound to one exact persistent resident; the compass will track that person, not a search area.";
+            return req.getBoolean("Started") ? progressView("mercenary_hunt.confirmed", "Real target confirmed • %s • no substitute target", name.isBlank() ? role.name().toLowerCase(java.util.Locale.ROOT) : name)
+                    : progressView("mercenary_hunt.binding", "Contract target is being bound to one exact persistent resident; the compass will track that person, not a search area.");
         }
         if ("MERCENARY_SABOTAGE".equals(type)) {
-            if (!req.getBoolean("Started")) return "Exact land-safe supply corridor marked • security roster commits automatically on approach.";
-            if (req.getBoolean("SabotageDone")) return "All 3 route points disrupted • escape 300 blocks clear";
+            if (!req.getBoolean("Started")) return progressView("mercenary_sabotage.marked", "Exact land-safe supply corridor marked • security roster commits automatically on approach.");
+            if (req.getBoolean("SabotageDone")) return progressView("mercenary_sabotage.escape", "All 3 route points disrupted • escape 300 blocks clear");
             int node = Math.min(3, Math.max(1, req.getInt("SabotageNode") + 1));
-            return "Route disruption " + node + " / 3 • " + (req.getBoolean("SabotageAlarm") ? "ALARMED — fixed security engaged" : "covert")
-                    + " • work " + Math.min(100, req.getInt("SabotageWork") * 100 / 200) + "%";
+            return progressView(req.getBoolean("SabotageAlarm") ? "mercenary_sabotage.alarmed" : "mercenary_sabotage.covert",
+                    req.getBoolean("SabotageAlarm") ? "Route disruption %s / 3 • ALARMED — fixed security engaged • work %s%%" : "Route disruption %s / 3 • covert • work %s%%",
+                    node, Math.min(100, req.getInt("SabotageWork") * 100 / 200));
         }
         if ("MERCENARY_EXTRACTION".equals(type)) {
-            if (!req.getBoolean("Started")) return "Exact embedded operative is marked by name • reach that person, not a search area.";
-            if (req.getBoolean("ExtractionPursuitTriggered") && !req.getBoolean("ExtractionPursuitResolved")) return "Escort the same operative • pursuit team active";
-            return "Escort " + (req.getString("TargetName").isBlank() ? "the same operative" : req.getString("TargetName")) + " home alive";
+            if (!req.getBoolean("Started")) return progressView("mercenary_extraction.marked", "Exact embedded operative is marked by name • reach that person, not a search area.");
+            if (req.getBoolean("ExtractionPursuitTriggered") && !req.getBoolean("ExtractionPursuitResolved")) return progressView("mercenary_extraction.pursuit", "Escort the same operative • pursuit team active");
+            return req.getString("TargetName").isBlank() ? progressView("mercenary_extraction.escort_generic", "Escort the same operative home alive")
+                    : progressView("mercenary_extraction.escort_named", "Escort %s home alive", req.getString("TargetName"));
         }
         if ("MERCENARY_INTEL".equals(type)) {
             if (!req.getBoolean("IntelBriefed")) {
                 String giver = req.getString("IntelMissionGiverName");
-                return "Briefing pending • meet " + (giver.isBlank() ? "the marked mission giver" : giver) + " and right-click them";
+                return giver.isBlank() ? progressView("mercenary_intel.briefing_generic", "Briefing pending • meet the marked mission giver and right-click them")
+                        : progressView("mercenary_intel.briefing_named", "Briefing pending • meet %s and right-click them", giver);
             }
             int stage = Math.max(1, req.getInt("SeriesStage"));
             if (stage == 1) {
                 int total = Math.max(3, req.getInt("IntelPointsNeed")); int point = Math.min(Math.max(1, req.contains("IntelPoint") ? req.getInt("IntelPoint") : 1), total);
                 FactionMissionFlavor.IntelScenario sc = FactionMissionFlavor.intelScenario(req.getInt("IntelScenarioSeed"), point);
-                String stealth = req.getBoolean("IntelDetected") ? "SPOTTED — break LOS" : "unseen";
-                return "Observation " + point + "/" + total + " • " + sc.name() + " • " + stealth + (req.getInt("IntelCasualties") > 0 ? " • casualties " + req.getInt("IntelCasualties") : "");
+                boolean detected = req.getBoolean("IntelDetected"); int casualties = req.getInt("IntelCasualties");
+                String key = "mercenary_intel.observation_" + (detected ? "spotted" : "unseen") + (casualties > 0 ? "_casualties" : "");
+                String fallback = "Observation %s/%s • %s • " + (detected ? "SPOTTED — break LOS" : "unseen") + (casualties > 0 ? " • casualties %s" : "");
+                String scenarioName = localizedIntelScenario(sc);
+                return casualties > 0 ? progressView(key, fallback, point, total, scenarioName, casualties) : progressView(key, fallback, point, total, scenarioName);
             }
             String giver = req.getString("IntelMissionGiverName");
-            return "Report ready • return to " + (giver.isBlank() ? "the same mission giver" : giver) + " and right-click them";
+            return giver.isBlank() ? progressView("mercenary_intel.report_generic", "Report ready • return to the same mission giver and right-click them")
+                    : progressView("mercenary_intel.report_named", "Report ready • return to %s and right-click them", giver);
         }
         if (isSupplyRequest(req)) {
             ensureExactSupplyBasket(req, type, null);
             String base = supplyProgress(req, "Shipment");
             String receiver = req.getString("SupplyReceiverName");
-            return receiver.isBlank() ? base + " • receiver unavailable — request will rebind automatically" : base + " • GIVE TO: " + receiver;
+            return receiver.isBlank() ? progressView("supply.receiver_unavailable", "%s • receiver unavailable — request will rebind automatically", base)
+                    : progressView("supply.give_to", "%s • GIVE TO: %s", base, receiver);
         }
         if ("TRAIN_RECRUIT".equals(type) || "TRAIN_OFFICER".equals(type) || "TRAINING".equals(type)) {
             int done = req.getList("TrainingCompleted", Tag.TAG_STRING).size();
             int total = Math.max(1, FactionRequestMissionManager.rosterSize(req, "TrainingTeam") > 0 ? FactionRequestMissionManager.rosterSize(req, "TrainingTeam") : requiredCount(req, type));
-            return "Real trainees • " + done + " / " + total + " completed" + (req.hasUUID("TargetEntity") ? " • current spar assigned" : " • selecting next member");
+            return progressView(req.hasUUID("TargetEntity") ? "training.assigned" : "training.selecting",
+                    req.hasUUID("TargetEntity") ? "Real trainees • %s / %s completed • current spar assigned" : "Real trainees • %s / %s completed • selecting next member", done, total);
         }
         if ("PATROL".equals(type) || "RECOVERY".equals(type)) {
             int total = req.contains("PatrolRoute", Tag.TAG_LIST) ? Math.max(1, req.getList("PatrolRoute", Tag.TAG_COMPOUND).size()) : ("RECOVERY".equals(type) ? 4 : 5);
             int leg = Math.min(total, Math.max(1, req.getInt("PatrolLeg") + 1));
-            if (!req.getBoolean("Started")) return "Meet the marked patrol leader • route " + total + " legs • patrol starts when you are within 14 blocks";
+            if (!req.getBoolean("Started")) return progressView("patrol.meet", "Meet the marked patrol leader • route %s legs • patrol starts when you are within 14 blocks", total);
             if (req.getBoolean("PatrolContactActive") && !req.getBoolean("PatrolContactResolved"))
-                return "Route " + leg + " / " + total + " • ROUTE CONTACT — defend the patrol against encountered rivals";
-            if (req.getBoolean("PatrolAmbushTriggered") && !req.getBoolean("PatrolAmbushResolved")) return "Route " + leg + " / " + total + " • AMBUSH — break the fixed rival force";
-            return "Route leg " + leg + " / " + total + " • " + (req.getBoolean("PatrolAirborne") ? "AERIAL — fly with" : "stay with") + " the same patrol";
+                return progressView("patrol.contact", "Route %s / %s • ROUTE CONTACT — defend the patrol against encountered rivals", leg, total);
+            if (req.getBoolean("PatrolAmbushTriggered") && !req.getBoolean("PatrolAmbushResolved")) return progressView("patrol.ambush", "Route %s / %s • AMBUSH — break the fixed rival force", leg, total);
+            return progressView(req.getBoolean("PatrolAirborne") ? "patrol.aerial" : "patrol.follow",
+                    req.getBoolean("PatrolAirborne") ? "Route leg %s / %s • AERIAL — fly with the same patrol" : "Route leg %s / %s • stay with the same patrol", leg, total);
         }
         if ("RECON".equals(type)) {
-            if (!req.contains("ReconX")) return "A safe observation point is being selected; follow the marker when it appears.";
-            return "Observe faction members • " + (req.getBoolean("ReconDetected") ? "SPOTTED — break line of sight" : "remain unidentified")
-                    + (req.getInt("ReconCasualties") > 0 ? " • casualties " + req.getInt("ReconCasualties") : "");
+            if (!req.contains("ReconX")) return progressView("recon.selecting", "A safe observation point is being selected; follow the marker when it appears.");
+            int casualties = req.getInt("ReconCasualties"); boolean detected = req.getBoolean("ReconDetected");
+            String key = "recon." + (detected ? "spotted" : "hidden") + (casualties > 0 ? "_casualties" : "");
+            String fallback = "Observe faction members • " + (detected ? "SPOTTED — break line of sight" : "remain unidentified") + (casualties > 0 ? " • casualties %s" : "");
+            return casualties > 0 ? progressView(key, fallback, casualties) : progressView(key, fallback);
         }
-        if ("PROTECT".equals(type)) return req.getBoolean("Started") ? "Assigned officer under protection • fixed attackers remaining are tracked directly" : "Assigned officer is marked by name • meet them";
-        if ("FRONTLINE".equals(type)) return req.getBoolean("Started") ? "Frontline teams engaged • nearest active enemy is compass-tracked" : "Enter the marked 120-block staging zone • both committed teams assemble automatically";
-        if ("DEFEND".equals(type)) return req.getBoolean("Started") ? "Fixed attacking force engaged • nearest active attacker is compass-tracked" : "Enter the marked 120-block defense zone • defenders and attackers assemble automatically";
-        if ("ASSAULT".equals(type)) return req.getBoolean("Started") ? "War Strike active • nearest active enemy is compass-tracked • no timer/no refills" : "Enter the marked 120-block strike staging zone • the committed teams assemble automatically; follow the marker";
-        if ("RETALIATION".equals(type)) return req.getBoolean("Started") ? "Counterstrike active • nearest active enemy is compass-tracked" : "Enter the marked 120-block counterstrike staging zone • the committed fighters assemble automatically";
+        if ("PROTECT".equals(type)) return progressView(req.getBoolean("Started") ? "protect.active" : "protect.meet", req.getBoolean("Started") ? "Assigned officer under protection • fixed attackers remaining are tracked directly" : "Assigned officer is marked by name • meet them");
+        if ("FRONTLINE".equals(type)) return progressView(req.getBoolean("Started") ? "frontline.active" : "frontline.staging", req.getBoolean("Started") ? "Frontline teams engaged • nearest active enemy is compass-tracked" : "Enter the marked 120-block staging zone • both committed teams assemble automatically");
+        if ("DEFEND".equals(type)) return progressView(req.getBoolean("Started") ? "defend.active" : "defend.staging", req.getBoolean("Started") ? "Fixed attacking force engaged • nearest active attacker is compass-tracked" : "Enter the marked 120-block defense zone • defenders and attackers assemble automatically");
+        if ("ASSAULT".equals(type)) return progressView(req.getBoolean("Started") ? "assault.active" : "assault.staging", req.getBoolean("Started") ? "War Strike active • nearest active enemy is compass-tracked • no timer/no refills" : "Enter the marked 120-block strike staging zone • the committed teams assemble automatically; follow the marker");
+        if ("RETALIATION".equals(type)) return progressView(req.getBoolean("Started") ? "retaliation.active" : "retaliation.staging", req.getBoolean("Started") ? "Counterstrike active • nearest active enemy is compass-tracked" : "Enter the marked 120-block counterstrike staging zone • the committed fighters assemble automatically");
         if ("CAPTURE".equals(type) || "ELITE_CAPTURE".equals(type)) {
-            if (req.getBoolean("CaptureSecured")) return "Step 3/3 • same prisoner secured • escort them to the land-safe faction handoff";
-            if (req.getBoolean("Started")) return "Step 2/3 • marked target reached • Friendly Fist to subdue • fixed escorts only";
+            if (req.getBoolean("CaptureSecured")) return progressView("capture.escort", "Step 3/3 • same prisoner secured • escort them to the land-safe faction handoff");
+            if (req.getBoolean("Started")) return progressView("capture.subdue", "Step 2/3 • marked target reached • Friendly Fist to subdue • fixed escorts only");
             return req.hasUUID("TargetEntity") || FactionRequestMissionManager.rosterId(req, "CaptureTarget", 0) != null
-                    ? "Step 1/3 • marked resident reserved • reach within 18 blocks; do not attack yet"
-                    : "Step 1/3 • selecting the named capture target; follow the marker when it appears";
+                    ? progressView("capture.reach", "Step 1/3 • marked resident reserved • reach within 18 blocks; do not attack yet")
+                    : progressView("capture.selecting", "Step 1/3 • selecting the named capture target; follow the marker when it appears");
         }
         if ("RESCUE".equals(type)) {
-            if (req.getBoolean("RescueFreed")) return "Same captive freed • escort the rescued fighter home alive";
-            return req.getBoolean("Started") ? "Exact captive located • break the fixed real guard roster" : "Travel to the same persistent captive";
+            if (req.getBoolean("RescueFreed")) return progressView("rescue.escort", "Same captive freed • escort the rescued fighter home alive");
+            return progressView(req.getBoolean("Started") ? "rescue.guards" : "rescue.travel", req.getBoolean("Started") ? "Exact captive located • break the fixed real guard roster" : "Travel to the same persistent captive");
         }
-        return req.getBoolean("Started") ? "Real mission participants assigned • complete the concrete objective" : "Travel to the land-safe mission area";
+        return progressView(req.getBoolean("Started") ? "default.active" : "default.travel", req.getBoolean("Started") ? "Real mission participants assigned • complete the concrete objective" : "Travel to the land-safe mission area");
     }
 
     /** Player-aware progress keeps server-authoritative delivery state only; inventory counts are rendered locally. */
@@ -2471,12 +2539,10 @@ public final class FactionRequestManager {
     private static String offerBoardProgress(ServerPlayer player, CompoundTag offer, long remainingSeconds) {
         if (offer == null) return "";
         if (isSupplyRequest(offer)) {
-            String base = "EXACT ORDER: " + exactSupplySummary(offer, false)
-                    + " • GIVE TO: " + offer.getString("SupplyReceiverName")
-                    + " • offer remains posted for " + formatSeconds(remainingSeconds);
-            return base;
+            return progressView("offer.supply", "EXACT ORDER: %s • GIVE TO: %s • offer remains posted for %s",
+                    exactSupplySummary(offer, false), offer.getString("SupplyReceiverName"), formatSeconds(remainingSeconds));
         }
-        return requestProgress(player, offer) + " • offer remains posted for " + formatSeconds(remainingSeconds);
+        return progressView("offer.available_for", "%s • offer remains posted for %s", requestProgress(player, offer), formatSeconds(remainingSeconds));
     }
 
     private static String supplyProgress(CompoundTag req, String prefix) {
@@ -2487,7 +2553,8 @@ public final class FactionRequestManager {
             CompoundTag line = items.getCompound(i);
             parts.add(line.getString("Name") + " " + Math.min(line.getInt("Progress"), line.getInt("Need")) + " / " + line.getInt("Need"));
         }
-        return prefix + (parts.isEmpty() ? " • no item order" : " • " + String.join(" • ", parts));
+        return parts.isEmpty() ? progressView("supply.no_order", "%s • no item order", prefix)
+                : progressView("supply.items", "%s • %s", prefix, String.join(" • ", parts));
     }
 
     private static List<SupplyItemSnapshot> supplyItemSnapshots(CompoundTag req) {
@@ -2602,7 +2669,7 @@ public final class FactionRequestManager {
                 if (source != null) {
                     FactionWorldData.get(level).addHistory(source, level.getServer().overworld().getGameTime(),
                             requestTitle(req) + " was betrayed when the outside helper killed patrol member " + victim.getFighterName() + ".");
-                    notify(player, "Patrol failed: you killed " + victim.getFighterName() + ", one of the real residents you were assigned to support.");
+                    notifyKey(player, "casualty.patrol_betrayal", victim.getFighterName());
                     setCooldown(player, source, level.getServer().overworld().getGameTime() + 36000L);
                 }
                 clearRequest(player);
@@ -2621,9 +2688,8 @@ public final class FactionRequestManager {
                     level.getGameTime() ^ victim.getUUID().getLeastSignificantBits()), 78);
             WorldFaction casualtyFaction = FactionWorldData.get(level).byId(req.getString("Target"));
             String casualtyFactionName = casualtyFaction == null ? req.getString("Target") : casualtyFaction.name();
-            notify(player, victim.getFighterName() + " is dead. They were a real " + casualtyFactionName
-                    + " member and will NOT return or be replaced. The intelligence operation is now compromised.");
-            objectiveToast(player, "CASUALTY: " + victim.getFighterName() + " is permanently gone • no replacement");
+            notifyKey(player, "casualty.intel", victim.getFighterName(), casualtyFactionName);
+            objectiveToastKey(player, "casualty", victim.getFighterName());
             return;
         }
         // All other retired combat-request callbacks below remain unreachable in R39; only the deliberately rebuilt
@@ -2634,7 +2700,7 @@ public final class FactionRequestManager {
             req.putInt("ReconCasualties", Math.min(99, req.getInt("ReconCasualties") + 1));
             req.putBoolean("ReconDetected", true); req.putInt("ReconSuspicion", 100); req.putInt("ReconCalm", 0);
             saveRequest(player, req);
-            notify(player, "Recon turned violent. That resident is an actual faction casualty; the patrol will not be replenished and the reputation value is reduced.");
+            notifyKey(player, "casualty.recon");
             return;
         }
         if ("WAR_READINESS".equals(activeType) && Math.max(1, req.getInt("SeriesStage")) == 2
@@ -2645,14 +2711,14 @@ public final class FactionRequestManager {
             req.putInt("SeriesRepPenalty", Math.max(req.getInt("SeriesRepPenalty"), Math.min(5, casualties + 1)));
             req.putBoolean("ReadinessSpotted", true);
             saveRequest(player, req);
-            notify(player, "Readiness recon casualty: " + victim.getFighterName() + " was a real deployment scout. The final mobilization will be more alert and the reputation payout is reduced; no replacement scout appears.");
+            notifyKey(player, "casualty.readiness", victim.getFighterName());
             return;
         }
         if ("MERCENARY_SABOTAGE".equals(activeType) && victim.getFactionId().equals(req.getString("Target"))
                 && FactionRequestMissionManager.rosterContains(req, "SabotageSecurity", victim.getUUID())) {
             req.putInt("SabotageCasualties", Math.min(99, req.getInt("SabotageCasualties") + 1));
             req.putBoolean("SabotageAlarm", true); saveRequest(player, req);
-            notify(player, "A real route guard was killed. Security is now fully alerted; nobody will spawn to replace them.");
+            notifyKey(player, "casualty.route_guard");
             return;
         }
         if ("MERCENARY_HUNT".equals(activeType) && req.hasUUID("TargetEntity")
@@ -2671,8 +2737,8 @@ public final class FactionRequestManager {
                         + " of " + targetFaction.name() + ".");
                 setCooldown(player, source, level.getGameTime() + 54000L + player.getRandom().nextInt(30001));
                 finishSuccess(player, req, reward,
-                        "The named contract target " + victim.getFighterName() + " was eliminated.",
-                        "The death is permanent, " + targetFaction.name() + " records the casualty, and relations changed by " + relationDamage + ".");
+                        resultView("mercenary_hunt_kill.summary", "The named contract target %s was eliminated.", victim.getFighterName()),
+                        resultView("mercenary_hunt_kill.impact", "The death is permanent, %s records the casualty, and relations changed by %s.", targetFaction.name(), relationDamage));
                 return;
             }
             clearRequest(player);
@@ -2682,7 +2748,7 @@ public final class FactionRequestManager {
             WorldFaction source = FactionWorldData.get(level).byId(req.getString("Source"));
             if (source != null) {
                 setCooldown(player, source, level.getGameTime() + 36000L);
-                notify(player, "Capture request failed: the target was killed instead of subdued.");
+                notifyKey(player, "casualty.capture_failed");
             }
             clearRequest(player); return;
         }
@@ -2692,7 +2758,7 @@ public final class FactionRequestManager {
         FactionManager.adjustReputation(player, faction, -6);
         FactionManager.propagatePlayerFactionConsequence(player, faction, -6);
         setCooldown(player, faction, level.getGameTime() + 60000L);
-        notify(player, "Request failed: killing one of " + faction.name() + "'s members was treated as betrayal.");
+        notifyKey(player, "casualty.request_betrayal", faction.name());
         clearRequest(player);
     }
 
@@ -2720,7 +2786,7 @@ public final class FactionRequestManager {
         if (!(player.level() instanceof ServerLevel level)) return 0;
         String normalized = type == null ? "" : type.toUpperCase(java.util.Locale.ROOT);
         if (!isSupportedRequestType(normalized)) {
-            notify(player, "That request type is not enabled yet. Debug forcing currently supports provisions, materials, war stockpiles, reparations and patrol.");
+            notifyKey(player, "debug.unsupported_type");
             return 0;
         }
         clearRequest(player);
@@ -2756,7 +2822,7 @@ public final class FactionRequestManager {
             }
         }
         if (ally == null) {
-            notify(player, "Debug force failed: no faction in this realm currently has the real persistent cast required for " + requestTitle(normalized) + ".");
+            notifyKey(player, "debug.no_required_cast", requestTitle(normalized));
             return 0;
         }
 
@@ -2764,7 +2830,7 @@ public final class FactionRequestManager {
             if (enemy == null) return 0;
             List<AmbientFighterEntity> realAllies = FactionRequestMissionManager.loadedAvailableResidents(level, ally,
                     f -> !f.isNonCombatant() && !f.isCaptive() && !f.isDefeated());
-            if (realAllies.isEmpty()) { notify(player, "Debug rescue needs a real loaded " + ally.name() + " member; no synthetic prisoner will be created."); return 0; }
+            if (realAllies.isEmpty()) { notifyKey(player, "debug.rescue_no_member", ally.name()); return 0; }
             AmbientFighterEntity realCaptive = realAllies.get(0);
             PrisonerWorldData.Prisoner p = PrisonerWorldData.get(level).captureExisting(level, realCaptive, enemy, now);
             if (p == null) return 0;
@@ -2773,22 +2839,21 @@ public final class FactionRequestManager {
                 || "PATROL".equals(normalized) || "TRAINING".equals(normalized) || "RECOVERY_LINE".equals(normalized) || isSupplyType(normalized)) {
             setRequest(player, normalized, ally, ally, "", now + 72000L);
         } else {
-            if (enemy == null) { notify(player, "Debug force failed: no second faction with a suitable real roster is available."); return 0; }
+            if (enemy == null) { notifyKey(player, "debug.no_second_faction"); return 0; }
             setRequest(player, normalized, ally, enemy, "", now + 72000L);
         }
         CompoundTag forced = request(player);
         initializeTargetedContract(forced, normalized, player, ally, enemy == null ? ally : enemy, data);
         if (isSupplyRequest(forced) && !commitSupplyReceiverBinding(player, level, forced, ally)) {
             clearRequest(player);
-            notify(player, "Debug force failed: " + ally.name() + " has no available faction member to receive the shipment.");
+            notifyKey(player, "debug.no_receiver", ally.name());
             return 0;
         }
         forced.putBoolean("DebugForcedTest", true);
         forced.putBoolean("DebugImmediate", false);
         resetPresence(forced); saveRequest(player, forced);
-        notify(player, "FORCED TEST REQUEST: " + requestTitle(forced) + " • " + ally.name()
-                + (enemy == null || enemy.id().equals(ally.id()) ? "" : " vs " + enemy.name())
-                + ". Starts at Step 1 and uses normal mission logic; no live-offer/need check is applied.");
+        notifyKey(player, enemy == null || enemy.id().equals(ally.id()) ? "debug.forced_request_single" : "debug.forced_request_opposed",
+                requestTitle(forced), ally.name(), enemy == null ? "" : enemy.name());
         return 1;
     }
 
@@ -2798,7 +2863,7 @@ public final class FactionRequestManager {
         WorldFaction faction = FactionManager.bySlot(level, factionSlot);
         if (faction == null || !PlayerWorldManager.knowsFaction(player, faction)) return 0;
         clearOffer(player, faction);
-        notify(player, "Debug: cleared " + faction.name() + "'s stored offer. Reopen Requests to generate a fresh one.");
+        notifyKey(player, "debug.offer_cleared", faction.name());
         return 1;
     }
 
@@ -2955,7 +3020,7 @@ public final class FactionRequestManager {
 
     private static String exactSupplySummary(CompoundTag req, boolean remainingOnly) {
         ensureExactSupplyBasket(req, req == null ? "" : req.getString("Type"), null);
-        if (req == null) return "the requested shipment";
+        if (req == null) return auxiliaryView("supply.requested_shipment", "the requested shipment");
         ListTag list = req.getList("SupplyItems", Tag.TAG_COMPOUND); java.util.ArrayList<String> parts = new java.util.ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             CompoundTag line = list.getCompound(i); int need = line.getInt("Need"), progress = Math.min(need, line.getInt("Progress"));
@@ -2963,18 +3028,17 @@ public final class FactionRequestManager {
             if (remainingOnly && amount <= 0) continue;
             parts.add(amount + "x " + line.getString("Name"));
         }
-        return parts.isEmpty() ? "nothing remaining" : String.join(", ", parts);
+        return parts.isEmpty() ? auxiliaryView("supply.nothing_remaining", "nothing remaining") : String.join(", ", parts);
     }
 
     private static String supplyDescription(CompoundTag req, WorldFaction faction, ServerLevel level, String state, String context) {
         ensureExactSupplyBasket(req, req.getString("Type"), null);
         if (req.getString("UrgencyTier").isBlank() && faction != null && level != null)
             applySupplyDemandContext(req, req.getString("Type"), faction, level, level.getServer().overworld().getGameTime());
-        String urgency = req.getString("UrgencyTier"); if (urgency.isBlank()) urgency = "Needed";
+        String urgency = req.getString("UrgencyTier"); if (urgency.isBlank()) urgency = auxiliaryView("urgency.needed", "Needed");
         String demand = req.getString("DemandState"); if (demand.isBlank()) demand = state;
-        return demand + " • Urgency: " + urgency + ". " + context + " ORDER: " + exactSupplySummary(req, false)
-                + ". GIVE TO " + supplyReceiverLabel(req, faction)
-                + ". Shift+Right-click the receiver and choose Deliver Supplies; ordinary right-click is also a quick hand-in. Partial deliveries are kept.";
+        return descriptionView("supply", "%s • Urgency: %s. %s ORDER: %s. GIVE TO %s. Shift+Right-click the receiver and choose Deliver Supplies; ordinary right-click is also a quick hand-in. Partial deliveries are kept.",
+                demand, urgency, context, exactSupplySummary(req, false), supplyReceiverLabel(req, faction));
     }
 
     private static void applySupplyDemandContext(CompoundTag req, String type, WorldFaction faction, ServerLevel level, long now) {
@@ -2982,20 +3046,22 @@ public final class FactionRequestManager {
         int score = requestUrgency(type, faction, level, now);
         req.putInt("UrgencyScore", score); req.putString("UrgencyTier", urgencyTier(score));
         String state = switch (type) {
-            case "WAR_STOCKPILE" -> "Preparing for active conflict";
-            case "REPARATIONS" -> "Recovery through restitution";
-            case "PROVISIONS" -> faction.ethos() == FactionEthos.RAIDERS || faction.ethos() == FactionEthos.MERCENARIES ? "Field ration shortage" : "Provision shortage";
-            case "MATERIALS" -> faction.ethos() == FactionEthos.MARTIAL_SCHOOL || faction.ethos() == FactionEthos.CHALLENGERS ? "Training material shortage" : "Material reserve shortage";
-            default -> "Supply need";
+            case "WAR_STOCKPILE" -> auxiliaryView("demand.war_stockpile", "Preparing for active conflict");
+            case "REPARATIONS" -> auxiliaryView("demand.reparations", "Recovery through restitution");
+            case "PROVISIONS" -> faction.ethos() == FactionEthos.RAIDERS || faction.ethos() == FactionEthos.MERCENARIES
+                    ? auxiliaryView("demand.field_rations", "Field ration shortage") : auxiliaryView("demand.provisions", "Provision shortage");
+            case "MATERIALS" -> faction.ethos() == FactionEthos.MARTIAL_SCHOOL || faction.ethos() == FactionEthos.CHALLENGERS
+                    ? auxiliaryView("demand.training_materials", "Training material shortage") : auxiliaryView("demand.materials", "Material reserve shortage");
+            default -> auxiliaryView("demand.supply", "Supply need");
         };
         req.putString("DemandState", state);
     }
 
     private static String urgencyTier(int score) {
-        if (score >= 82) return "CRITICAL";
-        if (score >= 68) return "URGENT";
-        if (score >= 52) return "NEEDED";
-        return "ROUTINE";
+        if (score >= 82) return auxiliaryView("urgency.critical", "CRITICAL");
+        if (score >= 68) return auxiliaryView("urgency.urgent", "URGENT");
+        if (score >= 52) return auxiliaryView("urgency.needed_upper", "NEEDED");
+        return auxiliaryView("urgency.routine", "ROUTINE");
     }
 
     private static String partialDeliveryLine(CompoundTag req) {
@@ -3003,19 +3069,21 @@ public final class FactionRequestManager {
         for (int i = 0; i < list.size(); i++) { CompoundTag line = list.getCompound(i); total += line.getInt("Need"); done += Math.min(line.getInt("Need"), line.getInt("Progress")); }
         double ratio = total <= 0 ? 0.0D : done / (double)total;
         String receiver = req.getString("SupplyReceiverName");
-        if (ratio >= 0.75D) return receiver + " accepts the shipment: almost there";
-        if (ratio >= 0.35D) return receiver + " accepts the shipment: that helps";
-        return receiver + " accepts the first part of the shipment";
+        if (ratio >= 0.75D) return auxiliaryView("delivery.almost_there", "%s accepts the shipment: almost there", receiver);
+        if (ratio >= 0.35D) return auxiliaryView("delivery.helps", "%s accepts the shipment: that helps", receiver);
+        return auxiliaryView("delivery.first_part", "%s accepts the first part of the shipment", receiver);
     }
 
     private static String supplyHistoryNote(ServerPlayer player, WorldFaction faction) {
         if (player == null || faction == null) return "";
         int previous = root(player).getInt("SupplyHelp." + faction.id());
         int rep = FactionManager.getReputation(player, faction);
-        String tone = rep >= 60 ? "They trust you with a concrete order."
-                : rep < 0 ? "They are keeping this strictly transactional."
-                : "They are asking for practical outside help.";
-        return tone + (previous > 0 ? " They remember " + previous + " previous completed shipment" + (previous == 1 ? "" : "s") + " from you." : "");
+        String tone = rep >= 60 ? auxiliaryView("history.trusted", "They trust you with a concrete order.")
+                : rep < 0 ? auxiliaryView("history.transactional", "They are keeping this strictly transactional.")
+                : auxiliaryView("history.practical_help", "They are asking for practical outside help.");
+        if (previous <= 0) return tone;
+        return auxiliaryView(previous == 1 ? "history.previous_one" : "history.previous_many",
+                previous == 1 ? "%s They remember %s previous completed shipment from you." : "%s They remember %s previous completed shipments from you.", tone, previous);
     }
 
     private static void recordSupplyMemory(ServerPlayer player, WorldFaction faction) {
@@ -3026,7 +3094,7 @@ public final class FactionRequestManager {
     private static void deliverSupplies(ServerPlayer player, ServerLevel level, WorldFaction faction, CompoundTag req, long now) {
         if (player == null || faction == null || req == null || !isSupplyRequest(req)) return;
         if (!commitSupplyReceiverBinding(player, level, req, faction)) {
-            notify(player, "This shipment cannot be completed because " + faction.name() + " has no member available to receive it. The request was cleared without a cooldown.");
+            notifyKey(player, "supply.no_receiver_cleared", faction.name());
             clearRequest(player);
             return;
         }
@@ -3039,14 +3107,13 @@ public final class FactionRequestManager {
             if (targetPos == null && req.contains("SupplyReceiverX"))
                 targetPos = new BlockPos(req.getInt("SupplyReceiverX"), req.getInt("SupplyReceiverY"), req.getInt("SupplyReceiverZ"));
             if (targetPos == null) {
-                notify(player, "Receiver: " + receiverName + ". Their exact position is temporarily unavailable; the request will update as soon as that resident is known again.");
+                notifyKey(player, "supply.position_unavailable", receiverName);
                 return;
             }
             double dx = targetPos.getX() + 0.5D - player.getX(), dz = targetPos.getZ() + 0.5D - player.getZ();
             int blocks = (int)Math.round(Math.sqrt(dx * dx + dz * dz));
-            notify(player, "GIVE TO " + receiverName + " • follow the live compass • "
-                    + FactionManager.direction(player.getX(), player.getZ(), targetPos.getX(), targetPos.getZ()) + " • " + blocks
-                    + " blocks • right-click " + receiverName + " when you reach them.");
+            notifyKey(player, "supply.navigation", receiverName,
+                    FactionManager.direction(player.getX(), player.getZ(), targetPos.getX(), targetPos.getZ()), blocks, receiverName);
             return;
         }
         ensureExactSupplyBasket(req, req.getString("Type"), player.getRandom());
@@ -3054,11 +3121,11 @@ public final class FactionRequestManager {
         player.getInventory().setChanged();
         saveRequest(player, req);
         if (delivered <= 0) {
-            notify(player, "You are not carrying the exact requested items still needed: " + exactSupplySummary(req, true) + ".");
+            notifyKey(player, "supply.missing_items", exactSupplySummary(req, true));
             return;
         }
         if (!exactSupplyComplete(req)) {
-            notify(player, partialDeliveryLine(req) + " • Remaining: " + exactSupplySummary(req, true) + ".");
+            notifyKey(player, "supply.partial", partialDeliveryLine(req), exactSupplySummary(req, true));
             return;
         }
 
@@ -3082,8 +3149,8 @@ public final class FactionRequestManager {
         recordSupplyMemory(player, faction);
         setCooldown(player, faction, now + 36000L + player.getRandom().nextInt(24001));
         finishSuccess(player, req, rep, supplyGain,
-                faction.name() + " accepted the full shipment through " + req.getString("SupplyReceiverName") + ".",
-                "The faction's persistent supply reserve increased by " + supplyGain + ".");
+                resultView("supply.summary", "%s accepted the full shipment through %s.", faction.name(), req.getString("SupplyReceiverName")),
+                resultView("supply.impact", "The faction's persistent supply reserve increased by %s.", supplyGain));
     }
 
     private static boolean atFactionDeliveryPoint(ServerPlayer player, ServerLevel level, WorldFaction faction) {
@@ -3139,9 +3206,9 @@ public final class FactionRequestManager {
         if (step.total() > 0 && req.getInt("HudStepIndex") != step.index()) {
             req.putInt("HudStepIndex", step.index());
             saveRequest(player, req);
-            objectiveToast(player, "Step " + step.index() + " / " + step.total() + " — " + step.label());
+            objectiveToastKey(player, "step", step.index(), step.total(), step.label());
         }
-        LWNetwork.sendFactionRequestTracker(player, new FactionRequestTrackerPacket(true, requestTitle(req),
+        LWNetwork.sendFactionRequestTracker(player, new FactionRequestTrackerPacket(true, requestTitleView(req),
                 objective.status(), direction, blocks, objective.targetX(), objective.targetZ(),
                 step.index(), step.total(), step.label(), step.next(), objective.arrivalRadius(),
                 objective.actionPrompt(), objective.secondsRemaining(), isSupplyRequest(req) ? supplyItemSnapshots(req) : List.of()));
@@ -3203,7 +3270,7 @@ public final class FactionRequestManager {
             AmbientFighterEntity receiver = receiverId == null ? null : FactionRequestMissionManager.loadedResident(level, source, receiverId);
             String receiverName = req.getString("SupplyReceiverName");
             if (receiver != null) receiverName = receiver.getFighterName();
-            if (receiverName.isBlank()) receiverName = "the assigned faction receiver";
+            if (receiverName.isBlank()) receiverName = objectiveView("assigned_receiver", "the assigned faction receiver");
 
             BlockPos receiverPos = receiver != null ? receiver.blockPosition()
                     : (receiverId == null ? null : FactionRequestMissionManager.residentLastPos(level, source, receiverId));
@@ -3213,17 +3280,17 @@ public final class FactionRequestManager {
             double tx = receiverPos == null ? player.getX() : receiverPos.getX() + 0.5D;
             double tz = receiverPos == null ? player.getZ() : receiverPos.getZ() + 0.5D;
             int radius = receiver != null ? 4 : 10;
-            String shipmentStatus = supplyProgress(req, gathered ? "Supplies ready" : "Shipment");
-            status = shipmentStatus + " • GIVE TO: " + receiverName;
+            String shipmentStatus = supplyProgress(req, gathered ? objectiveView("supplies_ready", "Supplies ready") : objectiveView("shipment", "Shipment"));
+            status = objectiveView("supply_status", "%s • GIVE TO: %s", shipmentStatus, receiverName);
             String action;
             if (!gathered) {
-                action = "Gather the listed items. Receiver: " + receiverName + ". The live compass already marks where you will hand them in.";
+                action = objectiveView("supply_gather", "Gather the listed items. Receiver: %s. The live compass already marks where you will hand them in.", receiverName);
             } else if (receiver != null) {
-                action = "Right-click " + receiverName + " to hand over the shipment.";
+                action = objectiveView("supply_deliver", "Right-click %s to hand over the shipment.", receiverName);
             } else if (receiverPos != null) {
-                action = "Go to " + receiverName + "'s marked last position. They should appear as you approach; then right-click them.";
+                action = objectiveView("supply_last_position", "Go to %s's marked last position. They should appear as you approach; then right-click them.", receiverName);
             } else {
-                action = "Receiver: " + receiverName + ". Their position is temporarily unavailable; keep the request active and check the tracker again shortly.";
+                action = objectiveView("supply_unavailable", "Receiver: %s. Their position is temporarily unavailable; keep the request active and check the tracker again shortly.", receiverName);
             }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, -1);
         }
@@ -3244,10 +3311,10 @@ public final class FactionRequestManager {
             AmbientFighterEntity trainee = id == null ? null : FactionRequestMissionManager.loadedResident(level, source, id);
             if (trainee != null) {
                 tx = trainee.getX(); tz = trainee.getZ(); radius = 6;
-                action = "Meet " + trainee.getFighterName() + " and start the sanctioned spar.";
-                status = requestProgress(req) + " • target: " + trainee.getFighterName();
+                action = objectiveView("training_meet", "Meet %s and start the sanctioned spar.", trainee.getFighterName());
+                status = objectiveView("training_target", "%s • target: %s", requestProgress(req), trainee.getFighterName());
             } else {
-                radius = 120; action = "Approach the training area; the exact real trainee will be marked automatically.";
+                radius = 120; action = objectiveView("training_approach", "Approach the training area; the exact real trainee will be marked automatically.");
             }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, -1);
         }
@@ -3262,7 +3329,7 @@ public final class FactionRequestManager {
                 CompoundTag p = route.getCompound(leg);
                 tx = p.getInt("X") + 0.5D; tz = p.getInt("Z") + 0.5D; radius = 10;
             } else {
-                radius = 120; action = "Approach the marked rendezvous; the route is created automatically.";
+                radius = 120; action = objectiveView("patrol_approach", "Approach the marked rendezvous; the route is created automatically.");
             }
             UUID leaderId = req.hasUUID("PatrolLeader") ? req.getUUID("PatrolLeader")
                     : FactionRequestMissionManager.rosterId(req, "Patrol", 0);
@@ -3270,41 +3337,39 @@ public final class FactionRequestManager {
             if (req.getBoolean("PatrolContactActive") && !req.getBoolean("PatrolContactResolved")) {
                 WorldFaction contactFaction = data.byId(req.getString("PatrolContactFaction"));
                 AmbientFighterEntity enemy = nearestActiveRoster(level, req, "PatrolContact", player);
-                if (enemy != null) { tx = enemy.getX(); tz = enemy.getZ(); radius = 12; action = "Route contact: help the patrol against " + enemy.getFighterName() + "."; }
+                if (enemy != null) { tx = enemy.getX(); tz = enemy.getZ(); radius = 12; action = objectiveView("patrol_contact", "Route contact: help the patrol against %s.", enemy.getFighterName()); }
                 int er = contactFaction == null ? 0 : rosterRemaining(level, req, contactFaction, "PatrolContact");
                 int et = FactionRequestMissionManager.rosterSize(req, "PatrolContact");
                 int ar = rosterRemaining(level, req, source, "Patrol");
                 int at = FactionRequestMissionManager.rosterSize(req, "Patrol");
-                status = "Natural route contact • rivals active " + er + "/" + et + " • patrol active " + ar + "/" + at;
+                status = objectiveView("patrol_contact_status", "Natural route contact • rivals active %s/%s • patrol active %s/%s", er, et, ar, at);
             } else if (req.getBoolean("PatrolAmbushTriggered") && !req.getBoolean("PatrolAmbushResolved")) {
                 WorldFaction threat = data.byId(req.getString("PatrolAmbushFaction"));
                 AmbientFighterEntity enemy = nearestActiveRoster(level, req, "PatrolAmbush", player);
-                if (enemy != null) { tx = enemy.getX(); tz = enemy.getZ(); radius = 12; action = "Defend the patrol: engage " + enemy.getFighterName() + "."; }
+                if (enemy != null) { tx = enemy.getX(); tz = enemy.getZ(); radius = 12; action = objectiveView("patrol_defend", "Defend the patrol: engage %s.", enemy.getFighterName()); }
                 int er = threat == null ? 0 : rosterRemaining(level, req, threat, "PatrolAmbush");
                 int et = FactionRequestMissionManager.rosterSize(req, "PatrolAmbush");
                 int ar = rosterRemaining(level, req, source, "Patrol");
                 int at = FactionRequestMissionManager.rosterSize(req, "Patrol");
-                status = "Ambush in progress • rivals active " + er + "/" + et + " • patrol active " + ar + "/" + at;
+                status = objectiveView("patrol_ambush_status", "Ambush in progress • rivals active %s/%s • patrol active %s/%s", er, et, ar, at);
             } else if (leader != null) {
                 double ld = Math.sqrt(player.distanceToSqr(leader));
                 if (!req.getBoolean("Started") || ld > 34.0D) {
                     tx = leader.getX(); tz = leader.getZ(); radius = 10;
-                    action = !req.getBoolean("Started") ? "Meet patrol leader " + leader.getFighterName() + "; patrol starts automatically."
-                            : "Regroup with " + leader.getFighterName() + " and stay within 38 blocks.";
+                    action = !req.getBoolean("Started") ? objectiveView("patrol_meet_leader", "Meet patrol leader %s; patrol starts automatically.", leader.getFighterName())
+                            : objectiveView("patrol_regroup", "Regroup with %s and stay within 38 blocks.", leader.getFighterName());
                 } else if (req.getInt("PatrolCheckpointHold") > 0) {
                     int need = Math.max(100, req.getInt("PatrolCheckpointNeed"));
-                    action = "Secure this checkpoint with " + leader.getFighterName() + " for "
-                            + secondsRemaining(req.getInt("PatrolCheckpointHold"), need) + "s before moving on.";
+                    action = objectiveView("patrol_secure_checkpoint", "Secure this checkpoint with %s for %ss before moving on.", leader.getFighterName(), secondsRemaining(req.getInt("PatrolCheckpointHold"), need));
                 } else action = req.getBoolean("PatrolAirborne")
-                        ? "Fly with " + leader.getFighterName() + " and stay within 38 blocks until the marked checkpoint."
-                        : "Stay within 38 blocks of " + leader.getFighterName() + " and reach the marked checkpoint together.";
-                status = requestProgress(req) + " • leader: " + leader.getFighterName();
+                        ? objectiveView("patrol_fly", "Fly with %s and stay within 38 blocks until the marked checkpoint.", leader.getFighterName())
+                        : objectiveView("patrol_stay", "Stay within 38 blocks of %s and reach the marked checkpoint together.", leader.getFighterName());
+                status = objectiveView("patrol_leader_status", "%s • leader: %s", requestProgress(req), leader.getFighterName());
             } else if (leaderId != null) {
                 String leaderName = req.getString("PatrolLeaderName");
                 if (leaderName.isBlank()) leaderName = FactionRequestMissionManager.residentName(level, source, leaderId);
-                action = "Stay at the marked patrol rendezvous. " + (leaderName.isBlank() ? "The patrol" : leaderName)
-                        + " is assembling here; do not search the surrounding territory.";
-                status = "Patrol assembly paused until a patrol member reaches the rendezvous • no hidden withdrawal timer";
+                action = objectiveView("patrol_wait", "Stay at the marked patrol rendezvous. %s is assembling here; do not search the surrounding territory.", leaderName.isBlank() ? objectiveView("the_patrol", "The patrol") : leaderName);
+                status = objectiveView("patrol_wait_status", "Patrol assembly paused until a patrol member reaches the rendezvous • no hidden withdrawal timer");
             }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, -1);
         }
@@ -3314,12 +3379,12 @@ public final class FactionRequestManager {
             else if (targetSite != null) { tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140; }
             if (req.getBoolean("ReconDetected")) {
                 seconds = secondsRemaining(req.getInt("ReconCalm"), 120);
-                action = "Break line of sight. Stay hidden for " + seconds + "s to shake the patrol.";
+                action = objectiveView("recon_break_los", "Break line of sight. Stay hidden for %ss to shake the patrol.", seconds);
             } else {
                 seconds = secondsRemaining(req.getInt("Presence"), requiredPresence(req, 1800));
-                action = "Stay within 24 blocks and remain unseen for " + seconds + "s.";
+                action = objectiveView("recon_observe", "Stay within 24 blocks and remain unseen for %ss.", seconds);
             }
-            status = requestProgress(req) + " • suspicion " + Math.max(0, req.getInt("ReconSuspicion")) + "%";
+            status = objectiveView("recon_status", "%s • suspicion %s%%", requestProgress(req), Math.max(0, req.getInt("ReconSuspicion")));
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, seconds);
         }
 
@@ -3332,7 +3397,7 @@ public final class FactionRequestManager {
                 if (giver != null) { tx = giver.getX(); tz = giver.getZ(); radius = 4; }
                 else if (req.contains("IntelMissionGiverX")) { tx = req.getDouble("IntelMissionGiverX"); tz = req.getDouble("IntelMissionGiverZ"); radius = 8; }
                 String name = req.getString("IntelMissionGiverName");
-                action = "Meet " + (name.isBlank() ? "the marked mission giver" : name) + " and right-click them for the briefing.";
+                action = objectiveView("intel_meet", "Meet %s and right-click them for the briefing.", name.isBlank() ? screenView("marked_mission_giver", "the marked mission giver") : name);
                 status = requestProgress(req);
                 return new ObjectiveSnapshot(step, status, tx, tz, radius, action, -1);
             } else if (stage == 1) {
@@ -3340,19 +3405,19 @@ public final class FactionRequestManager {
                 else if (targetSite != null) { tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140; }
                 if (req.getBoolean("IntelDetected")) {
                     seconds = secondsRemaining(req.getInt("IntelCalm"), 120);
-                    action = "SPOTTED: break real line of sight for " + seconds + "s, then return to this listening position.";
+                    action = objectiveView("intel_spotted", "SPOTTED: break real line of sight for %ss, then return to this listening position.", seconds);
                 } else {
                     seconds = secondsRemaining(req.getInt("Presence"), requiredPresence(req, 600));
-                    action = "Stay within 10 blocks and listen unseen for " + seconds + "s. On exposed ground, crouch and use distance; a real guard seeing you breaks the current attempt.";
+                    action = objectiveView("intel_listen", "Stay within 10 blocks and listen unseen for %ss. On exposed ground, crouch and use distance; a real guard seeing you breaks the current attempt.", seconds);
                 }
                 status = requestProgress(req);
             } else {
                 if (giver != null) { tx = giver.getX(); tz = giver.getZ(); radius = 4; }
                 else if (req.contains("IntelMissionGiverX")) { tx = req.getDouble("IntelMissionGiverX"); tz = req.getDouble("IntelMissionGiverZ"); radius = 8; }
                 String name = req.getString("IntelMissionGiverName");
-                action = "Return to " + (name.isBlank() ? "the same mission giver" : name) + " and right-click them to deliver the report.";
+                action = objectiveView("intel_report", "Return to %s and right-click them to deliver the report.", name.isBlank() ? objectiveView("same_mission_giver", "the same mission giver") : name);
                 status = requestProgress(req) + (req.getInt("IntelCasualties") > 0
-                        ? " • compromised by " + req.getInt("IntelCasualties") + " casualty/casualties" : " • clean collection");
+                        ? objectiveView("intel_compromised_suffix", " • compromised by %s casualty/casualties", req.getInt("IntelCasualties")) : objectiveView("intel_clean_suffix", " • clean collection"));
                 seconds = -1;
             }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, seconds);
@@ -3365,7 +3430,7 @@ public final class FactionRequestManager {
                     int node = Math.max(0, Math.min(route.size() - 1, req.getInt("SabotageNode")));
                     CompoundTag point = route.getCompound(node); tx = point.getInt("X") + 0.5D; tz = point.getInt("Z") + 0.5D; radius = 12;
                     seconds = secondsRemaining(req.getInt("SabotageWork"), 200);
-                    action = "Stay within 12 blocks and disrupt this route point for " + seconds + "s.";
+                    action = objectiveView("sabotage_disrupt", "Stay within 12 blocks and disrupt this route point for %ss.", seconds);
                 }
             } else if (req.getBoolean("SabotageDone") && targetSite != null) {
                 double cx = targetSite.getX() + 0.5D, cz = targetSite.getZ() + 0.5D;
@@ -3373,10 +3438,10 @@ public final class FactionRequestManager {
                 double mag = Math.max(1.0D, Math.sqrt(awayX * awayX + awayZ * awayZ));
                 tx = cx + awayX / mag * 330.0D; tz = cz + awayZ / mag * 330.0D; radius = 30;
                 seconds = secondsRemaining(req.getInt("Presence"), Math.max(120, req.getInt("ReturnNeed")));
-                action = "Get at least 300 blocks clear, then remain clear for " + seconds + "s.";
+                action = objectiveView("sabotage_escape", "Get at least 300 blocks clear, then remain clear for %ss.", seconds);
             } else if (targetSite != null) {
                 tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140;
-                action = "Approach the guarded supply corridor; exact disruption points will appear automatically.";
+                action = objectiveView("sabotage_approach", "Approach the guarded supply corridor; exact disruption points will appear automatically.");
             }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, seconds);
         }
@@ -3387,14 +3452,14 @@ public final class FactionRequestManager {
             AmbientFighterEntity hunted = id == null || target == null ? null : FactionRequestMissionManager.loadedResident(level, target, id);
             if (hunted != null) {
                 tx = hunted.getX(); tz = hunted.getZ(); radius = 12;
-                action = "Neutralize " + hunted.getFighterName() + ". They are the marked contract target.";
-                status = "Target: " + hunted.getFighterName() + " • " + target.name() + " • no substitute";
+                action = objectiveView("hunt_neutralize", "Neutralize %s. They are the marked contract target.", hunted.getFighterName());
+                status = objectiveView("hunt_status", "Target: %s • %s • no substitute", hunted.getFighterName(), target.name());
             } else if (target != null && id != null) {
                 BlockPos last = FactionRequestMissionManager.residentLastPos(level, target, id);
-                if (last != null) { tx = last.getX() + 0.5D; tz = last.getZ() + 0.5D; radius = 24; action = "Go to " + FactionRequestMissionManager.residentName(level, target, id) + "'s last confirmed position."; }
+                if (last != null) { tx = last.getX() + 0.5D; tz = last.getZ() + 0.5D; radius = 24; action = objectiveView("hunt_last_position", "Go to %s's last confirmed position.", FactionRequestMissionManager.residentName(level, target, id)); }
             } else if (targetSite != null) {
                 tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140;
-                action = "Approach the target faction sector; the contracted resident will be marked automatically.";
+                action = objectiveView("hunt_approach", "Approach the target faction sector; the contracted resident will be marked automatically.");
             }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, -1);
         }
@@ -3404,8 +3469,8 @@ public final class FactionRequestManager {
                     : FactionRequestMissionManager.rosterId(req, "ExtractionOperative", 0);
             AmbientFighterEntity agent = id == null ? null : FactionRequestMissionManager.loadedResident(level, source, id);
             if (!req.getBoolean("Started")) {
-                if (agent != null) { tx = agent.getX(); tz = agent.getZ(); radius = 8; action = "Reach operative " + agent.getFighterName() + "; extraction starts automatically."; }
-                else if (targetSite != null) { tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140; action = "Approach the pickup sector; the operative will be marked automatically."; }
+                if (agent != null) { tx = agent.getX(); tz = agent.getZ(); radius = 8; action = objectiveView("extraction_reach", "Reach operative %s; extraction starts automatically.", agent.getFighterName()); }
+                else if (targetSite != null) { tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140; action = objectiveView("extraction_approach", "Approach the pickup sector; the operative will be marked automatically."); }
             } else if (req.getBoolean("ExtractionPursuitTriggered") && !req.getBoolean("ExtractionPursuitResolved") && target != null) {
                 AmbientFighterEntity pursuer = nearestActiveRoster(level, req, "ExtractionPursuit", player);
                 boolean closePursuer = FactionRequestMissionManager.loadedActiveRoster(level, req, "ExtractionPursuit").stream()
@@ -3413,17 +3478,17 @@ public final class FactionRequestManager {
                 if (pursuer != null) { tx = pursuer.getX(); tz = pursuer.getZ(); radius = 14; }
                 if (closePursuer) {
                     seconds = 10;
-                    action = "A pursuer is within 160 blocks. Create distance; the 10-second escape counter starts only when every pursuer is farther away.";
+                    action = objectiveView("extraction_pursuer_close", "A pursuer is within 160 blocks. Create distance; the 10-second escape counter starts only when every pursuer is farther away.");
                 } else {
                     seconds = secondsRemaining(req.getInt("ExtractionPursuitCalm"), 200);
-                    action = "Keep every pursuer 160+ blocks away for " + seconds + "s, or break their fixed roster.";
+                    action = objectiveView("extraction_evade", "Keep every pursuer 160+ blocks away for %ss, or break their fixed roster.", seconds);
                 }
-                status = "Pursuit active • pursuers " + rosterRemaining(level, req, target, "ExtractionPursuit") + "/" + FactionRequestMissionManager.rosterSize(req, "ExtractionPursuit")
-                        + (agent != null ? " • operative " + (int)Math.round(Math.sqrt(player.distanceToSqr(agent))) + " blocks from you" : "");
+                status = agent != null ? objectiveView("extraction_status_with_distance", "Pursuit active • pursuers %s/%s • operative %s blocks from you", rosterRemaining(level, req, target, "ExtractionPursuit"), FactionRequestMissionManager.rosterSize(req, "ExtractionPursuit"), (int)Math.round(Math.sqrt(player.distanceToSqr(agent))))
+                        : objectiveView("extraction_status", "Pursuit active • pursuers %s/%s", rosterRemaining(level, req, target, "ExtractionPursuit"), FactionRequestMissionManager.rosterSize(req, "ExtractionPursuit"));
             } else {
                 if (sourceSite != null) { tx = sourceSite.getX() + 0.5D; tz = sourceSite.getZ() + 0.5D; radius = 150; }
                 seconds = secondsRemaining(req.getInt("Presence"), Math.min(40, Math.max(20, req.getInt("ReturnNeed"))));
-                action = "Bring the same operative into the marked home zone. Handoff completes in " + seconds + "s once both of you are there.";
+                action = objectiveView("extraction_home", "Bring the same operative into the marked home zone. Handoff completes in %ss once both of you are there.", seconds);
             }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, seconds);
         }
@@ -3433,8 +3498,8 @@ public final class FactionRequestManager {
                 if (sourceSite != null) { tx = sourceSite.getX() + 0.5D; tz = sourceSite.getZ() + 0.5D; radius = 65; }
                 UUID id = req.hasUUID("TargetEntity") ? req.getUUID("TargetEntity") : FactionRequestMissionManager.rosterId(req, "CaptureTarget", 0);
                 AmbientFighterEntity captive = id == null || target == null ? null : FactionRequestMissionManager.loadedResident(level, target, id);
-                action = "Escort " + (captive == null ? "the same prisoner" : captive.getFighterName()) + " into the marked faction handoff alive.";
-                if (captive != null) status = "Prisoner: " + captive.getFighterName() + " • " + (int)Math.round(Math.sqrt(player.distanceToSqr(captive))) + " blocks from you";
+                action = objectiveView("capture_escort", "Escort %s into the marked faction handoff alive.", captive == null ? objectiveView("same_prisoner", "the same prisoner") : captive.getFighterName());
+                if (captive != null) status = objectiveView("capture_prisoner_status", "Prisoner: %s • %s blocks from you", captive.getFighterName(), (int)Math.round(Math.sqrt(player.distanceToSqr(captive))));
             } else {
                 UUID id = req.hasUUID("TargetEntity") ? req.getUUID("TargetEntity") : FactionRequestMissionManager.rosterId(req, "CaptureTarget", 0);
                 AmbientFighterEntity captureTarget = id == null || target == null ? null : FactionRequestMissionManager.loadedResident(level, target, id);
@@ -3444,21 +3509,21 @@ public final class FactionRequestManager {
                     int exactDistance = (int)Math.round(Math.sqrt(captureDx * captureDx + captureDz * captureDz));
                     if (!req.getBoolean("Started")) {
                         radius = 18;
-                        action = "Approach " + captureTarget.getFighterName() + " within 18 blocks. Friendly Fist becomes the objective after you reach them.";
-                        status = "Exact target: " + captureTarget.getFighterName() + " • distance " + exactDistance + " blocks • confrontation range 18";
+                        action = objectiveView("capture_approach", "Approach %s within 18 blocks. Friendly Fist becomes the objective after you reach them.", captureTarget.getFighterName());
+                        status = objectiveView("capture_exact_status", "Exact target: %s • distance %s blocks • confrontation range 18", captureTarget.getFighterName(), exactDistance);
                     } else {
                         radius = 12;
-                        action = "Use Friendly Fist on " + captureTarget.getFighterName() + ". Do not kill the target.";
-                        status = "Capture target: " + captureTarget.getFighterName() + " • distance " + exactDistance + " blocks • Friendly Fist range 12";
+                        action = objectiveView("capture_friendly_fist", "Use Friendly Fist on %s. Do not kill the target.", captureTarget.getFighterName());
+                        status = objectiveView("capture_target_status", "Capture target: %s • distance %s blocks • Friendly Fist range 12", captureTarget.getFighterName(), exactDistance);
                     }
                 } else if (id != null && target != null) {
                     BlockPos last = FactionRequestMissionManager.residentLastPos(level, target, id);
                     if (last != null) {
                         tx = last.getX() + 0.5D; tz = last.getZ() + 0.5D; radius = 48;
-                        action = "Go to " + FactionRequestMissionManager.residentName(level, target, id) + "'s last confirmed position so that exact persistent resident can load.";
-                        status = "Recovering exact capture target • no substitute resident will be chosen";
+                        action = objectiveView("capture_last_position", "Go to %s's last confirmed position so that exact persistent resident can load.", FactionRequestMissionManager.residentName(level, target, id));
+                        status = objectiveView("capture_recovering", "Recovering exact capture target • no substitute resident will be chosen");
                     }
-                } else if (targetSite != null) { tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140; action = "Approach the marked target sector while the exact persistent resident is being resolved."; }
+                } else if (targetSite != null) { tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140; action = objectiveView("capture_resolving", "Approach the marked target sector while the exact persistent resident is being resolved."); }
             }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, -1);
         }
@@ -3470,13 +3535,13 @@ public final class FactionRequestManager {
                     : FactionRequestMissionManager.loadedResident(level, prisonerFaction, prisoner.entityId);
             if (req.getBoolean("RescueFreed")) {
                 if (sourceSite != null) { tx = sourceSite.getX() + 0.5D; tz = sourceSite.getZ() + 0.5D; radius = 65; }
-                action = "Escort " + (captive == null ? "the freed resident" : captive.getFighterName()) + " home alive.";
-                if (captive != null) status = "Freed resident: " + captive.getFighterName() + " • " + (int)Math.round(Math.sqrt(player.distanceToSqr(captive))) + " blocks from you";
+                action = objectiveView("rescue_escort", "Escort %s home alive.", captive == null ? objectiveView("freed_resident", "the freed resident") : captive.getFighterName());
+                if (captive != null) status = objectiveView("rescue_status", "Freed resident: %s • %s blocks from you", captive.getFighterName(), (int)Math.round(Math.sqrt(player.distanceToSqr(captive))));
             } else if (captive != null) {
                 tx = captive.getX(); tz = captive.getZ(); radius = 12;
-                action = req.getBoolean("Started") ? "Break the fixed guard roster and free " + captive.getFighterName() + "."
-                        : "Reach captive " + captive.getFighterName() + "; guards are the real captor members.";
-            } else if (targetSite != null) { tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140; action = "Approach the prison sector; the exact captive will be marked."; }
+                action = req.getBoolean("Started") ? objectiveView("rescue_free", "Break the fixed guard roster and free %s.", captive.getFighterName())
+                        : objectiveView("rescue_reach", "Reach captive %s; guards are the real captor members.", captive.getFighterName());
+            } else if (targetSite != null) { tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140; action = objectiveView("rescue_approach", "Approach the prison sector; the exact captive will be marked."); }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, -1);
         }
 
@@ -3484,29 +3549,29 @@ public final class FactionRequestManager {
             UUID oid = req.hasUUID("TargetEntity") ? req.getUUID("TargetEntity") : FactionRequestMissionManager.rosterId(req, "ProtectedOfficer", 0);
             AmbientFighterEntity officer = oid == null ? null : FactionRequestMissionManager.loadedResident(level, source, oid);
             if (!req.getBoolean("Started")) {
-                if (officer != null) { tx = officer.getX(); tz = officer.getZ(); radius = 10; action = "Meet officer " + officer.getFighterName() + "; the attack starts automatically."; }
-                else { radius = 120; action = "Approach the protection point; the exact officer will be marked automatically."; }
+                if (officer != null) { tx = officer.getX(); tz = officer.getZ(); radius = 10; action = objectiveView("protect_meet", "Meet officer %s; the attack starts automatically.", officer.getFighterName()); }
+                else { radius = 120; action = objectiveView("protect_approach", "Approach the protection point; the exact officer will be marked automatically."); }
             } else if (target != null) {
                 AmbientFighterEntity attacker = nearestActiveRoster(level, req, "ProtectAttackers", player);
-                if (attacker != null) { tx = attacker.getX(); tz = attacker.getZ(); radius = 14; action = "Protect " + (officer == null ? "the officer" : officer.getFighterName()) + " and engage " + attacker.getFighterName() + "."; }
-                status = "Attackers active " + rosterRemaining(level, req, target, "ProtectAttackers") + "/" + FactionRequestMissionManager.rosterSize(req, "ProtectAttackers")
-                        + (officer == null ? "" : " • officer HP " + Math.max(0, Math.round(officer.getHealth())) + "/" + Math.round(officer.getMaxHealth()));
+                if (attacker != null) { tx = attacker.getX(); tz = attacker.getZ(); radius = 14; action = objectiveView("protect_engage", "Protect %s and engage %s.", officer == null ? objectiveView("the_officer", "the officer") : officer.getFighterName(), attacker.getFighterName()); }
+                status = officer == null ? objectiveView("protect_status", "Attackers active %s/%s", rosterRemaining(level, req, target, "ProtectAttackers"), FactionRequestMissionManager.rosterSize(req, "ProtectAttackers"))
+                        : objectiveView("protect_status_hp", "Attackers active %s/%s • officer HP %s/%s", rosterRemaining(level, req, target, "ProtectAttackers"), FactionRequestMissionManager.rosterSize(req, "ProtectAttackers"), Math.max(0, Math.round(officer.getHealth())), Math.round(officer.getMaxHealth()));
             }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, -1);
         }
 
         if ("WAR_READINESS".equals(type)) {
             int stage = Math.max(1, req.getInt("SeriesStage"));
-            if (stage == 1) return new ObjectiveSnapshot(step, status, tx, tz, 120, "Complete the supply handoff to the assigned receiver.", -1);
+            if (stage == 1) return new ObjectiveSnapshot(step, status, tx, tz, 120, objectiveView("complete_supply_handoff", "Complete the supply handoff to the assigned receiver."), -1);
             if (stage == 2) {
                 if (req.contains("ReadinessReconX")) { tx = req.getDouble("ReadinessReconX"); tz = req.getDouble("ReadinessReconZ"); radius = 24; }
                 else if (targetSite != null) { tx = targetSite.getX() + 0.5D; tz = targetSite.getZ() + 0.5D; radius = 140; }
                 if (req.getBoolean("ReadinessSpotted")) {
                     seconds = secondsRemaining(req.getInt("ReadinessCalm"), 100);
-                    action = "Break line of sight from the deployment scouts for " + seconds + "s.";
+                    action = objectiveView("readiness_break_los", "Break line of sight from the deployment scouts for %ss.", seconds);
                 } else {
                     seconds = secondsRemaining(req.getInt("Presence"), requiredPresence(req, 600));
-                    action = "Stay within 24 blocks and observe deployment for " + seconds + "s without being identified.";
+                    action = objectiveView("readiness_observe", "Stay within 24 blocks and observe deployment for %ss without being identified.", seconds);
                 }
                 return new ObjectiveSnapshot(step, status, tx, tz, radius, action, seconds);
             }
@@ -3515,12 +3580,12 @@ public final class FactionRequestManager {
 
         if ("RECOVERY_LINE".equals(type)) {
             if (Math.max(1, req.getInt("SeriesStage")) <= 1)
-                return new ObjectiveSnapshot(step, status, tx, tz, 120, "Complete the supply handoff to the assigned receiver.", -1);
+                return new ObjectiveSnapshot(step, status, tx, tz, 120, objectiveView("complete_supply_handoff", "Complete the supply handoff to the assigned receiver."), -1);
             if (req.contains("RecoveryX")) { tx = req.getDouble("RecoveryX"); tz = req.getDouble("RecoveryZ"); radius = 10; }
             UUID lid = FactionRequestMissionManager.rosterId(req, "RecoveryTeam", 0);
             AmbientFighterEntity leader = lid == null ? null : FactionRequestMissionManager.loadedResident(level, source, lid);
-            action = "Escort the same recovery team to checkpoint " + (Math.min(3, req.getInt("RecoveryCheckpoints") + 1)) + "/3"
-                    + (leader == null ? "." : " and stay within 36 blocks of " + leader.getFighterName() + ".");
+            action = leader == null ? objectiveView("recovery_checkpoint", "Escort the same recovery team to checkpoint %s/3.", Math.min(3, req.getInt("RecoveryCheckpoints") + 1))
+                    : objectiveView("recovery_checkpoint_leader", "Escort the same recovery team to checkpoint %s/3 and stay within 36 blocks of %s.", Math.min(3, req.getInt("RecoveryCheckpoints") + 1), leader.getFighterName());
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, -1);
         }
 
@@ -3531,23 +3596,22 @@ public final class FactionRequestManager {
             if (!req.getBoolean("Started")) {
                 if (staging != null) { tx = staging.getX() + 0.5D; tz = staging.getZ() + 0.5D; }
                 radius = 120;
-                action = "Enter the 120-block staging zone. The real fixed rosters assemble automatically—do not search the wilderness for them.";
+                action = objectiveView("combat_staging", "Enter the 120-block staging zone. The real fixed rosters assemble automatically—do not search the wilderness for them.");
                 int alliesPresent = FactionRequestMissionManager.loadedRoster(level, req, "Allies").size();
                 int enemiesPresent = FactionRequestMissionManager.loadedRoster(level, req, "Enemies").size();
-                status = "Staging • real participants present: allies " + alliesPresent + " • enemies " + enemiesPresent
-                        + " • operation starts automatically once both sides are physically assembled";
+                status = objectiveView("combat_staging_status", "Staging • real participants present: allies %s • enemies %s • operation starts automatically once both sides are physically assembled", alliesPresent, enemiesPresent);
             } else {
                 AmbientFighterEntity enemy = nearestActiveRoster(level, req, "Enemies", player);
                 if (enemy != null) {
                     tx = enemy.getX(); tz = enemy.getZ(); radius = 14;
-                    action = "Engage " + enemy.getFighterName() + " — nearest active member of the fixed enemy roster.";
+                    action = objectiveView("combat_engage", "Engage %s — nearest active member of the fixed enemy roster.", enemy.getFighterName());
                 } else {
                     BlockPos last = rosterLastPosition(level, req, target, "Enemies");
-                    if (last != null) { tx = last.getX() + 0.5D; tz = last.getZ() + 0.5D; radius = 24; action = "Move to the last confirmed position of the remaining enemy roster."; }
+                    if (last != null) { tx = last.getX() + 0.5D; tz = last.getZ() + 0.5D; radius = 24; action = objectiveView("combat_last_position", "Move to the last confirmed position of the remaining enemy roster."); }
                 }
                 int er = rosterRemaining(level, req, target, "Enemies"), et = FactionRequestMissionManager.rosterSize(req, "Enemies");
                 int ar = rosterRemaining(level, req, source, "Allies"), at = FactionRequestMissionManager.rosterSize(req, "Allies");
-                status = "Enemy force active " + er + "/" + et + " • allied force active " + ar + "/" + at + " • no timer/no refills";
+                status = objectiveView("combat_status", "Enemy force active %s/%s • allied force active %s/%s • no timer/no refills", er, et, ar, at);
             }
             return new ObjectiveSnapshot(step, status, tx, tz, radius, action, -1);
         }
@@ -3570,100 +3634,100 @@ public final class FactionRequestManager {
             if (!req.getBoolean("IntelBriefed")) {
                 String giver = req.getString("IntelMissionGiverName");
                 return new MissionStep(1, total,
-                        "Meet " + (giver.isBlank() ? "the marked mission giver" : giver) + " for the in-person briefing",
-                        "Right-click them; infiltration does not begin before the briefing");
+                        stepView("intel.briefing", "Meet %s for the in-person briefing", giver.isBlank() ? screenView("marked_mission_giver", "the marked mission giver") : giver),
+                        stepView("intel.briefing_next", "Right-click them; infiltration does not begin before the briefing"));
             }
             int stage = Math.max(1, req.getInt("SeriesStage"));
             if (stage == 1) {
                 int point = Math.min(points, Math.max(1, req.contains("IntelPoint") ? req.getInt("IntelPoint") : 1));
                 FactionMissionFlavor.IntelScenario sc = FactionMissionFlavor.intelScenario(req.getInt("IntelScenarioSeed"), point);
                 return new MissionStep(point + 1, total,
-                        "Listening " + point + "/" + points + ": " + sc.name(),
-                        point < points ? "Then relocate to listening position " + (point + 1) + "/" + points : "Then return to the same mission giver");
+                        stepView("intel.listening", "Listening %s/%s: %s", point, points, localizedIntelScenario(sc)),
+                        point < points ? stepView("intel.listening_next", "Then relocate to listening position %s/%s", point + 1, points) : stepView("intel.return_next", "Then return to the same mission giver"));
             }
             String giver = req.getString("IntelMissionGiverName");
             return new MissionStep(total, total,
-                    "Return to " + (giver.isBlank() ? "the mission giver" : giver) + " and right-click to report",
-                    "Final handoff — no hidden timer or automatic completion");
+                    stepView("intel.report", "Return to %s and right-click to report", giver.isBlank() ? stepView("mission_giver", "the mission giver") : giver),
+                    stepView("intel.report_next", "Final handoff — no hidden timer or automatic completion"));
         }
 
         if ("PATROL".equals(type) || "RECOVERY".equals(type)) {
             int legs = req.contains("PatrolRoute", Tag.TAG_LIST)
                     ? Math.max(1, req.getList("PatrolRoute", Tag.TAG_COMPOUND).size()) : ("RECOVERY".equals(type) ? 4 : 5);
             if (!req.contains("PatrolRoute", Tag.TAG_LIST))
-                return new MissionStep(1, legs + 1, "Go to the marked patrol rendezvous", "The patrol route appears automatically");
+                return new MissionStep(1, legs + 1, stepView("patrol.rendezvous", "Go to the marked patrol rendezvous"), stepView("patrol.route_next", "The patrol route appears automatically"));
             if (!req.getBoolean("Started")) {
                 String leader = req.getString("PatrolLeaderName");
-                return new MissionStep(1, legs + 1, leader.isBlank() ? "Meet the marked patrol leader" : "Meet " + leader + ", your patrol leader",
-                        "The patrol starts automatically when you regroup");
+                return new MissionStep(1, legs + 1, leader.isBlank() ? stepView("patrol.meet_generic", "Meet the marked patrol leader") : stepView("patrol.meet_named", "Meet %s, your patrol leader", leader),
+                        stepView("patrol.regroup_next", "The patrol starts automatically when you regroup"));
             }
             int leg = Math.max(0, Math.min(legs - 1, req.getInt("PatrolLeg")));
             if (req.getBoolean("PatrolContactActive") && !req.getBoolean("PatrolContactResolved"))
-                return new MissionStep(2 + leg, legs + 1, "Defend the patrol from the rival fighters encountered on the route", "Then reform with the same surviving patrol");
+                return new MissionStep(2 + leg, legs + 1, stepView("patrol.contact", "Defend the patrol from the rival fighters encountered on the route"), stepView("patrol.reform_next", "Then reform with the same surviving patrol"));
             if (req.getBoolean("PatrolAmbushTriggered") && !req.getBoolean("PatrolAmbushResolved"))
-                return new MissionStep(2 + leg, legs + 1, "Defend the patrol: break the marked fixed ambush roster", "Then reform with the same surviving patrol");
-            String movement = req.getBoolean("PatrolAirborne") ? "Fly with the patrol" : "Follow the patrol";
+                return new MissionStep(2 + leg, legs + 1, stepView("patrol.ambush", "Defend the patrol: break the marked fixed ambush roster"), stepView("patrol.reform_next", "Then reform with the same surviving patrol"));
+            String movement = req.getBoolean("PatrolAirborne") ? stepView("patrol.fly", "Fly with the patrol") : stepView("patrol.follow", "Follow the patrol");
             return new MissionStep(2 + leg, legs + 1,
-                    movement + " to checkpoint " + (leg + 1) + "/" + legs + " and stay within 38 blocks of the leader",
-                    leg + 1 < legs ? "Then continue with the same patrol to checkpoint " + (leg + 2) + "/" + legs : "Finish the route with the surviving patrol");
+                    stepView("patrol.checkpoint", "%s to checkpoint %s/%s and stay within 38 blocks of the leader", movement, leg + 1, legs),
+                    leg + 1 < legs ? stepView("patrol.checkpoint_next", "Then continue with the same patrol to checkpoint %s/%s", leg + 2, legs) : stepView("patrol.finish_next", "Finish the route with the surviving patrol"));
         }
 
         if ("RECON".equals(type)) {
             if (!req.contains("ReconX"))
-                return new MissionStep(1, 2, "Go to the marked reconnaissance sector", "An exact observation point appears automatically");
+                return new MissionStep(1, 2, stepView("recon.sector", "Go to the marked reconnaissance sector"), stepView("recon.point_next", "An exact observation point appears automatically"));
             return new MissionStep(2, 2,
-                    req.getBoolean("ReconDetected") ? "Lose the marked patrol and break line of sight" : "Stay within 24 blocks of the exact observation point and remain unseen",
-                    "Finish the visible observation timer");
+                    req.getBoolean("ReconDetected") ? stepView("recon.lose_patrol", "Lose the marked patrol and break line of sight") : stepView("recon.observe", "Stay within 24 blocks of the exact observation point and remain unseen"),
+                    stepView("recon.timer_next", "Finish the visible observation timer"));
         }
 
         if ("MERCENARY_EXTRACTION".equals(type)) {
             if (!req.getBoolean("Started"))
-                return new MissionStep(1, 3, "Reach the marked real operative", "Pickup begins automatically when you get close");
+                return new MissionStep(1, 3, stepView("extraction.reach", "Reach the marked real operative"), stepView("extraction.pickup_next", "Pickup begins automatically when you get close"));
             if (req.getBoolean("ExtractionPursuitTriggered") && !req.getBoolean("ExtractionPursuitResolved"))
-                return new MissionStep(2, 3, "Protect the operative from the marked fixed pursuit roster", "Break them or shake the pursuit, then continue home");
-            return new MissionStep(3, 3, "Escort the same operative into the marked employer home zone", "Handoff completes in at most 2 visible seconds");
+                return new MissionStep(2, 3, stepView("extraction.protect", "Protect the operative from the marked fixed pursuit roster"), stepView("extraction.escape_next", "Break them or shake the pursuit, then continue home"));
+            return new MissionStep(3, 3, stepView("extraction.escort", "Escort the same operative into the marked employer home zone"), stepView("extraction.handoff_next", "Handoff completes in at most 2 visible seconds"));
         }
 
         if ("MERCENARY_SABOTAGE".equals(type)) {
             if (!req.getBoolean("Started"))
-                return new MissionStep(1, 5, "Go to the marked guarded supply corridor", "Three exact disruption points will appear");
+                return new MissionStep(1, 5, stepView("sabotage.corridor", "Go to the marked guarded supply corridor"), stepView("sabotage.points_next", "Three exact disruption points will appear"));
             if (!req.getBoolean("SabotageDone")) {
                 int node = Math.min(3, Math.max(1, req.getInt("SabotageNode") + 1));
-                return new MissionStep(1 + node, 5, "Disrupt route point " + node + "/3 from within 12 blocks",
-                        node < 3 ? "Then move to disruption point " + (node + 1) + "/3" : "Then escape the target faction area");
+                return new MissionStep(1 + node, 5, stepView("sabotage.point", "Disrupt route point %s/3 from within 12 blocks", node),
+                        node < 3 ? stepView("sabotage.point_next", "Then move to disruption point %s/3", node + 1) : stepView("sabotage.escape_next", "Then escape the target faction area"));
             }
-            return new MissionStep(5, 5, "Get 300+ blocks clear of the target faction and remain clear", "Visible escape timer completes the contract");
+            return new MissionStep(5, 5, stepView("sabotage.clear", "Get 300+ blocks clear of the target faction and remain clear"), stepView("sabotage.timer_next", "Visible escape timer completes the contract"));
         }
 
         if ("MERCENARY_HUNT".equals(type))
             return req.getBoolean("Started")
-                    ? new MissionStep(2, 2, "Neutralize the marked named resident — they are the contract target", "No substitute target can appear")
-                    : new MissionStep(1, 2, "Reach the marked contract target", "Then confirm and engage that same resident");
+                    ? new MissionStep(2, 2, stepView("hunt.neutralize", "Neutralize the marked named resident — they are the contract target"), stepView("hunt.no_substitute_next", "No substitute target can appear"))
+                    : new MissionStep(1, 2, stepView("hunt.reach", "Reach the marked contract target"), stepView("hunt.engage_next", "Then confirm and engage that same resident"));
 
         if ("WAR_READINESS".equals(type)) {
             int stage = Math.max(1, req.getInt("SeriesStage"));
             return switch (stage) {
-                case 1 -> new MissionStep(1, 3, "Deliver the requested stockpile to the marked receiver", "Then perform field reconnaissance");
-                case 2 -> new MissionStep(2, 3, req.getBoolean("ReadinessSpotted") ? "Break line of sight from the deployment scouts" : "Observe the marked scout point from within 24 blocks",
-                        "Then join the fixed mobilization battle");
-                default -> new MissionStep(3, 3, "Break the marked enemy mobilization team", "No timer and no reinforcement waves");
+                case 1 -> new MissionStep(1, 3, stepView("readiness.deliver", "Deliver the requested stockpile to the marked receiver"), stepView("readiness.recon_next", "Then perform field reconnaissance"));
+                case 2 -> new MissionStep(2, 3, req.getBoolean("ReadinessSpotted") ? stepView("readiness.break_los", "Break line of sight from the deployment scouts") : stepView("readiness.observe", "Observe the marked scout point from within 24 blocks"),
+                        stepView("readiness.battle_next", "Then join the fixed mobilization battle"));
+                default -> new MissionStep(3, 3, stepView("readiness.break_team", "Break the marked enemy mobilization team"), stepView("readiness.no_waves_next", "No timer and no reinforcement waves"));
             };
         }
 
         if ("RECOVERY_LINE".equals(type)) {
             int stage = Math.max(1, req.getInt("SeriesStage"));
             return stage <= 1
-                    ? new MissionStep(1, 2, "Deliver recovery supplies to the marked receiver", "Then escort the fixed recovery team")
-                    : new MissionStep(2, 2, "Escort the same recovery team through all 3 marked checkpoints", "Stay within 36 blocks of the leader");
+                    ? new MissionStep(1, 2, stepView("recovery.deliver", "Deliver recovery supplies to the marked receiver"), stepView("recovery.escort_next", "Then escort the fixed recovery team"))
+                    : new MissionStep(2, 2, stepView("recovery.checkpoints", "Escort the same recovery team through all 3 marked checkpoints"), stepView("recovery.stay_next", "Stay within 36 blocks of the leader"));
         }
 
         if (isSupplyRequest(req)) {
             boolean complete = req.getInt("FoodProgress") >= req.getInt("FoodNeed") && req.getInt("OreProgress") >= req.getInt("OreNeed");
             String receiver = req.getString("SupplyReceiverName");
-            if (receiver.isBlank()) receiver = "the named faction receiver";
+            if (receiver.isBlank()) receiver = stepView("supply.named_receiver", "the named faction receiver");
             return complete
-                    ? new MissionStep(2, 2, "Go to " + receiver + " and right-click them to deliver the supplies", "The handoff is immediate")
-                    : new MissionStep(1, 2, "Gather the listed food/materials (partial hand-ins are allowed)", "Give what you have to " + receiver + " by right-clicking them");
+                    ? new MissionStep(2, 2, stepView("supply.deliver", "Go to %s and right-click them to deliver the supplies", receiver), stepView("supply.handoff_next", "The handoff is immediate"))
+                    : new MissionStep(1, 2, stepView("supply.gather", "Gather the listed food/materials (partial hand-ins are allowed)"), stepView("supply.give_next", "Give what you have to %s by right-clicking them", receiver));
         }
 
         if ("TRAIN_RECRUIT".equals(type) || "TRAIN_OFFICER".equals(type) || "TRAINING".equals(type)) {
@@ -3671,54 +3735,54 @@ public final class FactionRequestManager {
             int total = Math.max(1, FactionRequestMissionManager.rosterSize(req, "TrainingTeam") > 0
                     ? FactionRequestMissionManager.rosterSize(req, "TrainingTeam") : requiredCount(req, type));
             return new MissionStep(Math.min(total, done + 1), total,
-                    "Meet and spar the marked real trainee " + Math.min(total, done + 1) + "/" + total,
-                    done + 1 < total ? "Then the next exact trainee will be marked" : "Finish the final sanctioned spar");
+                    stepView("training.spar", "Meet and spar the marked real trainee %s/%s", Math.min(total, done + 1), total),
+                    done + 1 < total ? stepView("training.next", "Then the next exact trainee will be marked") : stepView("training.finish", "Finish the final sanctioned spar"));
         }
 
         if ("CAPTURE".equals(type) || "ELITE_CAPTURE".equals(type)) {
             if (req.getBoolean("CaptureSecured"))
-                return new MissionStep(3, 3, "Escort the same subdued prisoner into the marked faction handoff", "The exact prisoner must arrive alive");
+                return new MissionStep(3, 3, stepView("capture.escort", "Escort the same subdued prisoner into the marked faction handoff"), stepView("capture.alive_next", "The exact prisoner must arrive alive"));
             if (req.getBoolean("Started") || req.getBoolean("CaptureEncountered"))
-                return new MissionStep(2, 3, "Use Friendly Fist on the marked real target — do not kill them", "Then escort that same prisoner home");
-            return new MissionStep(1, 3, "Reach within 18 blocks of the exact marked capture target", "Then Friendly Fist that same resident alive");
+                return new MissionStep(2, 3, stepView("capture.subdue", "Use Friendly Fist on the marked real target — do not kill them"), stepView("capture.escort_next", "Then escort that same prisoner home"));
+            return new MissionStep(1, 3, stepView("capture.reach", "Reach within 18 blocks of the exact marked capture target"), stepView("capture.subdue_next", "Then Friendly Fist that same resident alive"));
         }
 
         if ("RESCUE".equals(type)) {
             if (req.getBoolean("RescueFreed"))
-                return new MissionStep(3, 3, "Escort the same freed resident into the marked home handoff", "The exact rescued person must arrive alive");
+                return new MissionStep(3, 3, stepView("rescue.escort", "Escort the same freed resident into the marked home handoff"), stepView("rescue.alive_next", "The exact rescued person must arrive alive"));
             if (req.getBoolean("Started"))
-                return new MissionStep(2, 3, "Break the fixed real guard roster around the marked captive", "Then escort the captive home");
-            return new MissionStep(1, 3, "Reach the exact marked persistent captive", "Then break their fixed guard roster");
+                return new MissionStep(2, 3, stepView("rescue.guards", "Break the fixed real guard roster around the marked captive"), stepView("rescue.escort_next", "Then escort the captive home"));
+            return new MissionStep(1, 3, stepView("rescue.reach", "Reach the exact marked persistent captive"), stepView("rescue.guards_next", "Then break their fixed guard roster"));
         }
 
         if ("PROTECT".equals(type))
             return req.getBoolean("Started")
-                    ? new MissionStep(2, 2, "Protect the named officer and break the marked fixed attacking roster", "The officer must remain active and alive")
-                    : new MissionStep(1, 2, "Meet the exact marked officer", "The attack begins automatically");
+                    ? new MissionStep(2, 2, stepView("protect.defend", "Protect the named officer and break the marked fixed attacking roster"), stepView("protect.alive_next", "The officer must remain active and alive"))
+                    : new MissionStep(1, 2, stepView("protect.meet", "Meet the exact marked officer"), stepView("protect.attack_next", "The attack begins automatically"));
 
         if ("FRONTLINE".equals(type))
             return req.getBoolean("Started")
-                    ? new MissionStep(2, 2, "Break the marked fixed frontline enemy roster", "No waves, no timer, no refills")
-                    : new MissionStep(1, 2, "Enter the marked 120-block frontline staging zone", "Your allies assemble automatically");
+                    ? new MissionStep(2, 2, stepView("frontline.break", "Break the marked fixed frontline enemy roster"), stepView("frontline.rules_next", "No waves, no timer, no refills"))
+                    : new MissionStep(1, 2, stepView("frontline.staging", "Enter the marked 120-block frontline staging zone"), stepView("frontline.assemble_next", "Your allies assemble automatically"));
 
         if ("DEFEND".equals(type))
             return req.getBoolean("Started")
-                    ? new MissionStep(2, 2, "Break the marked fixed attacking roster before your defenders break", "No timer and no replacements")
-                    : new MissionStep(1, 2, "Enter the marked 120-block defense staging zone", "Real defenders and attackers assemble automatically");
+                    ? new MissionStep(2, 2, stepView("defend.break", "Break the marked fixed attacking roster before your defenders break"), stepView("defend.rules_next", "No timer and no replacements"))
+                    : new MissionStep(1, 2, stepView("defend.staging", "Enter the marked 120-block defense staging zone"), stepView("defend.assemble_next", "Real defenders and attackers assemble automatically"));
 
         if ("ASSAULT".equals(type))
             return req.getBoolean("Started")
-                    ? new MissionStep(2, 2, "War Strike: break the marked fixed enemy roster", "Follow the compass to the nearest active enemy — no timer/no refills")
-                    : new MissionStep(1, 2, "Enter the marked 120-block strike staging zone", "The real strike and defense rosters assemble automatically");
+                    ? new MissionStep(2, 2, stepView("assault.break", "War Strike: break the marked fixed enemy roster"), stepView("assault.compass_next", "Follow the compass to the nearest active enemy — no timer/no refills"))
+                    : new MissionStep(1, 2, stepView("assault.staging", "Enter the marked 120-block strike staging zone"), stepView("assault.assemble_next", "The real strike and defense rosters assemble automatically"));
 
         if ("RETALIATION".equals(type))
             return req.getBoolean("Started")
-                    ? new MissionStep(2, 2, "Counterstrike: break the marked fixed enemy roster", "Follow the compass to the nearest active enemy")
-                    : new MissionStep(1, 2, "Enter the marked 120-block retaliation staging zone", "Real combatants assemble automatically");
+                    ? new MissionStep(2, 2, stepView("retaliation.break", "Counterstrike: break the marked fixed enemy roster"), stepView("retaliation.compass_next", "Follow the compass to the nearest active enemy"))
+                    : new MissionStep(1, 2, stepView("retaliation.staging", "Enter the marked 120-block retaliation staging zone"), stepView("retaliation.assemble_next", "Real combatants assemble automatically"));
 
         return new MissionStep(req.getBoolean("Started") ? 2 : 1, 2,
-                req.getBoolean("Started") ? "Complete the marked concrete mission objective" : "Go to the exact marked mission point",
-                req.getBoolean("Started") ? "Follow the current objective text — no hidden requirement" : "The mission advances automatically when its shown condition is met");
+                req.getBoolean("Started") ? stepView("default.complete", "Complete the marked concrete mission objective") : stepView("default.go", "Go to the exact marked mission point"),
+                req.getBoolean("Started") ? stepView("default.follow_next", "Follow the current objective text — no hidden requirement") : stepView("default.advance_next", "The mission advances automatically when its shown condition is met"));
     }
 
     private static void applyOperationSimulationOutcome(FactionWorldData data, WorldFaction ally, WorldFaction enemy,
@@ -3761,7 +3825,7 @@ public final class FactionRequestManager {
                                                 WorldFaction faction, String rosterName, BlockPos activationPoint) {
         if (FactionRequestMissionManager.rosterLocked(req, rosterName)) return FactionRequestMissionManager.rosterSize(req, rosterName) > 0;
         if (activeResidentCount(FactionWorldData.get(level), faction, true) == 0L) {
-            notify(player, "Request unavailable: " + faction.name() + " has no real persistent combatant for this role. No fake replacement will be created.");
+            notifyKey(player, "assembly.no_combatant", faction.name());
             clearRequest(player);
             return false;
         }
@@ -3778,7 +3842,7 @@ public final class FactionRequestManager {
             req.remove(sinceKey);
             if (!req.getBoolean("RosterAssemblyNotified." + rosterName)) {
                 req.putBoolean("RosterAssemblyNotified." + rosterName, true);
-                notify(player, "The real " + faction.name() + " participants are assembling at the marked objective. Stay here; the quest will not withdraw on a hidden loading timer.");
+                notifyKey(player, "assembly.faction_participants", faction.name());
             }
             saveRequest(player, req);
             return false;
@@ -3811,7 +3875,7 @@ public final class FactionRequestManager {
 
         if (activeResidentCount(FactionWorldData.get(level), ally, true) == 0L
                 || activeResidentCount(FactionWorldData.get(level), enemy, true) == 0L) {
-            notify(player, "Operation unavailable: one side has no real persistent combatant. No stand-in force will be created.");
+            notifyKey(player, "assembly.operation_unavailable");
             clearRequest(player);
             return false;
         }
@@ -3821,7 +3885,7 @@ public final class FactionRequestManager {
         if (allyLoaded <= 0 || enemyLoaded <= 0) {
             if (!req.getBoolean("CombatAssemblyNotified")) {
                 req.putBoolean("CombatAssemblyNotified", true);
-                notify(player, "Real allied and enemy participants are assembling at staging. Stay in the marked zone; there is no 45-second withdrawal timer and no need to search for them.");
+                notifyKey(player, "assembly.combat_participants");
             }
             req.remove("CombatAssemblyReadySince"); saveRequest(player, req); return false;
         }
@@ -3865,7 +3929,7 @@ public final class FactionRequestManager {
         AmbientFighterEntity fighter = FactionRequestMissionManager.reserveOne(player, level, req, faction, rosterName,
                 anchor, side, role, filter);
         if (fighter == null && activeResidentCount(FactionWorldData.get(level), faction, false) == 0L) {
-            notify(player, "Request withdrawn: " + faction.name() + " has no real persistent resident available for this role. No fake quest NPC will be created.");
+            notifyKey(player, "assembly.request_withdrawn", faction.name());
             clearRequest(player);
             return null;
         }
@@ -3876,7 +3940,7 @@ public final class FactionRequestManager {
             if (!nearRecoveryPoint && lastKnown != null) nearRecoveryPoint = distanceSqTo(lastKnown, player) <= 96.0D * 96.0D;
             if (nearRecoveryPoint && !req.getBoolean("RealMemberWait." + rosterName)) {
                 req.putBoolean("RealMemberWait." + rosterName, true);
-                notify(player, "Recovering the real faction member at the marked area. The request is paused—not failing—and will never spawn a duplicate.");
+                notifyKey(player, "assembly.recovering_member");
             }
             saveRequest(player, req);
         } else {
@@ -4147,25 +4211,25 @@ public final class FactionRequestManager {
 
     private static String requestNeedReason(String type, WorldFaction faction, WorldFaction target, FactionWorldData data, long now) {
         int supplies = data.supplies(faction); float momentum = data.momentum(faction);
-        String rival = target == null || target.id().equals(faction.id()) ? "an opposing faction" : target.name();
+        String rival = target == null || target.id().equals(faction.id()) ? auxiliaryView("opposing_faction", "an opposing faction") : target.name();
         return switch (type) {
-            case "RESCUE" -> "One of their actual members is currently being held prisoner.";
-            case "REPARATIONS" -> "Their current shortages/recovery make material restitution useful enough to accept.";
-            case "PROVISIONS" -> "Their food/supply reserve is low (" + supplies + ").";
-            case "MATERIALS" -> "Their material reserve is strained (" + supplies + ").";
-            case "WAR_STOCKPILE", "WAR_READINESS" -> "They are at war and their current readiness/supplies need outside support.";
-            case "RECOVERY", "RECOVERY_LINE" -> "Their faction momentum has fallen to " + String.format(java.util.Locale.ROOT, "%.2f", momentum) + ".";
-            case "DEFEND", "RETALIATION", "FRONTLINE", "PROTECT" -> "An active war is putting immediate pressure on their forces.";
-            case "ASSAULT" -> "They currently have enough momentum and supplies to press an active war.";
-            case "RECON", "MERCENARY_INTEL" -> rival + " currently represents a strategic information threat.";
-            case "MERCENARY_HUNT" -> rival + " has become strong enough that they want a specific person removed.";
-            case "MERCENARY_SABOTAGE" -> rival + " currently has a supply advantage worth disrupting.";
-            case "CAPTURE", "ELITE_CAPTURE" -> rival + " is strong enough that taking a live prisoner has strategic value.";
-            case "MERCENARY_EXTRACTION" -> "An active conflict makes leaving an embedded operative in " + rival + " territory too risky.";
-            case "TRAIN_RECRUIT" -> "Their active fighter core has fallen below the faction's manpower target.";
-            case "TRAIN_OFFICER" -> "Their weakened combat readiness calls for higher-level officer drills.";
-            case "PATROL" -> "Current war/recovery pressure requires additional presence around their territory.";
-            default -> "A current faction need has created this request.";
+            case "RESCUE" -> auxiliaryView("reason.rescue", "One of their actual members is currently being held prisoner.");
+            case "REPARATIONS" -> auxiliaryView("reason.reparations", "Their current shortages/recovery make material restitution useful enough to accept.");
+            case "PROVISIONS" -> auxiliaryView("reason.provisions", "Their food/supply reserve is low (%s).", supplies);
+            case "MATERIALS" -> auxiliaryView("reason.materials", "Their material reserve is strained (%s).", supplies);
+            case "WAR_STOCKPILE", "WAR_READINESS" -> auxiliaryView("reason.war_supplies", "They are at war and their current readiness/supplies need outside support.");
+            case "RECOVERY", "RECOVERY_LINE" -> auxiliaryView("reason.recovery", "Their faction momentum has fallen to %s.", String.format(java.util.Locale.ROOT, "%.2f", momentum));
+            case "DEFEND", "RETALIATION", "FRONTLINE", "PROTECT" -> auxiliaryView("reason.war_pressure", "An active war is putting immediate pressure on their forces.");
+            case "ASSAULT" -> auxiliaryView("reason.assault", "They currently have enough momentum and supplies to press an active war.");
+            case "RECON", "MERCENARY_INTEL" -> auxiliaryView("reason.intel", "%s currently represents a strategic information threat.", rival);
+            case "MERCENARY_HUNT" -> auxiliaryView("reason.hunt", "%s has become strong enough that they want a specific person removed.", rival);
+            case "MERCENARY_SABOTAGE" -> auxiliaryView("reason.sabotage", "%s currently has a supply advantage worth disrupting.", rival);
+            case "CAPTURE", "ELITE_CAPTURE" -> auxiliaryView("reason.capture", "%s is strong enough that taking a live prisoner has strategic value.", rival);
+            case "MERCENARY_EXTRACTION" -> auxiliaryView("reason.extraction", "An active conflict makes leaving an embedded operative in %s territory too risky.", rival);
+            case "TRAIN_RECRUIT" -> auxiliaryView("reason.train_recruit", "Their active fighter core has fallen below the faction's manpower target.");
+            case "TRAIN_OFFICER" -> auxiliaryView("reason.train_officer", "Their weakened combat readiness calls for higher-level officer drills.");
+            case "PATROL" -> auxiliaryView("reason.patrol", "Current war/recovery pressure requires additional presence around their territory.");
+            default -> auxiliaryView("reason.default", "A current faction need has created this request.");
         };
     }
 
@@ -4191,34 +4255,32 @@ public final class FactionRequestManager {
         WorldFaction target = FactionWorldData.get(level).byId(req.getString("Target"));
         FactionRole role = FactionRole.byId(req.getInt("TargetRole"));
         String targetName = req.getString("TargetName");
-        String who = role == FactionRole.LEADER && !targetName.isBlank() ? targetName + ", leader of " + (target == null ? "the opposing faction" : target.name())
-                : "a marked " + (target == null ? role.name().toLowerCase(java.util.Locale.ROOT) : target.roleTitle(role)) + " of " + (target == null ? "an opposing faction" : target.name());
-        return "Work as a hired fighter for " + employer.name() + ": hunt down and eliminate " + who
-                + ". The target is a real faction person; normal reputation, casualty, leadership and faction-relation consequences still apply.";
+        if (role == FactionRole.LEADER && !targetName.isBlank())
+            return descriptionView("mercenary_hunt.leader", "Work as a hired fighter for %s: hunt down and eliminate %s, leader of %s. The target is a real faction person; normal reputation, casualty, leadership and faction-relation consequences still apply.",
+                    employer.name(), targetName, target == null ? "the opposing faction" : target.name());
+        return descriptionView("mercenary_hunt.target", "Work as a hired fighter for %s: hunt down and eliminate a marked %s of %s. The target is a real faction person; normal reputation, casualty, leadership and faction-relation consequences still apply.",
+                employer.name(), target == null ? role.name().toLowerCase(java.util.Locale.ROOT) : target.roleTitle(role), target == null ? "an opposing faction" : target.name());
     }
 
     private static String mercenaryExtractionDescription(CompoundTag req, WorldFaction employer, ServerLevel level) {
         WorldFaction target = FactionWorldData.get(level).byId(req.getString("Target"));
-        return "Enter " + (target == null ? "opposing territory" : target.name() + " territory") + ", locate an embedded " + employer.name()
-                + " operative, and physically escort that same person home alive. Enemy guards contest the pickup and some extractions trigger a pursuit on the way out; killing them is optional, but abandoning the operative is not.";
+        return descriptionView("mercenary_extraction", "Enter %s, locate an embedded %s operative, and physically escort that same person home alive. Enemy guards contest the pickup and some extractions trigger a pursuit on the way out; killing them is optional, but abandoning the operative is not.",
+                target == null ? "opposing territory" : target.name() + " territory", employer.name());
     }
 
     private static String mercenaryIntelDescription(CompoundTag req, WorldFaction employer, ServerLevel level) {
         WorldFaction target = FactionWorldData.get(level).byId(req.getString("Target"));
         int seconds = Math.max(1, requiredPresence(req, 600) / 20);
         int points = Math.max(3, req.getInt("IntelPointsNeed"));
-        return "Meet a real " + employer.name() + " mission giver first for an in-person briefing, then infiltrate "
-                + (target == null ? "opposing territory" : target.name() + " territory") + ". Complete " + points
-                + " changing listening scenarios—guard rotations, supply audits, courier relays, officer briefings, training rotations or perimeter signals—about "
-                + seconds + " seconds each. Stay in the marked position while mission-specific dialogue plays. A real guard with line of sight spots you immediately and attacks; escape sight for six seconds before retrying that listening point. Killing observers is possible but carries normal faction consequences and reduces the payout. Return to the same mission giver and right-click them to report.";
+        return descriptionView("mercenary_intel", "Meet a real %s mission giver first for an in-person briefing, then infiltrate %s. Complete %s changing listening scenarios—guard rotations, supply audits, courier relays, officer briefings, training rotations or perimeter signals—about %s seconds each. Stay in the marked position while mission-specific dialogue plays. A real guard with line of sight spots you immediately and attacks; escape sight for six seconds before retrying that listening point. Killing observers is possible but carries normal faction consequences and reduces the payout. Return to the same mission giver and right-click them to report.",
+                employer.name(), target == null ? "opposing territory" : target.name() + " territory", points, seconds);
     }
 
     private static String mercenarySabotageDescription(CompoundTag req, WorldFaction employer, ServerLevel level) {
         WorldFaction target = FactionWorldData.get(level).byId(req.getString("Target"));
         int supplyHit = Math.max(6, req.getInt("SupplyHit"));
-        return "Take an interdiction contract for " + employer.name() + ": penetrate "
-                + (target == null ? "opposing territory" : target.name() + " territory") + ", disrupt three separate points along a guarded supply route, and cost the rival up to "
-                + supplyHit + " real faction supplies. The security roster is made of actual persistent members and never refills; stay covert, force a withdrawal, or fight through them, then escape at least 300 blocks clear.";
+        return descriptionView("mercenary_sabotage", "Take an interdiction contract for %s: penetrate %s, disrupt three separate points along a guarded supply route, and cost the rival up to %s real faction supplies. The security roster is made of actual persistent members and never refills; stay covert, force a withdrawal, or fight through them, then escape at least 300 blocks clear.",
+                employer.name(), target == null ? "opposing territory" : target.name() + " territory", supplyHit);
     }
 
 
@@ -4402,6 +4464,28 @@ public final class FactionRequestManager {
         if (player == null || text == null || text.isBlank()) return;
         player.displayClientMessage(Component.literal("◆ " + text).withStyle(ChatFormatting.AQUA), true);
     }
+    private static void objectiveToastKey(ServerPlayer player, String key, Object... args) {
+        if (player != null) player.displayClientMessage(Component.translatable("dmzlivingworld.hud.faction_request.toast." + key, localizedComponentArgs(args))
+                .withStyle(ChatFormatting.AQUA), true);
+    }
+
+    /** Resolves nested LW payloads before giving them to vanilla's Component formatter. */
+    private static Object[] localizedComponentArgs(Object... args) {
+        if (args == null || args.length == 0) return new Object[0];
+        Object[] localized = new Object[args.length];
+        for (int i = 0; i < args.length; i++) {
+            Object value = args[i];
+            localized[i] = value instanceof String text && LWLang.isSpeechKey(text) ? LWLang.speech(text) : value;
+        }
+        return localized;
+    }
+
+    private static String localizedIntelScenario(FactionMissionFlavor.IntelScenario scenario) {
+        if (scenario == null || scenario.name() == null || scenario.name().isBlank()) return "";
+        String slug = scenario.name().toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        return auxiliaryView("intel_scenario." + slug, scenario.name());
+    }
 
     private static void clearQuestAggression(java.util.List<AmbientFighterEntity> fighters, ServerPlayer player) {
         if (fighters == null || fighters.isEmpty()) return;
@@ -4436,21 +4520,26 @@ public final class FactionRequestManager {
                                       String summary, String worldImpact) {
         if (player == null || req == null) return;
         WorldFaction source = player.level() instanceof ServerLevel level ? FactionWorldData.get(level).byId(req.getString("Source")) : null;
-        StringBuilder reward = new StringBuilder();
-        if (reputation > 0) reward.append("+").append(reputation).append(" faction reputation");
-        if (supplies > 0) {
-            if (reward.length() > 0) reward.append(" • ");
-            reward.append("+").append(supplies).append(" faction supplies");
-        }
-        if (reward.length() == 0) reward.append("No direct material payout");
+        // A completed good-faction request is a concrete act of rehabilitation.
+        if (source != null && source.alignment() == com.dmzlivingworld.entity.FighterAlignment.GOOD)
+            WantedManager.reducePlayerWantedPressurePoints(player, 1);
+        String reward = reputation > 0 && supplies > 0
+                ? LWLang.speechKey("faction_request.complete.reward_both", "+%s faction reputation • +%s faction supplies", reputation, supplies)
+                : reputation > 0 ? LWLang.speechKey("faction_request.complete.reward_reputation", "+%s faction reputation", reputation)
+                : supplies > 0 ? LWLang.speechKey("faction_request.complete.reward_supplies", "+%s faction supplies", supplies)
+                : LWLang.speechKey("faction_request.complete.reward_none", "No direct material payout");
         LWNetwork.sendFactionRequestComplete(player, new FactionRequestCompletePacket(
-                requestTitle(req), source == null ? "" : source.name(), summary, reward.toString(), worldImpact));
+                requestTitleView(req), source == null ? "" : source.name(), summary, reward, worldImpact));
         clearRequest(player);
     }
 
     private static void finishSuccess(ServerPlayer player, CompoundTag req, int reputation,
                                       String summary, String worldImpact) {
         finishSuccess(player, req, reputation, 0, summary, worldImpact);
+    }
+
+    private static String resultView(String key, String fallback, Object... args) {
+        return LWLang.speechKey("faction_request.complete." + key, fallback, args);
     }
 
     private static void clearRequest(ServerPlayer p){
@@ -4467,7 +4556,11 @@ public final class FactionRequestManager {
     private static CompoundTag root(ServerPlayer p){CompoundTag d=p.getPersistentData();if(!d.contains(ROOT,net.minecraft.nbt.Tag.TAG_COMPOUND))d.put(ROOT,new CompoundTag());return d.getCompound(ROOT);}
     private static void save(ServerPlayer p,CompoundTag root){p.getPersistentData().put(ROOT,root);}
     private static AmbientFighterEntity entity(ServerLevel l,UUID id){var e=l.getEntity(id);return e instanceof AmbientFighterEntity f?f:null;}
-    private static void notify(ServerPlayer p,String text){p.displayClientMessage(Component.literal("[Living World] ").withStyle(ChatFormatting.GOLD).append(Component.literal(text).withStyle(ChatFormatting.WHITE)),false);}
+    private static void notify(ServerPlayer p,String text){p.displayClientMessage(Component.translatable("dmzlivingworld.message.prefix").withStyle(ChatFormatting.GOLD).append(Component.literal(text).withStyle(ChatFormatting.WHITE)),false);}
+    private static void notifyKey(ServerPlayer p, String key, Object... args) {
+        p.displayClientMessage(Component.translatable("dmzlivingworld.message.prefix").withStyle(ChatFormatting.GOLD)
+                .append(Component.translatable("dmzlivingworld.message.faction_request." + key, localizedComponentArgs(args)).withStyle(ChatFormatting.WHITE)), false);
+    }
 
     @SubscribeEvent public static void onClone(PlayerEvent.Clone e){if(e.getOriginal() instanceof ServerPlayer o&&e.getEntity() instanceof ServerPlayer c&&o.getPersistentData().contains(ROOT,net.minecraft.nbt.Tag.TAG_COMPOUND))c.getPersistentData().put(ROOT,o.getPersistentData().getCompound(ROOT).copy());}
 }

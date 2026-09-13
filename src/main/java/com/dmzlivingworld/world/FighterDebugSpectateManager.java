@@ -41,8 +41,8 @@ public final class FighterDebugSpectateManager {
         player.teleportTo(targetLevel, fighter.getX(), fighter.getY() + 1.0D, fighter.getZ(), player.getYRot(), player.getXRot());
         player.setGameMode(GameType.SPECTATOR);
         player.setCamera(fighter);
-        player.displayClientMessage(Component.literal("[Living World] Spectating " + fighter.getFighterName()
-                + " • use /lw fighter spectate stop to return.").withStyle(ChatFormatting.AQUA), false);
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.debug.spectating", fighter.getFighterName())
+                .withStyle(ChatFormatting.AQUA), false);
         return 1;
     }
 
@@ -53,13 +53,13 @@ public final class FighterDebugSpectateManager {
         ReturnState state = ACTIVE.remove(player.getUUID());
         player.setCamera(player);
         if (state == null) {
-            if (message) player.displayClientMessage(Component.literal("[Living World] No Living World spectate session is active.").withStyle(ChatFormatting.GRAY), false);
+            if (message) player.displayClientMessage(Component.translatable("dmzlivingworld.message.debug.spectate_inactive").withStyle(ChatFormatting.GRAY), false);
             return 0;
         }
         ServerLevel returnLevel = player.getServer().getLevel(state.dimension());
         if (returnLevel != null) player.teleportTo(returnLevel, state.x(), state.y(), state.z(), state.yaw(), state.pitch());
         player.setGameMode(state.gameType());
-        if (message) player.displayClientMessage(Component.literal("[Living World] Returned from NPC spectate.").withStyle(ChatFormatting.AQUA), false);
+        if (message) player.displayClientMessage(Component.translatable("dmzlivingworld.message.debug.spectate_returned").withStyle(ChatFormatting.AQUA), false);
         return 1;
     }
 

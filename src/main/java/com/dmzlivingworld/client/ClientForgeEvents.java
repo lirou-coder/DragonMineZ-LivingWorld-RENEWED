@@ -133,7 +133,8 @@ public final class ClientForgeEvents {
                 ChatFormatting nameColor = WorldMenaceManager.isHerobrine(fighter)
                         ? ChatFormatting.RED : ChatFormatting.AQUA;
                 minecraft.gui.getChat().addMessage(Component.literal(fighter.getFighterName()).withStyle(nameColor)
-                        .append(Component.literal(": " + speech).withStyle(ChatFormatting.WHITE)));
+                        .append(Component.literal(": ").withStyle(ChatFormatting.WHITE))
+                        .append(LWLang.speech(speech).copy().withStyle(ChatFormatting.WHITE)));
             }
         }
         LAST_MIRRORED_SPEECH.keySet().removeIf(id -> !nearby.contains(id));
