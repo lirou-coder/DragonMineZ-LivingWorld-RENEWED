@@ -212,8 +212,17 @@ public final class FighterInstantTransmissionManager {
             AmbientFighterEntity spawned = AmbientFighterSpawner.spawnRememberedSignalAt(player, record.getCompound("Profile"), recordId,
                     Math.max(1, record.getInt("Encounters")), record.getInt("Relationship"),
                     record.getBoolean("Rescued"), life);
-            if (spawned != null) FighterMemoryManager.refreshLoadedProfile(spawned);
-            return spawned;
+            if (spawned == null) return null;
+
+            // Do not refresh the newly materialized UUID before reconciling identities. The
+            // remembered LifeEntityUUID still points at the genuine persistent actor and is the
+            // strongest signal if its chunk finished loading during materialization. Re-resolving
+            // here keeps that actor and discards the temporary copy; if no old actor exists, the
+            // spawned entity is rebound and becomes the sole canonical instance.
+            AmbientFighterEntity canonical = findLoadedIdentity(player, recordId, record);
+            CompoundTag identitySnapshot = record.copy();
+            player.getServer().execute(() -> findLoadedIdentity(player, recordId, identitySnapshot));
+            return canonical == null ? spawned : canonical;
         } finally {
             MATERIALIZING.remove(guard);
         }

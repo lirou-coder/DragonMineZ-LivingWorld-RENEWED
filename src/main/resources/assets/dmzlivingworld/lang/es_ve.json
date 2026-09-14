@@ -4830,5 +4830,12 @@
   "dmzlivingworld.wish.revive_all_good": "Revivir Luchadores Buenos",
   "dmzlivingworld.wish.revive_all_wanted": "Revivir NPC Buscados",
   "dmzlivingworld.wish.revive_all_neutral": "Revivir NPC Neutrales",
-  "dmzlivingworld.wish.revive_all": "Revivir Todos NPC"
+  "dmzlivingworld.wish.revive_all": "Revivir Todos NPC",
+  "dmzlivingworld.label.mood_cause.dynamic.losing_spar_to": "haber perdido el duelo contra %s",
+  "dmzlivingworld.message.full_power.no_stronger_form": "[Mundo Vivo] Este luchador no tiene una forma más poderosa en este momento.",
+  "dmzlivingworld.dialogue.full_power.no_stronger_form.heroic": "¿Poder total? Esto es todo lo que tengo ahora, pero no dejaré de mejorar.",
+  "dmzlivingworld.dialogue.full_power.no_stronger_form.calm": "¿Poder total? Ya estoy usando todo mi poder.",
+  "dmzlivingworld.dialogue.full_power.no_stronger_form.proud": "¿Qué quieres decir? ¡¿Te estás burlando de mí?!",
+  "dmzlivingworld.dialogue.full_power.no_stronger_form.aggressive": "¡Este es todo mi poder! ¿Tienes algún problema con eso?",
+  "dmzlivingworld.dialogue.full_power.no_stronger_form.cautious": "No tengo otra forma que mostrarte. Esto es lo máximo que puedo alcanzar ahora."
 }

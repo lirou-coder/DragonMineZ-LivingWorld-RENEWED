@@ -34,7 +34,10 @@ public final class FighterHairLayer extends GeoRenderLayer<AmbientFighterEntity>
         String hairRace = entity.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID
                 || entity.getRace().isSairensRace() ? "human" : entity.getRace().dmzId();
         String hairType = entity.getActiveRacialForm() == null ? "base" : entity.getActiveRacialForm().hairType();
-        CustomHair hair = switch (hairType) {
+        String forcedHairCode = entity.getActiveRacialFormConfig() == null
+                ? "" : entity.getActiveRacialFormConfig().forcedHairCode();
+        CustomHair hair = decodeForcedHair(forcedHairCode, hairType);
+        if (hair == null || hair.isEmpty()) hair = switch (hairType) {
             case "ssj" -> HairManager.getPresetHairSSJ(entity.getHairId(), hairRace);
             case "ssj2" -> HairManager.getPresetHairSSJ2(entity.getHairId(), hairRace);
             case "ssj3" -> HairManager.getPresetHairSSJ3(entity.getHairId(), hairRace);
@@ -61,5 +64,26 @@ public final class FighterHairLayer extends GeoRenderLayer<AmbientFighterEntity>
         );
         bufferSource.getBuffer(renderType);
         poseStack.popPose();
+    }
+
+    private static CustomHair decodeForcedHair(String code, String hairType) {
+        if (code == null || code.isBlank()) return null;
+        try {
+            if (HairManager.isFullSetCode(code)) {
+                CustomHair[] set = HairManager.fromFullSetCode(code);
+                if (set == null || set.length == 0) return null;
+                int variant = switch (hairType) {
+                    case "ssj" -> 1;
+                    case "ssj2" -> 2;
+                    case "ssj3" -> 3;
+                    default -> 0;
+                };
+                return set[Math.min(variant, set.length - 1)];
+            }
+            return HairManager.fromCode(code);
+        } catch (RuntimeException ignored) {
+            // A malformed live form config must not break rendering; fall back to preset hair.
+            return null;
+        }
     }
 }

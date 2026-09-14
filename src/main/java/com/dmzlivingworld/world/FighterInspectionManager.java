@@ -32,6 +32,10 @@ public final class FighterInspectionManager {
     }
 
     private static String labelText(String category, String fallback) {
+        // Outcomes and other profile values may already be serialized LW language payloads.
+        // Wrapping one of those in a second key turns its control bytes into a bogus slug and
+        // exposes the raw \u0001lw:... value in the dossier.
+        if (LWLang.isSpeechKey(fallback)) return fallback;
         if ("faction_name".equals(category)) return fallback == null ? "" : fallback;
         String slug = fallback == null ? "unknown" : fallback.toLowerCase(java.util.Locale.ROOT)
                 .replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
@@ -512,6 +516,11 @@ public final class FighterInspectionManager {
 
     private static String localizedMoodCause(String cause) {
         if (cause == null || cause.isBlank()) return labelText("mood_cause", "recent events");
+        String sparLossPrefix = "losing the spar to ";
+        if (cause.startsWith(sparLossPrefix) && cause.length() > sparLossPrefix.length()) {
+            return LWLang.speechKey("label.mood_cause.dynamic.losing_spar_to", "losing the duel to %s",
+                    cause.substring(sparLossPrefix.length()));
+        }
         String[][] dynamic = {
                 {" being supportive", "being_supportive"}, {" getting under their skin", "getting_under_their_skin"},
                 {" falling in battle", "falling_in_battle"}, {" being defeated", "being_defeated"},

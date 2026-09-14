@@ -485,6 +485,8 @@ public final class WorldMenaceManager {
     public static boolean tickFighter(AmbientFighterEntity fighter) {
         if (!isHerobrine(fighter) || fighter.level().isClientSide || !(fighter.level() instanceof ServerLevel level)) return false;
         long now = level.getGameTime();
+        ServerPlayer nearestPlayer = nearestPlayer(fighter);
+        if (nearestPlayer != null) stareAt(fighter, nearestPlayer);
 
         // Keep the singleton recovery coordinate fresh while the exact entity is loaded. Most
         // movement is ordinary navigation rather than teleportation; a one-second snapshot makes
@@ -547,6 +549,16 @@ public final class WorldMenaceManager {
         fighter.getPersistentData().remove(INSPECTION_RELOCATE_PLAYER);
 
         WatchSession session = WATCHES.get(fighter.getUUID());
+        // Sessions are runtime-only. A loaded menace (especially after a server reload) must not
+        // become an inert entity that no longer checks sight or proximity merely because this map
+        // was rebuilt. Bind it immediately to the closest valid player without relocating it.
+        if (session == null && nearestPlayer != null) {
+            session = new WatchSession(nearestPlayer.getUUID(), now + 12_000L, false, now, nearestPlayer.position());
+            WATCHES.put(fighter.getUUID(), session);
+        } else if (session != null && nearestPlayer != null && !session.playerId.equals(nearestPlayer.getUUID())) {
+            session = new WatchSession(nearestPlayer.getUUID(), now + 12_000L, false, now, nearestPlayer.position());
+            WATCHES.put(fighter.getUUID(), session);
+        }
         if (session != null) {
             ServerPlayer watched = level.getServer().getPlayerList().getPlayer(session.playerId);
             if (watched == null || watched.isSpectator() || watched.serverLevel() != level || now >= session.endsAt) {
@@ -737,6 +749,20 @@ public final class WorldMenaceManager {
         fighter.yBodyRot = yaw;
         fighter.yHeadRot = yaw;
         fighter.getLookControl().setLookAt(player, 35.0F, 28.0F);
+    }
+
+    private static ServerPlayer nearestPlayer(AmbientFighterEntity fighter) {
+        if (fighter == null || !(fighter.level() instanceof ServerLevel level)) return null;
+        return level.players().stream()
+                .filter(player -> player.isAlive() && !player.isSpectator())
+                .min(java.util.Comparator.comparingDouble(fighter::distanceToSqr)).orElse(null);
+    }
+
+    /** Final post-AI rotation lock; native combat goals must never turn Herobrine away. */
+    public static void enforceNearestPlayerStare(AmbientFighterEntity fighter) {
+        if (!isHerobrine(fighter) || fighter.level().isClientSide) return;
+        ServerPlayer nearest = nearestPlayer(fighter);
+        if (nearest != null) stareAt(fighter, nearest);
     }
 
 

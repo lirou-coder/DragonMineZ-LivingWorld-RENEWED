@@ -81,7 +81,7 @@ public final class NpcFormConfigBridge {
         return new Form(id, f.getName(), skillLevel, positive(f.getStrMultiplier()), positive(f.getDefMultiplier()),
                 positive(f.getVitMultiplier()), positive(f.getPwrMultiplier()), positive(f.getSpeedMultiplier()),
                 positive(f.getAttackSpeed()), modelScale, clean(f.getCustomModel()), clean(f.getHairType()),
-                clean(f.getHairColor()), clean(f.getEye1Color()), clean(f.getEye2Color()), clean(f.getAuraType()),
+                clean(f.getForcedHairCode()), clean(f.getHairColor()), clean(f.getEye1Color()), clean(f.getEye2Color()), clean(f.getAuraType()),
                 parseColor(f.getAuraColor()), Boolean.TRUE.equals(f.getHasLightnings()), clean(f.getLightningColor()),
                 clean(f.getBodyColor1()), clean(f.getBodyColor2()), clean(f.getBodyColor3()));
     }
@@ -95,7 +95,7 @@ public final class NpcFormConfigBridge {
 
     public record Form(String id, String name, int skillLevel, double melee, double defense, double vitality,
                        double ki, double speed, double attackSpeed, float scale, String modelKey, String hairType,
-                       String hairColor, String eyeColor, String eye2Color, String auraType, int auraColor,
+                       String forcedHairCode, String hairColor, String eyeColor, String eye2Color, String auraType, int auraColor,
                        boolean lightning, String lightningColor, String bodyColor1, String bodyColor2, String bodyColor3) {
         public double averageMultiplier() { return (melee + defense + vitality + ki + speed + attackSpeed) / 6.0D; }
     }

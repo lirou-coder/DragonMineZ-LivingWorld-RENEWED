@@ -2,6 +2,7 @@ package com.dmzlivingworld.entity;
 
 import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;
+import com.dragonminez.common.config.ConfigManager;
 import com.dragonminez.common.init.entities.IBattlePower;
 import com.dragonminez.common.init.MainSounds;
 import com.dragonminez.common.init.MainParticles;
@@ -743,6 +744,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (level().isClientSide && clientWeaponAnimationWindow > 0) clientWeaponAnimationWindow--;
         if (!level().isClientSide && isAlive() && postSparPeaceTicks > 0) enforcePostSparPeace();
         if (!level().isClientSide && isAlive()) enforcePlayerAlignmentCombatRules();
+        if (!level().isClientSide && isAlive()) WorldMenaceManager.enforceNearestPlayerStare(this);
     }
 
     private void enforceLivingWorldSleepingRotation() {
@@ -2620,7 +2622,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains(race.dmzId()) ? random.nextInt(22) : 0);
                 String skin = pick(random, SKIN_COLORS);
                 entityData.set(BODY_COLOR, skin);
-                entityData.set(BODY_COLOR2, race == FighterRace.SAIYAN ? "#572117" : skin);
+                // This layer is not another random skin channel. DMZ initializes it from the
+                // race's configured player default and forms then override that same channel.
+                entityData.set(BODY_COLOR2, defaultPlayerBodyColor2(race));
                 entityData.set(BODY_COLOR3, skin);
             }
             case NAMEKIAN -> {
@@ -2778,6 +2782,12 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     private static String randomColor(RandomSource random) {
         return String.format(java.util.Locale.ROOT, "#%02X%02X%02X",
                 random.nextInt(256), random.nextInt(256), random.nextInt(256));
+    }
+
+    private static String defaultPlayerBodyColor2(FighterRace race) {
+        var raceAppearance = ConfigManager.getRaceCharacter(race == null ? "human" : race.dmzId());
+        String configured = raceAppearance == null ? null : raceAppearance.getDefaultBodyColor2();
+        return configured == null || configured.isBlank() ? "#F5D5A6" : configured;
     }
 
     private static String contrastingColor(RandomSource random, String source) {
@@ -3459,7 +3469,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         tag.putInt("MemoryEncounters", memoryEncounters);
         tag.putInt("MemoryRelationship", memoryRelationship);
         tag.putBoolean("MemoryRescued", memoryRescued);
-        tag.putFloat("DisplayScale", getDisplayScale());
+        boolean transformedAppearance = isRacialFormActive();
+        tag.putFloat("DisplayScale", transformedAppearance && racialBaseScale > 0.0F ? racialBaseScale : getDisplayScale());
         tag.putInt("Gender", entityData.get(GENDER));
         tag.putInt("BodyType", getBodyType());
         tag.putInt("EyesType", getEyesType());
@@ -3467,12 +3478,12 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         tag.putInt("MouthType", getMouthType());
         tag.putInt("HairId", getHairId());
         tag.putInt("Outfit", getOutfit());
-        tag.putString("BodyColor", getBodyColor());
-        tag.putString("BodyColor2", getBodyColor2());
-        tag.putString("BodyColor3", getBodyColor3());
-        tag.putString("HairColor", getHairColor());
-        tag.putString("Eye1Color", getEye1Color());
-        tag.putString("Eye2Color", getEye2Color());
+        tag.putString("BodyColor", transformedAppearance && !racialBaseBodyColor.isBlank() ? racialBaseBodyColor : getBodyColor());
+        tag.putString("BodyColor2", transformedAppearance && !racialBaseBodyColor2.isBlank() ? racialBaseBodyColor2 : getBodyColor2());
+        tag.putString("BodyColor3", transformedAppearance && !racialBaseBodyColor3.isBlank() ? racialBaseBodyColor3 : getBodyColor3());
+        tag.putString("HairColor", transformedAppearance && !racialBaseHairColor.isBlank() ? racialBaseHairColor : getHairColor());
+        tag.putString("Eye1Color", transformedAppearance && !racialBaseEye1Color.isBlank() ? racialBaseEye1Color : getEye1Color());
+        tag.putString("Eye2Color", transformedAppearance && !racialBaseEye2Color.isBlank() ? racialBaseEye2Color : getEye2Color());
         if (isFactionMember()) tag.putString("FactionId", getFactionId());
         tag.putString("FactionName", getFactionDisplayName());
         tag.putString("FactionTitle", getFactionTitle());
@@ -3730,11 +3741,10 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         setBattlePower(projectedBattlePower());
         if (!temporary) setHealth(Math.min(getMaxHealth(), getHealth() + getMaxHealth() * (getRank() == FighterRank.VETERAN ? 0.26F : 0.18F)));
 
-        if (getRace() == FighterRace.SAIYAN) {
-            entityData.set(HAIR_COLOR, "#F2D35A");
-            entityData.set(EYE1_COLOR, "#58D7D1");
-            entityData.set(EYE2_COLOR, "#2F9F9D");
-        }
+        // Awakened is Living World's generic power state, not a Saiyan racial form.
+        // Cosmetic colors belong exclusively to the active DMZ form configuration and
+        // are restored by stopRacialForm(); changing them here permanently turned an
+        // awakened Saiyan into a Super Saiyan even after the state had ended.
         setLightning(true);
         if (getRandom().nextFloat() < 0.72F) flareAura(140 + getRandom().nextInt(121));
         level().playSound(null, blockPosition(), MainSounds.TRANSFORM_ON.get(), SoundSource.HOSTILE, 1.25F, 1.0F);
@@ -4194,6 +4204,16 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     public boolean isRacialFormActive() { return getActiveRacialFormLevel() > 0; }
     public RacialFormProfile getActiveRacialForm() {
         return isRacialFormActive() ? NpcFormConfigBridge.profile(getRace(), getActiveRacialFormLevel()) : null;
+    }
+    public NpcFormConfigBridge.Form getActiveRacialFormConfig() {
+        return isRacialFormActive() ? NpcFormConfigBridge.form(getRace(), getActiveRacialFormLevel()) : null;
+    }
+    public boolean isSaiyanSsj4Form() {
+        if (getRace() != FighterRace.SAIYAN) return false;
+        NpcFormConfigBridge.Form form = getActiveRacialFormConfig();
+        if (form == null || form.modelKey() == null) return false;
+        String model = form.modelKey().trim().toLowerCase(java.util.Locale.ROOT);
+        return "ssj4d".equals(model) || "ssj4gt".equals(model);
     }
     public boolean isFrostDemonPrimitive() {
         if (getRace() != FighterRace.FROST_DEMON) return false;
@@ -5003,9 +5023,10 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         character.setEye1Color(getEye1Color());
         character.setEye2Color(getEye2Color());
         character.setAuraColor("#FFFFFF");
-        // Do not synthesize a Saiyan tail here. DMZ's real player tail is rendered by
-        // its separate race-parts pipeline (tailenrolled + character state), not this model.
-        character.setHasSaiyanTail(false);
+        // SSJ4 Daima and GT explicitly carry a Saiyan tail even when the fighter's base
+        // appearance does not. Keep the native DMZ character state consistent with the
+        // model visibility rule; every other form remains tailless.
+        character.setHasSaiyanTail(isSaiyanSsj4Form());
         if (getRace().usesHair()) {
             CustomHair hair = HairManager.getPresetHair(getHairId(), getRace().dmzId());
             if (hair == null || hair.isEmpty()) hair = HairManager.getPresetHair(getHairId(), "human");
@@ -5088,11 +5109,15 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         tag.putDouble("LWRacialBaseAttackSpeed", racialBaseAttackSpeed);
         tag.putFloat("LWRacialBaseKiDamage", racialBaseKiDamage);
         tag.putFloat("LWRacialBaseScale", racialBaseScale);
+        tag.putString("LWRacialBaseBody", racialBaseBodyColor == null ? "" : racialBaseBodyColor);
+        tag.putString("LWRacialBaseBody2", racialBaseBodyColor2 == null ? "" : racialBaseBodyColor2);
+        tag.putString("LWRacialBaseBody3", racialBaseBodyColor3 == null ? "" : racialBaseBodyColor3);
         tag.putString("LWRacialBaseHair", racialBaseHairColor == null ? "" : racialBaseHairColor);
         tag.putString("LWRacialBaseEye1", racialBaseEye1Color == null ? "" : racialBaseEye1Color);
         tag.putString("LWRacialBaseEye2", racialBaseEye2Color == null ? "" : racialBaseEye2Color);
         tag.putString("LWRacialBaseAuraType", racialBaseAuraType == null ? "" : racialBaseAuraType);
         tag.putInt("LWRacialBaseAuraColor", racialBaseAuraColor);
+        tag.putInt("LWRacialBaseLightningColor", racialBaseLightningColor);
         tag.putBoolean("LWRacialBaseLightning", racialBaseLightning);
         tag.putInt("LWStoryRole", getStoryRole());
         tag.remove("LWMentorName");
@@ -5217,11 +5242,15 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         racialBaseAttackSpeed = tag.contains("LWRacialBaseAttackSpeed") ? tag.getDouble("LWRacialBaseAttackSpeed") : getDefaultAttackSpeed();
         racialBaseKiDamage = tag.contains("LWRacialBaseKiDamage") ? tag.getFloat("LWRacialBaseKiDamage") : 0.0F;
         racialBaseScale = tag.contains("LWRacialBaseScale") ? tag.getFloat("LWRacialBaseScale") : getDisplayScale();
+        racialBaseBodyColor = tag.contains("LWRacialBaseBody") ? tag.getString("LWRacialBaseBody") : getBodyColor();
+        racialBaseBodyColor2 = tag.contains("LWRacialBaseBody2") ? tag.getString("LWRacialBaseBody2") : getBodyColor2();
+        racialBaseBodyColor3 = tag.contains("LWRacialBaseBody3") ? tag.getString("LWRacialBaseBody3") : getBodyColor3();
         racialBaseHairColor = tag.contains("LWRacialBaseHair") ? tag.getString("LWRacialBaseHair") : getHairColor();
         racialBaseEye1Color = tag.contains("LWRacialBaseEye1") ? tag.getString("LWRacialBaseEye1") : getEye1Color();
         racialBaseEye2Color = tag.contains("LWRacialBaseEye2") ? tag.getString("LWRacialBaseEye2") : getEye2Color();
         racialBaseAuraType = tag.contains("LWRacialBaseAuraType") ? tag.getString("LWRacialBaseAuraType") : getAuraType();
         racialBaseAuraColor = tag.contains("LWRacialBaseAuraColor") ? tag.getInt("LWRacialBaseAuraColor") : getAuraColor();
+        racialBaseLightningColor = tag.contains("LWRacialBaseLightningColor") ? tag.getInt("LWRacialBaseLightningColor") : getLightningColor();
         racialBaseLightning = tag.contains("LWRacialBaseLightning") && tag.getBoolean("LWRacialBaseLightning");
         entityData.set(STORY_ROLE, tag.contains("LWStoryRole") ? tag.getInt("LWStoryRole") : STORY_NONE);
         legacyData.remove("MentorStudentLocked");
@@ -5269,8 +5298,12 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             if (!racialBaseHairColor.isBlank()) entityData.set(HAIR_COLOR, racialBaseHairColor);
             if (!racialBaseEye1Color.isBlank()) entityData.set(EYE1_COLOR, racialBaseEye1Color);
             if (!racialBaseEye2Color.isBlank()) entityData.set(EYE2_COLOR, racialBaseEye2Color);
+            if (!racialBaseBodyColor.isBlank()) entityData.set(BODY_COLOR, racialBaseBodyColor);
+            if (!racialBaseBodyColor2.isBlank()) entityData.set(BODY_COLOR2, racialBaseBodyColor2);
+            if (!racialBaseBodyColor3.isBlank()) entityData.set(BODY_COLOR3, racialBaseBodyColor3);
             setAuraType(racialBaseAuraType == null ? "" : racialBaseAuraType);
             setAuraColor(racialBaseAuraColor);
+            setLightningColor(racialBaseLightningColor);
             setLightning(racialBaseLightning);
         }
         partyId = tag.hasUUID("LWPartyId") ? tag.getUUID("LWPartyId") : null;
@@ -5290,6 +5323,11 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         else entityData.set(BODY_COLOR2, getBodyColor());
         if (tag.contains("LWBodyColor3")) entityData.set(BODY_COLOR3, tag.getString("LWBodyColor3"));
         else entityData.set(BODY_COLOR3, getBodyColor());
+        if (getRace() == FighterRace.HUMAN || getRace() == FighterRace.SAIYAN) {
+            String playerDefaultBody2 = defaultPlayerBodyColor2(getRace());
+            entityData.set(BODY_COLOR2, playerDefaultBody2);
+            if (restoreRacialAppearance) racialBaseBodyColor2 = playerDefaultBody2;
+        }
         if (getRace() == FighterRace.NAMEKIAN) {
             int migratedBodyType = Math.floorMod(getBodyType(), 3);
             entityData.set(BODY_TYPE, migratedBodyType);
@@ -5352,6 +5390,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             if (!racialBaseHairColor.isBlank()) entityData.set(HAIR_COLOR, racialBaseHairColor);
             if (!racialBaseEye1Color.isBlank()) entityData.set(EYE1_COLOR, racialBaseEye1Color);
             if (!racialBaseEye2Color.isBlank()) entityData.set(EYE2_COLOR, racialBaseEye2Color);
+            if (!racialBaseBodyColor.isBlank()) entityData.set(BODY_COLOR, racialBaseBodyColor);
+            if (!racialBaseBodyColor2.isBlank()) entityData.set(BODY_COLOR2, racialBaseBodyColor2);
+            if (!racialBaseBodyColor3.isBlank()) entityData.set(BODY_COLOR3, racialBaseBodyColor3);
         }
         // Appearance NBT from older builds may contain the former body-coloured Majin eyes.
         // Normalize the base eye colour after every generic/form restoration has completed.

@@ -110,8 +110,14 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
                     hair, pt, light, overlay);
         }
 
-        if (e.getActiveRacialForm() != null && "supersaiyan4".equals(e.getActiveRacialForm().id())) {
-            layer(model, pose, buffers, e, dmz("textures/entity/races/humansaiyan/ssj4d_layer1.png"), WHITE, pt, light, overlay);
+        if (e.isSaiyanSsj4Form()) {
+            // The tail geometry uses DMZ's separate monochrome tail mask; without this
+            // pass its newly-visible bones sample transparent pixels from the base skin.
+            layer(model, pose, buffers, e, dmz("textures/entity/races/tail1.png"), hair, pt, light, overlay);
+            var form = e.getActiveRacialFormConfig();
+            String ssj4Layer = form != null && "ssj4gt".equalsIgnoreCase(form.modelKey())
+                    ? "ssj4gt_layer1.png" : "ssj4d_layer1.png";
+            layer(model, pose, buffers, e, dmz("textures/entity/races/humansaiyan/" + ssj4Layer), WHITE, pt, light, overlay);
         }
 
         String eye = HUMAN_FACE + "humansaiyan_eye_" + e.getEyesType() + "_";
@@ -320,6 +326,8 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
                 && !(e.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID
                 && SairensRaceCompat.isBioAndroidHumanModel())
                 && !e.getRace().isSairensRace())) return false;
+        var form = e.getActiveRacialFormConfig();
+        if (form != null && !form.forcedHairCode().isBlank()) return true;
         if (e.getHairId() == 5) return false;
         String raceId = e.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID || e.getRace().isSairensRace()
             ? "human" : e.getRace().dmzId();

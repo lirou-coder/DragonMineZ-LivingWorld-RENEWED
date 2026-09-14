@@ -4822,5 +4822,12 @@
   "dmzlivingworld.wish.revive_all_good": "Revive Good Fighters",
   "dmzlivingworld.wish.revive_all_wanted": "Revive Wanted NPCs",
   "dmzlivingworld.wish.revive_all_neutral": "Revive Neutral NPCs",
-  "dmzlivingworld.wish.revive_all": "Revive All NPCs"
+  "dmzlivingworld.wish.revive_all": "Revive All NPCs",
+  "dmzlivingworld.label.mood_cause.dynamic.losing_spar_to": "losing the duel to %s",
+  "dmzlivingworld.message.full_power.no_stronger_form": "[Living World] This Fighter does not have a stronger form right now.",
+  "dmzlivingworld.dialogue.full_power.no_stronger_form.heroic": "Full power? This is all I have right now—but I won't stop improving.",
+  "dmzlivingworld.dialogue.full_power.no_stronger_form.calm": "Full power? I'm already at full power.",
+  "dmzlivingworld.dialogue.full_power.no_stronger_form.proud": "What do you mean? Are you mocking me?!",
+  "dmzlivingworld.dialogue.full_power.no_stronger_form.aggressive": "This is my full power! Got a problem with that?",
+  "dmzlivingworld.dialogue.full_power.no_stronger_form.cautious": "I don't have another form to show you. This is as far as I can go right now."
 }

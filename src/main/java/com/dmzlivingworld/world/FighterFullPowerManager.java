@@ -34,6 +34,22 @@ public final class FighterFullPowerManager {
             player.displayClientMessage(Component.translatable("dmzlivingworld.message.full_power.unavailable", fighter.getFighterName()), false);
             return false;
         }
+        boolean hasRacialForm = fighter.getRacialSkillLevel() > 0
+                && NpcFormConfigBridge.form(fighter.getRace(), fighter.getRacialSkillLevel()) != null;
+        boolean hasUnusedAwakening = !fighter.isAwakened()
+                && fighter.getRank() != com.dmzlivingworld.entity.FighterRank.ROOKIE;
+        if (!hasRacialForm && !hasUnusedAwakening) {
+            String responseKey = switch (fighter.getPersonality()) {
+                case HEROIC -> "heroic";
+                case CALM -> "calm";
+                case PROUD -> "proud";
+                case AGGRESSIVE -> "aggressive";
+                case CAUTIOUS -> "cautious";
+            };
+            fighter.speakKey("dialogue.full_power.no_stronger_form." + responseKey, 90);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.full_power.no_stronger_form"), false);
+            return false;
+        }
 
         FighterAmbientActivityManager.cancel(fighter);
         FighterNpcSocialManager.cancelFor(fighter);
@@ -53,7 +69,11 @@ public final class FighterFullPowerManager {
         fighter.getPersistentData().putLong(UNTIL, now + DURATION);
         fighter.getPersistentData().putBoolean(FORM_REQUESTED, false);
         fighter.getPersistentData().putBoolean(AmbientFighterEntity.TEMPORARY_AWAKENING, true);
-        fighter.beginAwakening();
+        if (!fighter.beginAwakening()) {
+            clearMarkers(fighter);
+            player.displayClientMessage(Component.translatable("dmzlivingworld.message.full_power.no_stronger_form"), false);
+            return false;
+        }
         fighter.setKiCharge(true);
         fighter.flareAura((int) DURATION);
         player.displayClientMessage(Component.translatable("dmzlivingworld.message.full_power.started", fighter.getFighterName()), false);
@@ -68,10 +88,13 @@ public final class FighterFullPowerManager {
         if (until <= 0L) return false;
         long now = fighter.level().getGameTime();
 
-        // A genuine fight outranks the showcase. Leave any real form active and hand ownership
-        // straight back to normal combat, where its normal lifecycle/stat rules continue.
+        // Combat temporarily outranks the cinematic AI, but not the player's full-power order.
+        // Move the expiry forward by one tick for every combat tick, preserving the exact amount
+        // of showcase time that remained when the target was acquired. Normal combat AI owns the
+        // fighter meanwhile and the racial-form lifecycle sees this state as active, so it cannot
+        // calm down and revert in the middle of the fight.
         if (fighter.getTarget() != null && fighter.getTarget().isAlive()) {
-            clearMarkers(fighter);
+            data.putLong(UNTIL, Math.max(now + 1L, until + 1L));
             fighter.setKiCharge(false);
             return false;
         }
