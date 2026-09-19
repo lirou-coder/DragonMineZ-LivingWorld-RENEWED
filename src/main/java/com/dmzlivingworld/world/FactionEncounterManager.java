@@ -286,7 +286,7 @@ public final class FactionEncounterManager {
         BlockPos leaderPos = AmbientFighterSpawner.findSafeGroundAround(level, anchor, player.getRandom(), 2, 5, 12);
         if (leaderPos == null) leaderPos = anchor;
         AmbientFighterEntity leader = AmbientFighterSpawner.spawnAt(
-                level, leaderPos, faction.alignment(), FighterRank.VETERAN,
+                player, level, leaderPos, faction.alignment(), FighterRank.VETERAN,
                 data.currentLeaderPersonality(faction), data.currentLeaderRace(faction),
                 data.currentLeaderArchetype(faction), player.getRandom());
         if (leader == null) return 0;
@@ -332,7 +332,7 @@ public final class FactionEncounterManager {
         var personality = faction.ethos().rollPersonality(random, faction.alignment());
         FighterArchetype style = faction.ethos().rollArchetype(random);
         AmbientFighterEntity fighter = AmbientFighterSpawner.spawnAt(
-                level, pos, faction.alignment(), rank, personality, race, style, random);
+                player, level, pos, faction.alignment(), rank, personality, race, style, random);
         if (fighter == null) return null;
         fighter.assignFaction(faction, role, party, captain, regional);
         if (regional) FactionWorldData.get(level).recordResident(faction, fighter);

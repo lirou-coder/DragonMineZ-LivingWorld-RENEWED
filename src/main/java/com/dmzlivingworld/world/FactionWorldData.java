@@ -1317,25 +1317,18 @@ public final class FactionWorldData extends SavedData {
     }
 
     public static FighterRace rollFactionRace(RandomSource random, FactionRealm realm) {
-        int roll = random.nextInt(100);
         if (realm == FactionRealm.NAMEK) {
-            if (roll < 66) return FighterRace.NAMEKIAN;
-            if (roll < 77) return FighterRace.HUMAN;
-            if (roll < 87) return FighterRace.SAIYAN;
-            if (roll < 92) return FighterRace.MAJIN;
-            if (roll < 96) return FighterRace.FROST_DEMON;
-            if (SairensRaceCompat.isLoaded() && roll < 98) return FighterRace.ZAARAKIN;
-            if (SairensRaceCompat.isLoaded()) return FighterRace.ANTORANIAN;
-            return FighterRace.BIO_ANDROID;
+            return FighterRace.rollWeighted(random,
+                    FighterRace.NAMEKIAN, 66, FighterRace.HUMAN, 11,
+                    FighterRace.SAIYAN, 10, FighterRace.MAJIN, 5,
+                    FighterRace.FROST_DEMON, 4, FighterRace.BIO_ANDROID, 2,
+                    FighterRace.ZAARAKIN, 1, FighterRace.ANTORANIAN, 1);
         }
-        if (roll < 38) return FighterRace.HUMAN;
-        if (roll < 62) return FighterRace.SAIYAN;
-        if (roll < 76) return FighterRace.NAMEKIAN;
-        if (roll < 88) return FighterRace.MAJIN;
-        if (roll < 95) return FighterRace.FROST_DEMON;
-        if (SairensRaceCompat.isLoaded() && roll < 98) return FighterRace.ZAARAKIN;
-        if (SairensRaceCompat.isLoaded()) return FighterRace.ANTORANIAN;
-        return FighterRace.BIO_ANDROID;
+        return FighterRace.rollWeighted(random,
+                FighterRace.HUMAN, 38, FighterRace.SAIYAN, 24,
+                FighterRace.NAMEKIAN, 14, FighterRace.MAJIN, 12,
+                FighterRace.FROST_DEMON, 7, FighterRace.BIO_ANDROID, 2,
+                FighterRace.ZAARAKIN, 1, FighterRace.ANTORANIAN, 2);
     }
 
     public static long mix(long z) {

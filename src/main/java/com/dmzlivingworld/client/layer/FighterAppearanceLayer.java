@@ -111,9 +111,6 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         }
 
         if (e.isSaiyanSsj4Form()) {
-            // The tail geometry uses DMZ's separate monochrome tail mask; without this
-            // pass its newly-visible bones sample transparent pixels from the base skin.
-            layer(model, pose, buffers, e, dmz("textures/entity/races/tail1.png"), hair, pt, light, overlay);
             var form = e.getActiveRacialFormConfig();
             String ssj4Layer = form != null && "ssj4gt".equalsIgnoreCase(form.modelKey())
                     ? "ssj4gt_layer1.png" : "ssj4d_layer1.png";

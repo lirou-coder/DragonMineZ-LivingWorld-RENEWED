@@ -1567,7 +1567,7 @@ public final class LivingWorldCommands {
         if (pos == null) return 0;
         FighterRace race = forcedRace == null ? AmbientFighterSpawner.rollRaceForLevel(level, player.getRandom()) : forcedRace;
         FighterArchetype style = forcedStyle == null ? FighterArchetype.roll(player.getRandom(), FighterRank.TRAINED) : forcedStyle;
-        AmbientFighterEntity fighter = AmbientFighterSpawner.spawnAt(level, pos, FighterAlignment.NEUTRAL,
+        AmbientFighterEntity fighter = AmbientFighterSpawner.spawnAt(player, level, pos, FighterAlignment.NEUTRAL,
                 FighterRank.TRAINED, FighterPersonality.CALM, race, style, player.getRandom());
         if (fighter == null) return 0;
         fighter.seedCommandRecoverySupplies();
@@ -1632,7 +1632,7 @@ public final class LivingWorldCommands {
             return 0;
         }
 
-        AmbientFighterEntity fighter = AmbientFighterSpawner.spawnAt(level, pos, alignment, rank,
+        AmbientFighterEntity fighter = AmbientFighterSpawner.spawnAt(player, level, pos, alignment, rank,
                 personality, race, archetype, player.getRandom());
         if (fighter == null) return 0;
         fighter.seedCommandRecoverySupplies();
@@ -2323,9 +2323,9 @@ public final class LivingWorldCommands {
         BlockPos p2 = AmbientFighterSpawner.findSafeGroundAround(level, anchor, player.getRandom(), 12, 17, 18);
         if (p1 == null || p2 == null) return 0;
         FighterRank rank = FighterRank.VETERAN;
-        AmbientFighterEntity first = AmbientFighterSpawner.spawnAt(level, p1, FighterAlignment.NEUTRAL, rank,
+        AmbientFighterEntity first = AmbientFighterSpawner.spawnAt(player, level, p1, FighterAlignment.NEUTRAL, rank,
                 FighterPersonality.PROUD, AmbientFighterSpawner.rollRaceForLevel(level, player.getRandom()), firstStyle, player.getRandom());
-        AmbientFighterEntity second = AmbientFighterSpawner.spawnAt(level, p2, FighterAlignment.NEUTRAL, rank,
+        AmbientFighterEntity second = AmbientFighterSpawner.spawnAt(player, level, p2, FighterAlignment.NEUTRAL, rank,
                 FighterPersonality.CALM, AmbientFighterSpawner.rollRaceForLevel(level, player.getRandom()), secondStyle, player.getRandom());
         if (first == null || second == null) {
             if (first != null) first.discard();

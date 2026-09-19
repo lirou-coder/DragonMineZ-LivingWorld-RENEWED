@@ -12,6 +12,8 @@ import com.dragonminez.common.quest.Quest;
 import com.dragonminez.common.quest.QuestRegistry;
 import com.dragonminez.common.quest.Saga;
 import com.dragonminez.common.quest.objectives.KillObjective;
+import net.minecraftforge.fml.ModList;
+import java.lang.reflect.Method;
 import java.util.List;
 
 /**
@@ -26,6 +28,8 @@ public final class WorldPowerScaler {
     private static final String OBSERVED_PLAYER_PRESSURE = "LWObservedPlayerPressure";
     private static final String OBSERVED_PLAYER_PRESSURE_AT = "LWObservedPlayerPressureAt";
     private static final long OBSERVED_PLAYER_PRESSURE_MEMORY_TICKS = 12_000L;
+    private static Method revampDefenseGetter;
+    private static boolean revampDefenseGetterResolved;
 
     // Medium relevance profile. These are soft growth-rate anchors, never stat targets.
     // Ratios are fighter permanent BP / unsuppressed player progression BP.
@@ -47,7 +51,12 @@ public final class WorldPowerScaler {
 
     /** Canonical totalStats budget. Every era is anchored to configured QUEST enemy stats. */
     public static double rollEffectiveStats(ServerLevel level, FighterRank rank, RandomSource random) {
-        double reference = sagaKillReference(level) * LivingWorldConfig.npcStrengthScale()
+        return rollEffectiveStats(level, null, rank, random);
+    }
+
+    public static double rollEffectiveStats(ServerLevel level, ServerPlayer player,
+                                            FighterRank rank, RandomSource random) {
+        double reference = sagaKillReference(level, player) * LivingWorldConfig.npcStrengthScale()
                 * LivingWorldConfig.npcPowerMultiplier();
         return Math.max(1.0D, reference * rollReferenceFactor(rank, random));
     }
@@ -56,11 +65,14 @@ public final class WorldPowerScaler {
      * Before any completion, use the first QUEST kill reachable from the first root saga. After
      * that, use the final configured QUEST kill in the furthest completed saga recorded by world.
      */
-    private static double sagaKillReference(ServerLevel level) {
-        WorldEraData data = WorldEraData.get(level);
-        boolean first = data.eraNumber() == 0 || data.anchorSagaId().isBlank();
+    private static double sagaKillReference(ServerLevel level, ServerPlayer player) {
+        WorldEraProgression.PlayerEra personalEra = player == null ? null : WorldEraProgression.eraFor(player);
+        WorldEraData data = personalEra == null ? WorldEraData.get(level) : null;
+        int eraNumber = personalEra == null ? data.eraNumber() : personalEra.number();
+        String anchorSagaId = personalEra == null ? data.anchorSagaId() : personalEra.sagaId();
+        boolean first = eraNumber == 0 || anchorSagaId.isBlank();
         if (first) return initialAvailableReference();
-        Saga saga = QuestRegistry.getSaga(data.anchorSagaId());
+        Saga saga = QuestRegistry.getSaga(anchorSagaId);
         if (saga != null) {
             int questIndex = saga.getQuests().size() - 1;
             int questEnd = -1;
@@ -73,10 +85,11 @@ public final class WorldPowerScaler {
                 for (; objectiveIndex != objectiveEnd; objectiveIndex += objectiveStep) {
                     if (!(quest.getObjectives().get(objectiveIndex) instanceof KillObjective kill)
                             || kill.getSpawnMode() != KillObjective.SpawnMode.QUEST) continue;
-                    double hp = Math.max(0.0D, kill.getHealth());
-                    double melee = Math.max(0.0D, kill.getMeleeDamage());
-                    double ki = Math.max(0.0D, kill.getKiDamage());
-                    double reference = ((hp/2.0D) + melee + ki) / 2.0D;
+                    double reference = ModList.get().isLoaded("dmzrevamp")
+                            ? killReference(kill)
+                            : ((Math.max(0.0D, kill.getHealth()) / 2.0D)
+                            + Math.max(0.0D, kill.getMeleeDamage())
+                            + Math.max(0.0D, kill.getKiDamage())) / 2.0D;
                     if (Double.isFinite(reference) && reference > 0.0D) return reference;
                 }
             }
@@ -123,8 +136,33 @@ public final class WorldPowerScaler {
         double hp = Math.max(0.0D, kill.getHealth());
         double melee = Math.max(0.0D, kill.getMeleeDamage());
         double ki = Math.max(0.0D, kill.getKiDamage());
-        double reference = (hp + melee + ki) / 2.0D;
+        double reference = ModList.get().isLoaded("dmzrevamp")
+                ? hp / 2.0D + melee + ki + revampDefense(kill)
+                : (hp + melee + ki) / 2.0D;
         return Double.isFinite(reference) ? reference : -1.0D;
+    }
+
+    /** Overhaul injects this accessor into KillObjective; reflection keeps the dependency optional. */
+    private static double revampDefense(KillObjective kill) {
+        if (kill == null || !ModList.get().isLoaded("dmzrevamp")) return 0.0D;
+        try {
+            if (!revampDefenseGetterResolved) {
+                synchronized (WorldPowerScaler.class) {
+                    if (!revampDefenseGetterResolved) {
+                        revampDefenseGetter = kill.getClass().getMethod("dmzrevamp$getDefense");
+                        revampDefenseGetterResolved = true;
+                    }
+                }
+            }
+            if (revampDefenseGetter == null) return 0.0D;
+            Object value = revampDefenseGetter.invoke(kill);
+            return value instanceof Number number && Double.isFinite(number.doubleValue())
+                    ? Math.max(0.0D, number.doubleValue()) : 0.0D;
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            revampDefenseGetterResolved = true;
+            revampDefenseGetter = null;
+            return 0.0D;
+        }
     }
 
     /** World/faction maintenance retains the original era-only baseline and never reacts to a passerby. */
@@ -182,7 +220,7 @@ public final class WorldPowerScaler {
         double days = level.getServer().overworld().getGameTime() / 24000.0D;
         double ageFactor = 1.0D + Math.min(0.35D, Math.max(0.0D, days) / 900.0D);
         double difficulty = LivingWorldConfig.npcStrengthScale();
-        double effectiveReference = sagaKillReference(level) * ageFactor * difficulty
+        double effectiveReference = sagaKillReference(level, null) * ageFactor * difficulty
                 * LivingWorldConfig.npcPowerMultiplier();
         return Math.max(90.0D, BattlePowerFormula.battlePower(Math.max(1.0D, effectiveReference)));
     }

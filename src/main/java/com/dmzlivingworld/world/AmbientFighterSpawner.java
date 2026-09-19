@@ -156,7 +156,7 @@ public final class AmbientFighterSpawner {
                 ? findSafeGroundAround(level, player.blockPosition(), player.getRandom(), min, max, 18)
                 : findSafeGroundAroundSeparated(level, player.blockPosition(), player.getRandom(), min, max, 28, 16.0D);
         if (pos == null) return null;
-        return spawnAt(level, pos, alignment, rank, personality, player.getRandom());
+        return spawnAt(player, level, pos, alignment, rank, personality, null, null, player.getRandom());
     }
 
     public static AmbientFighterEntity spawnNearPlayer(ServerPlayer player, FighterAlignment alignment, boolean debug) {
@@ -181,7 +181,7 @@ public final class AmbientFighterSpawner {
         if (!(player.level() instanceof ServerLevel level) || anchor == null) return null;
         BlockPos pos = findSafeGroundAround(level, anchor, player.getRandom(), minRadius, maxRadius, 14);
         if (pos == null) pos = anchor;
-        return spawnAt(level, pos, alignment, rank, personality, player.getRandom());
+        return spawnAt(player, level, pos, alignment, rank, personality, null, null, player.getRandom());
     }
 
     public static AmbientFighterEntity spawnAt(ServerLevel level, BlockPos pos, FighterAlignment alignment,
@@ -194,6 +194,13 @@ public final class AmbientFighterSpawner {
                                                  FighterRank rank, FighterPersonality personality,
                                                  FighterRace race, FighterArchetype archetype,
                                                  RandomSource random) {
+        return spawnAt(null, level, pos, alignment, rank, personality, race, archetype, random);
+    }
+
+    public static AmbientFighterEntity spawnAt(ServerPlayer progressionPlayer, ServerLevel level, BlockPos pos,
+                                                 FighterAlignment alignment, FighterRank rank,
+                                                 FighterPersonality personality, FighterRace race,
+                                                 FighterArchetype archetype, RandomSource random) {
         if (!level.getWorldBorder().isWithinBounds(pos) || !isUsableGround(level, pos)) return null;
 
         AmbientFighterEntity fighter = LWEntities.AMBIENT_FIGHTER.get().create(level);
@@ -204,7 +211,7 @@ public final class AmbientFighterSpawner {
         FighterRace resolvedRace = race == null ? rollRaceForLevel(level, random) : race;
         if (resolvedRace.isSairensRace() && !SairensRaceCompat.isLoaded()) return null;
         FighterArchetype resolvedArchetype = archetype == null ? FighterArchetype.roll(random, rank) : archetype;
-        fighter.initializeAs(alignment, rank, resolvedPersonality, resolvedRace, resolvedArchetype);
+        fighter.initializeAs(alignment, rank, resolvedPersonality, resolvedRace, resolvedArchetype, progressionPlayer);
         if (!level.noCollision(fighter)) return null;
 
         level.addFreshEntity(fighter);
@@ -323,16 +330,11 @@ public final class AmbientFighterSpawner {
 
     public static FighterRace rollRaceForLevel(ServerLevel level, RandomSource random) {
         if (LivingWorldDimensions.realm(level) == FactionRealm.NAMEK) {
-            int roll = random.nextInt(100);
-            if (roll < 58) return FighterRace.NAMEKIAN;
-            if (roll < 70) return FighterRace.HUMAN;
-            if (roll < 82) return FighterRace.SAIYAN;
-            if (roll < 89) return FighterRace.MAJIN;
-            if (roll < 95) return FighterRace.FROST_DEMON;
-            if (roll < 97) return FighterRace.BIO_ANDROID;
-                return SairensRaceCompat.isLoaded()
-                    ? (random.nextBoolean() ? FighterRace.ZAARAKIN : FighterRace.ANTORANIAN)
-                    : FighterRace.BIO_ANDROID;
+            return FighterRace.rollWeighted(random,
+                    FighterRace.NAMEKIAN, 58, FighterRace.HUMAN, 12,
+                    FighterRace.SAIYAN, 12, FighterRace.MAJIN, 7,
+                    FighterRace.FROST_DEMON, 6, FighterRace.BIO_ANDROID, 3,
+                    FighterRace.ZAARAKIN, 1, FighterRace.ANTORANIAN, 1);
         }
         return FighterRace.roll(random);
     }

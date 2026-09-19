@@ -178,11 +178,10 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
                 || !entity.getItemBySlot(EquipmentSlot.FEET).isEmpty();
         for (String boneName : ARMOR_LAYER_BONES) setHiddenIfPresent(boneName, !hasArmor);
 
-        // The DMZ player geometry already contains its native articulated tail bones.
-        // Living World Saiyans are normally tailless, but both configured SSJ4 models
-        // (Daima and GT) explicitly restore the tail for exactly as long as that form is active.
+        // DMZ renders the SSJ4 tail through its native character/race-parts state. These
+        // embedded body-model bones are a second, non-animated copy and must stay hidden.
         boolean hideTail = entity.getRace() == FighterRace.HUMAN
-                || (entity.getRace() == FighterRace.SAIYAN && !entity.isSaiyanSsj4Form())
+                || entity.getRace() == FighterRace.SAIYAN
                 || entity.getRace() == FighterRace.MAJIN
                 || entity.getRace() == FighterRace.NAMEKIAN;
         for (String boneName : TAIL_BONES) setHiddenIfPresent(boneName, hideTail);

@@ -47,6 +47,7 @@ import com.dmzlivingworld.world.WorldFaction;
 import com.dmzlivingworld.world.WantedManager;
 import com.dmzlivingworld.world.WorldPowerScaler;
 import com.dmzlivingworld.world.WorldEraData;
+import com.dmzlivingworld.world.WorldEraProgression;
 import com.dmzlivingworld.world.FighterPowerStatScaler;
 import com.dmzlivingworld.world.BattlePowerFormula;
 import com.dmzlivingworld.world.NpcDefenseCalculator;
@@ -615,6 +616,11 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     public void initializeAs(FighterAlignment alignment, FighterRank rank, FighterPersonality personality,
                              FighterRace race, FighterArchetype archetype) {
+        initializeAs(alignment, rank, personality, race, archetype, null);
+    }
+
+    public void initializeAs(FighterAlignment alignment, FighterRank rank, FighterPersonality personality,
+                             FighterRace race, FighterArchetype archetype, ServerPlayer progressionPlayer) {
         RandomSource random = getRandom();
         if (race == FighterRace.ZAARAKIN && archetype == FighterArchetype.KI_SPECIALIST) {
             archetype = FighterArchetype.BRAWLER;
@@ -631,7 +637,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         randomizeNativeAppearance(random);
         entityData.set(FIGHTER_NAME, FighterNames.rollUnique(this, random, race, isFemale()));
         if (level() instanceof ServerLevel server) {
-            double effective = WorldPowerScaler.rollEffectiveStats(server, rank, random);
+            double effective = WorldPowerScaler.rollEffectiveStats(server, progressionPlayer, rank, random);
             FighterPowerStatScaler.setEffectiveStatBudget(this, effective);
             setBattlePower((int)Math.min(Integer.MAX_VALUE - 1L,
                     Math.round(FighterPowerStatScaler.battlePowerForEffectiveBudget(this, effective))));
@@ -671,8 +677,10 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         entityData.set(KAIOKEN_LEVEL, 0);
         entityData.set(STORY_ROLE, STORY_NONE);
         entityData.set(FLIGHT_UNLOCKED, race == FighterRace.ANTORANIAN || rollInitialFlight(random, rank));
-        entityData.set(RACIAL_SKILL_LEVEL, level() instanceof ServerLevel racialLevel
-                && WorldEraData.get(racialLevel).eraNumber() >= LivingWorldConfig.racialSkillMinimumEra()
+        int spawnEra = progressionPlayer == null
+                ? (level() instanceof ServerLevel racialLevel ? WorldEraData.get(racialLevel).eraNumber() : 0)
+                : WorldEraProgression.eraFor(progressionPlayer).number();
+        entityData.set(RACIAL_SKILL_LEVEL, spawnEra >= LivingWorldConfig.racialSkillMinimumEra()
                 ? rollInitialRacialSkill(random, rank, race) : 0);
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, 0);
         entityData.set(AMBIENT_POSE, 0);

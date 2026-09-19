@@ -103,6 +103,33 @@ public final class WorldEraProgression {
         data.redefine(bestDepth, bestSaga == null ? "" : bestSaga.getId(), bestReference);
     }
 
+    /** Saga era belonging to one player; ambient generation must never inherit another player's progress. */
+    public static PlayerEra eraFor(net.minecraft.server.level.ServerPlayer player) {
+        if (player == null) return new PlayerEra(0, "");
+        PlayerQuestData quests = player.getCapability(StatsCapability.INSTANCE)
+                .map(stats -> stats.getPlayerQuestData()).orElse(null);
+        if (quests == null) return new PlayerEra(0, "");
+
+        double strongestReference = -1.0D;
+        int deepest = 0;
+        Saga selected = null;
+        for (Saga saga : QuestRegistry.getAllSagas().values()) {
+            if (isMovies(saga) || !isSagaCompleted(quests, saga)) continue;
+            double reference = WorldPowerScaler.lastKillReference(saga);
+            if (!Double.isFinite(reference) || reference <= 0.0D) continue;
+            int depth = sagaDepth(saga);
+            if (reference > strongestReference
+                    || (Double.compare(reference, strongestReference) == 0 && depth > deepest)) {
+                strongestReference = reference;
+                deepest = depth;
+                selected = saga;
+            }
+        }
+        return new PlayerEra(deepest, selected == null ? "" : selected.getId());
+    }
+
+    public record PlayerEra(int number, String sagaId) {}
+
     private static int sagaDepth(Saga saga) {
         int depth = 1;
         Set<String> visited = new HashSet<>();
