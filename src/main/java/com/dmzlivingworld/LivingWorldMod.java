@@ -56,6 +56,7 @@ public final class LivingWorldMod {
         event.enqueueWork(() -> {
             LWNetwork.register();
             FusionAnimationNetwork.register();
+            DBZMeditation.commonSetup();
         });
     }
 
