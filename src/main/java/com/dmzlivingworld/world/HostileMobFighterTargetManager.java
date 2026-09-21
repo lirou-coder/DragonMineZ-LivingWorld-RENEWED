@@ -34,8 +34,22 @@ public final class HostileMobFighterTargetManager {
                 || !(event.getNewTarget() instanceof AmbientFighterEntity fighter)) {
             return;
         }
-        if (mob instanceof Creeper || mob instanceof EnderMan
-                || WorldMenaceManager.isWorldMenace(fighter)) {
+
+        // Creepers never target fighters.
+        if (mob instanceof Creeper) {
+            event.setCanceled(true);
+            return;
+        }
+
+        // Endermen do not proactively target fighters, but may retaliate
+        // against a fighter that attacked them.
+        if (mob instanceof EnderMan && !isRetaliatingAgainst(mob, fighter)) {
+            event.setCanceled(true);
+            return;
+        }
+
+        // World Menaces are never victims of ordinary hostile mobs.
+        if (WorldMenaceManager.isWorldMenace(fighter)) {
             event.setCanceled(true);
         }
     }
@@ -49,19 +63,31 @@ public final class HostileMobFighterTargetManager {
             return;
         }
 
-        // Also repair targets restored from NBT or assigned by code that predates/bypasses
-        // LivingChangeTargetEvent. Ordinary fighters remain valid hostile-mob targets.
-        if (mob.getTarget() instanceof AmbientFighterEntity fighter
-                && (mob instanceof Creeper || mob instanceof EnderMan
-                || WorldMenaceManager.isWorldMenace(fighter))) {
-            mob.setTarget(null);
-        } else if (mob.getTarget() != null) {
+        // Repair invalid fighter targets assigned/restored outside the normal event.
+        if (mob.getTarget() instanceof AmbientFighterEntity fighter) {
+            boolean invalidTarget =
+                    mob instanceof Creeper
+                    || WorldMenaceManager.isWorldMenace(fighter)
+                    || (mob instanceof EnderMan && !isRetaliatingAgainst(mob, fighter));
+
+            if (invalidTarget) {
+                mob.setTarget(null);
+            }
+        }
+
+        if (mob.getTarget() != null) {
             return;
         }
-        if (Math.floorMod(mob.tickCount + mob.getId(), TARGET_SCAN_INTERVAL) != 0) return;
 
-        double range = Math.max(MIN_SCAN_RANGE,
-                Math.min(MAX_SCAN_RANGE, mob.getAttributeValue(Attributes.FOLLOW_RANGE)));
+        if (Math.floorMod(mob.tickCount + mob.getId(), TARGET_SCAN_INTERVAL) != 0) {
+            return;
+        }
+
+        double range = Math.max(
+                MIN_SCAN_RANGE,
+                Math.min(MAX_SCAN_RANGE, mob.getAttributeValue(Attributes.FOLLOW_RANGE))
+        );
+
         mob.level().getEntitiesOfClass(
                         AmbientFighterEntity.class,
                         mob.getBoundingBox().inflate(range),
@@ -72,12 +98,22 @@ public final class HostileMobFighterTargetManager {
     }
 
     private static boolean mayTarget(Mob mob, AmbientFighterEntity fighter) {
+        // Never proactively acquire fighters for Creepers or Endermen.
         if (mob instanceof Creeper || mob instanceof EnderMan
-                || !fighter.isAlive() || fighter.isDeadSoul() || fighter.isDefeated()
-                || fighter.isCaptive() || fighter.isNonCombatant()
+                || !fighter.isAlive()
+                || fighter.isDeadSoul()
+                || fighter.isDefeated()
+                || fighter.isCaptive()
+                || fighter.isNonCombatant()
                 || WorldMenaceManager.isWorldMenace(fighter)) {
             return false;
         }
-        return !mob.isAlliedTo(fighter) && mob.canAttack((LivingEntity) fighter);
+
+        return !mob.isAlliedTo(fighter)
+                && mob.canAttack((LivingEntity) fighter);
+    }
+
+    private static boolean isRetaliatingAgainst(Mob mob, AmbientFighterEntity fighter) {
+        return mob.getLastHurtByMob() == fighter;
     }
 }
