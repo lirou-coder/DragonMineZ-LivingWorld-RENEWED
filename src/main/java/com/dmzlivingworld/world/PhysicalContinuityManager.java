@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
@@ -300,7 +301,7 @@ public final class PhysicalContinuityManager {
             fighter.setNoGravity(false);
             fighter.setCanFly(fighter.hasFlightUnlocked());
             fighter.setSprinting(horizontal > 12.0D);
-            fighter.setLocomotionMode(horizontal > 8.0D ? DBSagasEntity.LocomotionMode.RUN : DBSagasEntity.LocomotionMode.WALK);
+            fighter.setLocomotionMode(horizontal > 8.0D ? LivingWorldSagasEntity.LocomotionMode.RUN : LivingWorldSagasEntity.LocomotionMode.WALK);
 
             // Repath frequently to the short leg. A stall forces a fresh lateral candidate instead
             // of repeatedly submitting the same dead Path to vanilla navigation.
@@ -502,3 +503,5 @@ public final class PhysicalContinuityManager {
 
     public static void clearRuntime() { lastTick = Long.MIN_VALUE; }
 }
+
+

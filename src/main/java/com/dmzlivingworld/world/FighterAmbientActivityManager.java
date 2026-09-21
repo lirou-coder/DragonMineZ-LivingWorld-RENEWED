@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldConfig;
@@ -463,7 +464,7 @@ public final class FighterAmbientActivityManager {
                 if (session.scientistResearchVariant == 0 && !ensureTemporaryItem(fighter, Items.BOOK)) { finish(fighter); return; }
                 fighter.setPose(Pose.STANDING);
                 fighter.setAmbientPose(session.scientistResearchVariant == 0 ? 15 : 16);
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+                fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
                 fighter.setDeltaMovement(0.0D, 0.0D, 0.0D);
             }
             case TRAINING -> {
@@ -485,7 +486,7 @@ public final class FighterAmbientActivityManager {
                 session.strengthVariant = 2;
                 fighter.setPose(Pose.STANDING);
                 fighter.setAmbientPose(25);
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+                fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
                 fighter.setSprinting(false);
                 fighter.setDeltaMovement(0.0D, 0.0D, 0.0D);
             }
@@ -500,7 +501,7 @@ public final class FighterAmbientActivityManager {
                         .add(horizontal.scale(session.kiVariant == 0 ? 0.96D : 0.90D));
                 lockKiFocus(fighter, session.kiCore);
                 fighter.setAmbientPose(session.kiVariant == 0 ? 23 : 24);
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+                fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
                 fighter.setSprinting(false);
                 fighter.setKiCharge(false);
                 fighter.setDeltaMovement(0.0D, 0.0D, 0.0D);
@@ -652,7 +653,7 @@ public final class FighterAmbientActivityManager {
                 session.strengthVariant = 2;
                 fighter.setPose(Pose.STANDING);
                 fighter.setAmbientPose(25);
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+                fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
                 fighter.setSprinting(false);
                 fighter.setDeltaMovement(0.0D, fighter.getDeltaMovement().y, 0.0D);
                 if (now >= session.nextBeat) {
@@ -666,7 +667,7 @@ public final class FighterAmbientActivityManager {
                 long cycle = session.kiVariant == 0 ? 140L : 360L;
                 long phase = Math.floorMod(now - session.started, cycle);
                 fighter.setAmbientPose(session.kiVariant == 0 ? 23 : 24);
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+                fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
                 fighter.setSprinting(false);
                 fighter.setKiCharge(false);
                 if (session.kiCore == null) {
@@ -720,7 +721,7 @@ public final class FighterAmbientActivityManager {
                         double appleDistance = fighter.distanceToSqr(apple);
                         if (appleDistance > 1.85D * 1.85D) {
                             fighter.setSprinting(false);
-                            fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.WALK);
+                            fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.WALK);
                             fighter.getNavigation().moveTo(apple, 0.86D * ReactiveWorldManager.movementPace(fighter));
                             return;
                         }
@@ -842,7 +843,7 @@ public final class FighterAmbientActivityManager {
                 if (session.scientistResearchVariant == 0 && !ensureTemporaryItem(fighter, Items.BOOK)) { finish(fighter); return; }
                 fighter.setPose(Pose.STANDING);
                 fighter.setAmbientPose(session.scientistResearchVariant == 0 ? 15 : 16);
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+                fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
                 fighter.setDeltaMovement(0.0D, 0.0D, 0.0D);
                 if (now >= session.nextBeat) {
                     session.nextBeat = now + 85L + fighter.getRandom().nextInt(86);
@@ -1022,7 +1023,7 @@ public final class FighterAmbientActivityManager {
                     fighter.setAmbientFlightActivity(false);
                 }
                 fighter.setSprinting(true);
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.RUN);
+                fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.RUN);
                 fighter.getNavigation().moveTo(prey, 2.35D * ReactiveWorldManager.movementPace(fighter));
                 return;
             }
@@ -1072,7 +1073,7 @@ public final class FighterAmbientActivityManager {
         }
         boolean run = distance > 3.5D && (session.foodPrefersRun || distance > 7.0D);
         fighter.setSprinting(run);
-        fighter.setLocomotionMode(run ? DBSagasEntity.LocomotionMode.RUN : DBSagasEntity.LocomotionMode.WALK);
+        fighter.setLocomotionMode(run ? LivingWorldSagasEntity.LocomotionMode.RUN : LivingWorldSagasEntity.LocomotionMode.WALK);
         if (fighter.getNavigation().isDone() || now % 2L == Math.floorMod(fighter.getId(), 2))
             fighter.getNavigation().moveTo(target.x, target.y, target.z,
                     (run ? 2.05D : 1.05D) * ReactiveWorldManager.movementPace(fighter));
@@ -1086,7 +1087,7 @@ public final class FighterAmbientActivityManager {
             fighter.setNoGravity(false);
             fighter.setAmbientFlightActivity(false);
         }
-        if (fighter.getTarget() == null && !fighter.isFlying()) fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.WALK);
+        if (fighter.getTarget() == null && !fighter.isFlying()) fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.WALK);
     }
 
     private static LivingEntity nearestFoodPrey(ServerLevel level, AmbientFighterEntity fighter, int radius) {
@@ -1136,7 +1137,7 @@ public final class FighterAmbientActivityManager {
         fighter.setFlying(false);
         fighter.setFlyingFast(false);
         fighter.setNoGravity(false);
-        fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.RUN);
+        fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.RUN);
         fighter.setSprinting(true);
         fighter.setAggressive(true);
         Vec3 target = session.mobileTarget == null ? Vec3.atBottomCenterOf(session.stand) : session.mobileTarget;
@@ -1160,7 +1161,7 @@ public final class FighterAmbientActivityManager {
         fighter.setNoGravity(false);
         fighter.setAggressive(false);
         fighter.setSprinting(false);
-        fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.WALK);
+        fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.WALK);
         Vec3 target = session.mobileTarget == null ? Vec3.atBottomCenterOf(session.stand) : session.mobileTarget;
         if (fighter.position().distanceToSqr(target) < 2.0D * 2.0D || fighter.getNavigation().isDone()) {
             target = nextCoherentGroundTarget(level, fighter, session, false);
@@ -1804,7 +1805,7 @@ public final class FighterAmbientActivityManager {
         Session session = fighter == null ? null : SESSIONS.get(fighter.getUUID());
         if (session == null) return "";
         if (!session.actualStarted) return "Heading to " + session.type.label();
-        if (session.type == Type.DANCING) return session.danceVariant == 1 ? "Dancing • Disco" : "Dancing • Groove";
+        if (session.type == Type.DANCING) return session.danceVariant == 1 ? "Dancing â€¢ Disco" : "Dancing â€¢ Groove";
         if (session.type == Type.SCIENTIST_RESEARCH) return session.scientistResearchVariant == 0
                 ? "Improving Saibaman formula" : "Analyzing Saibaman combat data";
         return session.type.label();
@@ -2144,7 +2145,7 @@ public final class FighterAmbientActivityManager {
         ServerPlayer closest = near.stream().min(java.util.Comparator.comparingDouble(fighter::distanceToSqr)).orElse(null);
         if (closest == null) return;
         if (now >= session.nextProximityWarning) {
-            fighter.speak(pickKey(fighter, "ambient.training.warning", "Careful—I'm training here.", "Heads up. You're inside my training range.", "Give me a little room—these strikes are fast.",
+            fighter.speak(pickKey(fighter, "ambient.training.warning", "Carefulâ€”I'm training here.", "Heads up. You're inside my training range.", "Give me a little roomâ€”these strikes are fast.",
                     "Watch the reach on this one.", "Give me two steps of space, please.", "You're close enough to catch a stray hit."), 52);
             session.nextProximityWarning = now + 180L;
         }
@@ -2156,7 +2157,7 @@ public final class FighterAmbientActivityManager {
             double dx = closest.getX() - fighter.getX(), dz = closest.getZ() - fighter.getZ();
             double len = Math.max(0.01D, Math.sqrt(dx * dx + dz * dz));
             closest.push(dx / len * 0.35D, 0.12D, dz / len * 0.35D);
-            fighter.speak(pickKey(fighter, "ambient.training.accident", "Whoa—careful!", "Sorry! I warned you.", "You okay? That's why I need space.", "Sorry—that one reached farther than I thought.", "My fault. Step back a little."), 48);
+            fighter.speak(pickKey(fighter, "ambient.training.accident", "Whoaâ€”careful!", "Sorry! I warned you.", "You okay? That's why I need space.", "Sorryâ€”that one reached farther than I thought.", "My fault. Step back a little."), 48);
         }
     }
 
@@ -2462,7 +2463,7 @@ public final class FighterAmbientActivityManager {
         fighter.getNavigation().stop();
         fighter.setPose(Pose.SLEEPING);
         fighter.setAmbientPose(0);
-        fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+        fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
         fighter.setSprinting(false);
         fighter.setXRot(0.0F);
         fighter.xRotO = 0.0F;
@@ -2560,7 +2561,7 @@ public final class FighterAmbientActivityManager {
         fighter.xRotO = 0.0F;
         fighter.setAmbientFlightActivity(false);
         fighter.setSprinting(false);
-        if (fighter.getTarget() == null && !fighter.isFlying()) fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.WALK);
+        if (fighter.getTarget() == null && !fighter.isFlying()) fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.WALK);
         clearTemporaryItem(fighter);
         restoreMainHand(fighter);
         fighter.setSocialLifeActivity(false);
@@ -2618,3 +2619,5 @@ public final class FighterAmbientActivityManager {
 
     public static void clearRuntime() { SESSIONS.clear(); }
 }
+
+

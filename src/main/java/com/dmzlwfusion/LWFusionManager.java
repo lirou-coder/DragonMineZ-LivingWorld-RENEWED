@@ -1,5 +1,6 @@
 package com.dmzlwfusion;
 
+import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
 import com.dragonminez.common.config.ConfigManager;
 import com.dragonminez.common.events.DMZEvent;
 import com.dragonminez.common.init.MainEffects;
@@ -648,7 +649,7 @@ public final class LWFusionManager {
             fighter.setCanFly(fighter.hasFlightUnlocked() && !fighter.isNonCombatant());
             fighter.setAmbientFlightActivity(false);
             fighter.setSocialLifeActivity(false);
-            fighter.setLocomotionMode(com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.WALK);
+            fighter.setLocomotionMode(com.dmzlivingworld.entity.combat.LivingWorldSagasEntity.LocomotionMode.WALK);
             fighter.setPose(net.minecraft.world.entity.Pose.STANDING);
             fighter.setSprinting(false);
             fighter.getPersistentData().remove("LWIdleFlightTravel");
@@ -822,3 +823,5 @@ public final class LWFusionManager {
     }
 
 }
+
+

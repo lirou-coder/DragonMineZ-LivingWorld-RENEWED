@@ -407,7 +407,7 @@ public final class WorldMenaceManager {
         // respawning right beside the player. Only the explicit debug spawn gets a close fallback.
         if (pos == null && closeDebug) pos = AmbientFighterSpawner.findSafeGroundAround(level, anchor.blockPosition(), anchor.getRandom(), 8, 32, 32);
         if (pos == null) return null;
-        AmbientFighterEntity fighter = LWEntities.AMBIENT_FIGHTER.get().create(level);
+        AmbientFighterEntity fighter = LWEntities.WORLD_MENACE_FIGHTER.get().create(level);
         if (fighter == null) return null;
         CompoundTag profile = data.profile();
         if (!profile.isEmpty() && profile.contains("Name", Tag.TAG_STRING)) fighter.initializeFromMemory(profile);
@@ -920,6 +920,28 @@ public final class WorldMenaceManager {
             // The recorded UUID vanished from its saved chunk; recover the same logical menace from its profile.
         }
         return spawn(player.getServer().overworld(), player, data, true) != null ? 1 : 0;
+    }
+
+    /** Applies the singleton Herobrine identity to an entity created directly by `/summon`. */
+    public static void initializeCommandSpawn(AmbientFighterEntity fighter, ServerLevel level) {
+        if (fighter == null || level == null || isWorldMenace(fighter)) return;
+        WorldMenaceData data = WorldMenaceData.get(level);
+        CompoundTag profile = data.profile();
+        if (!profile.isEmpty() && profile.contains("Name", Tag.TAG_STRING)) {
+            fighter.initializeFromMemory(profile);
+        } else {
+            fighter.initializeAs(FighterAlignment.NEUTRAL, FighterRank.VETERAN, FighterPersonality.CALM,
+                    FighterRace.HUMAN, FighterArchetype.SPEEDSTER);
+        }
+        fighter.getPersistentData().putBoolean(HEROBRINE_TAG, true);
+        fighter.configureHerobrineAppearance();
+        fighter.setFlightUnlockedForDebug(true);
+        fighter.setPersistenceRequired();
+        fighter.getPersistentData().putString(MENACE_STATE, data.deaths() > 0 ? "RETURNED" : "UNREADABLE");
+        fighter.getPersistentData().putLong(NEXT_WATCH, level.getGameTime() + 3600L + fighter.getRandom().nextInt(6401));
+        enforceStrength(fighter, data.deaths());
+        data.markActive(fighter.getUUID(), fighter.writeMemoryProfile(),
+                fighter.getX(), fighter.getY(), fighter.getZ());
     }
 
     public static int debugTeleport(ServerPlayer player) {

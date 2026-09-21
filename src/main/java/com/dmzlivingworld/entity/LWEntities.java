@@ -19,5 +19,13 @@ public final class LWEntities {
                     .updateInterval(3)
                     .build(LivingWorldMod.MOD_ID + ":ambient_fighter")
     );
+    public static final RegistryObject<EntityType<WorldMenaceFighterEntity>> WORLD_MENACE_FIGHTER = ENTITY_TYPES.register(
+            "world_menace_fighter",
+            () -> EntityType.Builder.of(WorldMenaceFighterEntity::new, MobCategory.MONSTER)
+                    .sized(0.62F, 1.86F)
+                    .clientTrackingRange(10)
+                    .updateInterval(3)
+                    .build(LivingWorldMod.MOD_ID + ":world_menace_fighter")
+    );
     private LWEntities() {}
 }

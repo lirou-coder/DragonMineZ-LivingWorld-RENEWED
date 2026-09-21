@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.compat.MeditationCompat;
@@ -392,8 +393,8 @@ public final class FighterNpcSocialManager {
             }
             stopMeetingTravel(a); stopMeetingTravel(b);
             a.getNavigation().stop(); b.getNavigation().stop();
-            a.setLocomotionMode(com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.IDLE);
-            b.setLocomotionMode(com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.IDLE);
+            a.setLocomotionMode(com.dmzlivingworld.entity.combat.LivingWorldSagasEntity.LocomotionMode.IDLE);
+            b.setLocomotionMode(com.dmzlivingworld.entity.combat.LivingWorldSagasEntity.LocomotionMode.IDLE);
             a.setPose(net.minecraft.world.entity.Pose.STANDING);
             b.setPose(net.minecraft.world.entity.Pose.STANDING);
             c.settledAt = now;
@@ -624,8 +625,8 @@ public final class FighterNpcSocialManager {
         boolean run = distance > 10.0D;
         mover.setSprinting(run);
         mover.setLocomotionMode(run
-                ? com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.RUN
-                : com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.WALK);
+                ? com.dmzlivingworld.entity.combat.LivingWorldSagasEntity.LocomotionMode.RUN
+                : com.dmzlivingworld.entity.combat.LivingWorldSagasEntity.LocomotionMode.WALK);
         if (mover.getNavigation().isDone() || now % 15L == Math.floorMod(mover.getId(), 15))
             mover.getNavigation().moveTo(other, (run ? 1.18D : 0.84D) * ReactiveWorldManager.movementPace(mover));
     }
@@ -640,7 +641,7 @@ public final class FighterNpcSocialManager {
             fighter.setAmbientFlightActivity(false);
         }
         if (fighter.getTarget() == null && !fighter.isFlying())
-            fighter.setLocomotionMode(com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.IDLE);
+            fighter.setLocomotionMode(com.dmzlivingworld.entity.combat.LivingWorldSagasEntity.LocomotionMode.IDLE);
     }
 
     private static List<Beat> buildMeetingConversation(AmbientFighterEntity a, AmbientFighterEntity b, Topic topic, ServerLevel level) {
@@ -1210,3 +1211,5 @@ public final class FighterNpcSocialManager {
     public static void clearRuntime() { CONVERSATIONS.clear(); }
     public static int runtimeEntries() { return new HashSet<>(CONVERSATIONS.values()).size(); }
 }
+
+

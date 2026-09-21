@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
 import net.minecraft.nbt.CompoundTag;
@@ -28,7 +29,7 @@ public final class FighterTechniqueManager {
         ListTag list = cleanList(fighter.getLegacyData());
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);
-            DBSagasEntity.KiSkillType type = DBSagasEntity.KiSkillType.fromId(entry.getInt("Id"));
+            LivingWorldSagasEntity.KiSkillType type = LivingWorldSagasEntity.KiSkillType.fromId(entry.getInt("Id"));
             if (type == null || hasSkill(fighter, type.getId())) continue;
             int cooldown = clamp(entry.getInt("Cooldown"), 70, 900);
             float size = clampFloat(entry.getFloat("Size"), 0.35F, 2.5F);
@@ -46,9 +47,9 @@ public final class FighterTechniqueManager {
         ListTag known = cleanList(learner.getLegacyData());
         if (known.size() >= MAX_LEARNED) return false;
 
-        List<DBSagasEntity.KiSkill> candidates = new ArrayList<>();
-        for (DBSagasEntity.KiSkill skill : source.getSkillPool()) {
-            if (skill == null || DBSagasEntity.KiSkillType.fromId(skill.id) == null || hasSkill(learner, skill.id)) continue;
+        List<LivingWorldSagasEntity.KiSkill> candidates = new ArrayList<>();
+        for (LivingWorldSagasEntity.KiSkill skill : source.getSkillPool()) {
+            if (skill == null || LivingWorldSagasEntity.KiSkillType.fromId(skill.id) == null || hasSkill(learner, skill.id)) continue;
             candidates.add(skill);
         }
         if (candidates.isEmpty()) return false;
@@ -56,8 +57,8 @@ public final class FighterTechniqueManager {
         // Named/major techniques are more memorable, but generic techniques remain valid.
         candidates.sort(Comparator.comparingInt(FighterTechniqueManager::learningPriority).reversed());
         int pool = Math.min(3, candidates.size());
-        DBSagasEntity.KiSkill chosen = candidates.get(learner.getRandom().nextInt(pool));
-        DBSagasEntity.KiSkillType type = DBSagasEntity.KiSkillType.fromId(chosen.id);
+        LivingWorldSagasEntity.KiSkill chosen = candidates.get(learner.getRandom().nextInt(pool));
+        LivingWorldSagasEntity.KiSkillType type = LivingWorldSagasEntity.KiSkillType.fromId(chosen.id);
         if (type == null) return false;
 
         CompoundTag entry = new CompoundTag();
@@ -93,10 +94,10 @@ public final class FighterTechniqueManager {
         List<String> out = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);
-            DBSagasEntity.KiSkillType type = DBSagasEntity.KiSkillType.fromId(entry.getInt("Id"));
+            LivingWorldSagasEntity.KiSkillType type = LivingWorldSagasEntity.KiSkillType.fromId(entry.getInt("Id"));
             if (type == null) continue;
             String teacher = entry.getString("Teacher");
-            out.add(label(type) + (teacher.isBlank() ? "" : " ← " + teacher));
+            out.add(label(type) + (teacher.isBlank() ? "" : " â† " + teacher));
         }
         return out.isEmpty() ? "none" : String.join(", ", out);
     }
@@ -107,12 +108,12 @@ public final class FighterTechniqueManager {
         List<String> out = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);
-            DBSagasEntity.KiSkillType type = DBSagasEntity.KiSkillType.fromId(entry.getInt("Id"));
+            LivingWorldSagasEntity.KiSkillType type = LivingWorldSagasEntity.KiSkillType.fromId(entry.getInt("Id"));
             if (type == null) continue;
             String lineage = entry.getString("Lineage");
             if (!lineage.isBlank()) out.add(label(type) + ": " + lineage);
         }
-        return out.isEmpty() ? "none" : String.join(" • ", out);
+        return out.isEmpty() ? "none" : String.join(" â€¢ ", out);
     }
 
     private static ListTag cleanList(CompoundTag legacy) {
@@ -120,7 +121,7 @@ public final class FighterTechniqueManager {
         ListTag clean = new ListTag();
         for (int i = Math.max(0, source.size() - MAX_LEARNED); i < source.size(); i++) {
             CompoundTag entry = source.getCompound(i).copy();
-            DBSagasEntity.KiSkillType type = DBSagasEntity.KiSkillType.fromId(entry.getInt("Id"));
+            LivingWorldSagasEntity.KiSkillType type = LivingWorldSagasEntity.KiSkillType.fromId(entry.getInt("Id"));
             if (type == null || containsId(clean, type.getId())) continue;
             entry.putInt("Cooldown", clamp(entry.getInt("Cooldown"), 70, 900));
             entry.putFloat("Size", clampFloat(entry.getFloat("Size"), 0.35F, 2.5F));
@@ -138,12 +139,12 @@ public final class FighterTechniqueManager {
     }
 
     private static boolean hasSkill(AmbientFighterEntity fighter, int id) {
-        for (DBSagasEntity.KiSkill skill : fighter.getSkillPool()) if (skill != null && skill.id == id) return true;
+        for (LivingWorldSagasEntity.KiSkill skill : fighter.getSkillPool()) if (skill != null && skill.id == id) return true;
         return false;
     }
 
-    private static int learningPriority(DBSagasEntity.KiSkill skill) {
-        DBSagasEntity.KiSkillType type = DBSagasEntity.KiSkillType.fromId(skill.id);
+    private static int learningPriority(LivingWorldSagasEntity.KiSkill skill) {
+        LivingWorldSagasEntity.KiSkillType type = LivingWorldSagasEntity.KiSkillType.fromId(skill.id);
         if (type == null) return 0;
         return switch (type) {
             case KAMEHAMEHA, GALICK_GUN, MAKANKOSAPPO, KIENZAN, DEATH_BALL, MASENKO,
@@ -160,12 +161,12 @@ public final class FighterTechniqueManager {
             CompoundTag entry = list.getCompound(i);
             if (entry.getInt("Id") != id) continue;
             String existing = entry.getString("Lineage");
-            return existing.isBlank() ? source.getFighterName() : existing + " → " + source.getFighterName();
+            return existing.isBlank() ? source.getFighterName() : existing + " â†’ " + source.getFighterName();
         }
         return source.getFighterName();
     }
 
-    public static String label(DBSagasEntity.KiSkillType type) {
+    public static String label(LivingWorldSagasEntity.KiSkillType type) {
         if (type == null) return "Ki technique";
         return switch (type) {
             case KI_SMALL -> "Ki shots";
@@ -199,3 +200,5 @@ public final class FighterTechniqueManager {
         return value.length() <= max ? value : value.substring(0, max);
     }
 }
+
+

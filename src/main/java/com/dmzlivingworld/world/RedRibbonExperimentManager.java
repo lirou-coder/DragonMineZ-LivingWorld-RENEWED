@@ -492,7 +492,7 @@ public final class RedRibbonExperimentManager {
         BlockPos pos = AmbientFighterSpawner.findSafeGroundAroundSeparated(level, anchor.blockPosition(), anchor.getRandom(), debug?8:58, debug?20:112, debug?16:42, debug?16.0D:34.0D);
         if (pos == null && debug) pos = AmbientFighterSpawner.findSafeGroundAround(level, anchor.blockPosition(), anchor.getRandom(), 8, 28, 24);
         if (pos == null) return null;
-        AmbientFighterEntity fighter = LWEntities.AMBIENT_FIGHTER.get().create(level); if (fighter == null) return null;
+        AmbientFighterEntity fighter = LWEntities.WORLD_MENACE_FIGHTER.get().create(level); if (fighter == null) return null;
         CompoundTag profile = data.profile();
         if (!profile.isEmpty() && profile.contains("Name", Tag.TAG_STRING)) fighter.initializeFromMemory(profile);
         else {
@@ -523,6 +523,27 @@ public final class RedRibbonExperimentManager {
         AmbientFighterEntity loaded = findLoaded(player.getServer(), data.entityId());
         if (loaded != null) { markSpotted(player, loaded); return 1; }
         AmbientFighterEntity f = spawn(player.serverLevel(), player, data, true); if (f != null) { markSpotted(player,f); return 1; } return 0;
+    }
+    /** Applies the singleton X-7 identity to an entity created directly by `/summon`. */
+    public static void initializeCommandSpawn(AmbientFighterEntity fighter, ServerLevel level) {
+        if (fighter == null || level == null || WorldMenaceManager.isWorldMenace(fighter)) return;
+        RedRibbonExperimentData data = RedRibbonExperimentData.get(level);
+        CompoundTag profile = data.profile();
+        if (!profile.isEmpty() && profile.contains("Name", Tag.TAG_STRING)) {
+            fighter.initializeFromMemory(profile);
+        } else {
+            fighter.initializeAs(FighterAlignment.NEUTRAL, FighterRank.VETERAN, FighterPersonality.PROUD,
+                    FighterRace.HUMAN, FighterArchetype.MARTIAL_ARTIST);
+            int start = (int)Math.min(Integer.MAX_VALUE - 1L,
+                    Math.max(85_000D, Math.max(WorldPowerScaler.resolveWorldAnchor(level, fighter.blockPosition()) * 5.5D,
+                            WorldPowerScaler.activePlayerPowerPressure(level) * 1.35D)));
+            fighter.setBattlePowerAndRefresh(start);
+            fighter.getLegacyData().putDouble("LWPotentialV1", 1.68D);
+        }
+        fighter.getPersistentData().putBoolean(TAG, true);
+        enforceIdentity(fighter);
+        data.markActive(fighter.getUUID(), fighter.writeMemoryProfile(),
+                fighter.getX(), fighter.getY(), fighter.getZ());
     }
     public static int debugTeleport(ServerPlayer player) {
         if (player == null) return 0; RedRibbonExperimentData data=RedRibbonExperimentData.get(player.serverLevel()); AmbientFighterEntity f=findLoaded(player.getServer(),data.entityId());

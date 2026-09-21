@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.config.LivingWorldConfig;
@@ -50,7 +51,7 @@ public final class FighterCombatDirector {
     }
 
     public static String signatureLabel(AmbientFighterEntity fighter) {
-        DBSagasEntity.KiSkillType type = signatureType(fighter);
+        LivingWorldSagasEntity.KiSkillType type = signatureType(fighter);
         if (type == null) {
             return switch (fighter.getArchetype()) {
                 case BRAWLER -> "Meteor rush";
@@ -105,10 +106,10 @@ public final class FighterCombatDirector {
             case BRAWLER -> {
                 if (rank == FighterRank.ROOKIE && (variant & 1) == 1) {
                     fighter.setAllowedCombos(comboCooldown,
-                            DBSagasEntity.ComboType.BASIC,
-                            DBSagasEntity.ComboType.RAPID_KICKS);
+                            LivingWorldSagasEntity.ComboType.BASIC,
+                            LivingWorldSagasEntity.ComboType.RAPID_KICKS);
                 } else {
-                    fighter.setAllowedCombos(comboCooldown, DBSagasEntity.ComboType.BASIC);
+                    fighter.setAllowedCombos(comboCooldown, LivingWorldSagasEntity.ComboType.BASIC);
                 }
                 fighter.setEvade(rank == FighterRank.VETERAN && variant % 3 == 0, 72);
                 fighter.setWildSense(rank == FighterRank.VETERAN && variant == 7, 130);
@@ -116,33 +117,33 @@ public final class FighterCombatDirector {
             case MARTIAL_ARTIST -> {
                 if (rank == FighterRank.ROOKIE && variant >= 5) {
                     fighter.setAllowedCombos(comboCooldown,
-                            DBSagasEntity.ComboType.BASIC,
-                            DBSagasEntity.ComboType.RAPID_KICKS);
+                            LivingWorldSagasEntity.ComboType.BASIC,
+                            LivingWorldSagasEntity.ComboType.RAPID_KICKS);
                 } else {
-                    fighter.setAllowedCombos(comboCooldown, DBSagasEntity.ComboType.BASIC);
+                    fighter.setAllowedCombos(comboCooldown, LivingWorldSagasEntity.ComboType.BASIC);
                 }
                 fighter.setEvade(true, rank == FighterRank.VETERAN ? 42 : 68);
                 fighter.setWildSense(rank == FighterRank.VETERAN || variant == 6, rank == FighterRank.VETERAN ? 105 : 145);
             }
             case KI_SPECIALIST -> {
-                fighter.setAllowedCombos(comboCooldown + 16, DBSagasEntity.ComboType.BASIC);
+                fighter.setAllowedCombos(comboCooldown + 16, LivingWorldSagasEntity.ComboType.BASIC);
                 fighter.setEvade(rank != FighterRank.ROOKIE, rank == FighterRank.VETERAN ? 54 : 88);
                 fighter.setZanzoken(rank == FighterRank.VETERAN && variant % 2 == 0, 110);
             }
             case SPEEDSTER -> {
                 if (rank == FighterRank.ROOKIE) {
                     fighter.setAllowedCombos(Math.max(26, comboCooldown - 10),
-                            DBSagasEntity.ComboType.BASIC,
-                            DBSagasEntity.ComboType.RAPID_KICKS);
+                            LivingWorldSagasEntity.ComboType.BASIC,
+                            LivingWorldSagasEntity.ComboType.RAPID_KICKS);
                 } else {
-                    fighter.setAllowedCombos(Math.max(26, comboCooldown - 10), DBSagasEntity.ComboType.BASIC);
+                    fighter.setAllowedCombos(Math.max(26, comboCooldown - 10), LivingWorldSagasEntity.ComboType.BASIC);
                 }
                 fighter.setEvade(true, rank == FighterRank.VETERAN ? 34 : 54);
                 fighter.setZanzoken(rank != FighterRank.ROOKIE, rank == FighterRank.VETERAN ? 68 : 108);
                 fighter.setWildSense(rank == FighterRank.VETERAN && variant >= 4, 100);
             }
             case GUARDIAN -> {
-                fighter.setAllowedCombos(comboCooldown + 8, DBSagasEntity.ComboType.BASIC);
+                fighter.setAllowedCombos(comboCooldown + 8, LivingWorldSagasEntity.ComboType.BASIC);
                 fighter.setEvade(true, rank == FighterRank.VETERAN ? 46 : 74);
                 fighter.setWildSense(rank == FighterRank.VETERAN || variant == 5, rank == FighterRank.VETERAN ? 108 : 150);
                 fighter.setZanzoken(rank == FighterRank.VETERAN && variant == 7, 120);
@@ -181,14 +182,14 @@ public final class FighterCombatDirector {
 
     private static void configureKiIdentity(AmbientFighterEntity fighter, FighterRank rank,
                                             FighterArchetype style, int variant) {
-        DBSagasEntity.KiSkillType clashBeam = clashBeamFor(fighter, variant);
-        DBSagasEntity.KiSkillType finisher = finisherFor(fighter, variant);
+        LivingWorldSagasEntity.KiSkillType clashBeam = clashBeamFor(fighter, variant);
+        LivingWorldSagasEntity.KiSkillType finisher = finisherFor(fighter, variant);
 
         if (style == FighterArchetype.BRAWLER) {
             // Many brawlers are deliberately pure melee. The exceptional ones feel
             // more memorable because Ki is not guaranteed on the archetype.
             if (rank == FighterRank.ROOKIE || variant < 4) return;
-            fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_SMALL, rank == FighterRank.VETERAN ? 125 : 160, 0.62F);
+            fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_SMALL, rank == FighterRank.VETERAN ? 125 : 160, 0.62F);
             if (rank == FighterRank.VETERAN && variant >= 6) {
                 fighter.addKiSkill(finisher, 300, 0.90F);
             }
@@ -197,40 +198,40 @@ public final class FighterCombatDirector {
 
         if (style == FighterArchetype.MARTIAL_ARTIST) {
             if (rank == FighterRank.ROOKIE) {
-                if (variant == 7) fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_SMALL, 165, 0.56F);
+                if (variant == 7) fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_SMALL, 165, 0.56F);
                 return;
             }
             switch (variant % 3) {
-                case 0 -> fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_SMALL, 118, 0.66F);
+                case 0 -> fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_SMALL, 118, 0.66F);
                 case 1 -> fighter.addKiSkill(clashBeam, 260, 0.78F);
-                default -> fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_VOLLEY, 210, 0.68F);
+                default -> fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_VOLLEY, 210, 0.68F);
             }
             if (rank == FighterRank.VETERAN) {
                 if (variant >= 4 && variant % 3 != 1) fighter.addKiSkill(clashBeam, 285, 0.92F);
                 if (variant >= 6) fighter.addKiSkill(finisher, 330, 0.88F);
-                else if (variant == 5) fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_AIR_VOLLEY, 245, 0.72F);
+                else if (variant == 5) fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_AIR_VOLLEY, 245, 0.72F);
             }
             return;
         }
 
         if (style == FighterArchetype.KI_SPECIALIST) {
             if (rank == FighterRank.ROOKIE) {
-                fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_SMALL, 122, 0.64F);
-                if (variant >= 6) fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_VOLLEY, 235, 0.60F);
+                fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_SMALL, 122, 0.64F);
+                if (variant >= 6) fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_VOLLEY, 235, 0.60F);
                 return;
             }
 
             // Every specialist gets a distinct pressure tool + a race/UUID-derived beam.
-            fighter.addKiSkill((variant & 1) == 0 ? DBSagasEntity.KiSkillType.KI_SMALL : DBSagasEntity.KiSkillType.KI_VOLLEY,
+            fighter.addKiSkill((variant & 1) == 0 ? LivingWorldSagasEntity.KiSkillType.KI_SMALL : LivingWorldSagasEntity.KiSkillType.KI_VOLLEY,
                     102, 0.78F);
             fighter.addKiSkill(clashBeam, rank == FighterRank.VETERAN ? 225 : 275,
                     rank == FighterRank.VETERAN ? 1.02F : 0.88F);
 
             switch (variant % 4) {
-                case 0 -> fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_LASER, 165, 0.72F);
-                case 1 -> fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_AIR_VOLLEY, 205, 0.80F);
-                case 2 -> fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_EXPLOSION, 245, 0.80F);
-                default -> fighter.addKiSkill(DBSagasEntity.KiSkillType.TRIPLE_LASER, 235, 0.76F);
+                case 0 -> fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_LASER, 165, 0.72F);
+                case 1 -> fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_AIR_VOLLEY, 205, 0.80F);
+                case 2 -> fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_EXPLOSION, 245, 0.80F);
+                default -> fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.TRIPLE_LASER, 235, 0.76F);
             }
             if (rank == FighterRank.VETERAN) fighter.addKiSkill(finisher, 350, 1.02F);
             return;
@@ -238,12 +239,12 @@ public final class FighterCombatDirector {
 
         if (style == FighterArchetype.SPEEDSTER) {
             if (rank == FighterRank.ROOKIE) return;
-            if (variant % 3 == 0) fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_LASER, 185, 0.66F);
-            else if (variant % 3 == 1) fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_SMALL, 120, 0.68F);
-            else fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_VOLLEY, 220, 0.66F);
+            if (variant % 3 == 0) fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_LASER, 185, 0.66F);
+            else if (variant % 3 == 1) fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_SMALL, 120, 0.68F);
+            else fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_VOLLEY, 220, 0.66F);
             if (rank == FighterRank.VETERAN) {
                 if (variant >= 3) fighter.addKiSkill(clashBeam, 300, 0.86F);
-                if (variant >= 6) fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_AIR_VOLLEY, 250, 0.76F);
+                if (variant >= 6) fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_AIR_VOLLEY, 250, 0.76F);
             }
             return;
         }
@@ -251,63 +252,63 @@ public final class FighterCombatDirector {
         // Guardian: defense is the identity, but veterans can still answer a beam
         // head-on instead of every single guardian having the same safe response.
         if (rank != FighterRank.ROOKIE) {
-            fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_BARRIER, rank == FighterRank.VETERAN ? 132 : 185, 0.84F);
+            fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_BARRIER, rank == FighterRank.VETERAN ? 132 : 185, 0.84F);
             if (variant % 3 == 0) fighter.addKiSkill(clashBeam, 285, 0.78F);
-            else if (variant % 3 == 1) fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_SMALL, 132, 0.64F);
-            else fighter.addKiSkill(DBSagasEntity.KiSkillType.KI_EXPLOSION, 275, 0.70F);
+            else if (variant % 3 == 1) fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_SMALL, 132, 0.64F);
+            else fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.KI_EXPLOSION, 275, 0.70F);
             if (rank == FighterRank.VETERAN && variant >= 5 && variant % 3 != 0) fighter.addKiSkill(clashBeam, 310, 0.90F);
         }
     }
 
-    private static DBSagasEntity.KiSkillType clashBeamFor(AmbientFighterEntity fighter, int variant) {
+    private static LivingWorldSagasEntity.KiSkillType clashBeamFor(AmbientFighterEntity fighter, int variant) {
         return switch (fighter.getRace()) {
             case HUMAN -> switch (variant % 3) {
-                case 0 -> DBSagasEntity.KiSkillType.KAMEHAMEHA;
-                case 1 -> DBSagasEntity.KiSkillType.MASENKO;
-                default -> DBSagasEntity.KiSkillType.GENERIC_KI_WAVE;
+                case 0 -> LivingWorldSagasEntity.KiSkillType.KAMEHAMEHA;
+                case 1 -> LivingWorldSagasEntity.KiSkillType.MASENKO;
+                default -> LivingWorldSagasEntity.KiSkillType.GENERIC_KI_WAVE;
             };
             case SAIYAN -> switch (variant % 3) {
-                case 0 -> DBSagasEntity.KiSkillType.GALICK_GUN;
-                case 1 -> DBSagasEntity.KiSkillType.KAMEHAMEHA;
-                default -> DBSagasEntity.KiSkillType.FINAL_FLASH;
+                case 0 -> LivingWorldSagasEntity.KiSkillType.GALICK_GUN;
+                case 1 -> LivingWorldSagasEntity.KiSkillType.KAMEHAMEHA;
+                default -> LivingWorldSagasEntity.KiSkillType.FINAL_FLASH;
             };
             case NAMEKIAN -> switch (variant % 3) {
-                case 0 -> DBSagasEntity.KiSkillType.MASENKO;
-                case 1 -> DBSagasEntity.KiSkillType.GENERIC_KI_WAVE;
-                default -> DBSagasEntity.KiSkillType.KAMEHAMEHA;
+                case 0 -> LivingWorldSagasEntity.KiSkillType.MASENKO;
+                case 1 -> LivingWorldSagasEntity.KiSkillType.GENERIC_KI_WAVE;
+                default -> LivingWorldSagasEntity.KiSkillType.KAMEHAMEHA;
             };
             case MAJIN -> switch (variant % 3) {
-                case 0 -> DBSagasEntity.KiSkillType.KAMEHAMEHA;
-                case 1 -> DBSagasEntity.KiSkillType.GENERIC_KI_WAVE;
-                default -> DBSagasEntity.KiSkillType.DOUBLE_SUNDAY;
+                case 0 -> LivingWorldSagasEntity.KiSkillType.KAMEHAMEHA;
+                case 1 -> LivingWorldSagasEntity.KiSkillType.GENERIC_KI_WAVE;
+                default -> LivingWorldSagasEntity.KiSkillType.DOUBLE_SUNDAY;
             };
             case FROST_DEMON -> switch (variant % 3) {
-                case 0 -> DBSagasEntity.KiSkillType.DOUBLE_SUNDAY;
-                case 1 -> DBSagasEntity.KiSkillType.GENERIC_KI_WAVE;
-                default -> DBSagasEntity.KiSkillType.GALICK_GUN;
+                case 0 -> LivingWorldSagasEntity.KiSkillType.DOUBLE_SUNDAY;
+                case 1 -> LivingWorldSagasEntity.KiSkillType.GENERIC_KI_WAVE;
+                default -> LivingWorldSagasEntity.KiSkillType.GALICK_GUN;
             };
             case BIO_ANDROID -> switch (variant % 3) {
-                case 0 -> DBSagasEntity.KiSkillType.GENERIC_KI_WAVE;
-                case 1 -> DBSagasEntity.KiSkillType.KAMEHAMEHA;
-                default -> DBSagasEntity.KiSkillType.MASENKO;
+                case 0 -> LivingWorldSagasEntity.KiSkillType.GENERIC_KI_WAVE;
+                case 1 -> LivingWorldSagasEntity.KiSkillType.KAMEHAMEHA;
+                default -> LivingWorldSagasEntity.KiSkillType.MASENKO;
             };
             case ZAARAKIN, ANTORANIAN -> switch (variant % 3) {
-                case 0 -> DBSagasEntity.KiSkillType.KAMEHAMEHA;
-                case 1 -> DBSagasEntity.KiSkillType.MASENKO;
-                default -> DBSagasEntity.KiSkillType.GENERIC_KI_WAVE;
+                case 0 -> LivingWorldSagasEntity.KiSkillType.KAMEHAMEHA;
+                case 1 -> LivingWorldSagasEntity.KiSkillType.MASENKO;
+                default -> LivingWorldSagasEntity.KiSkillType.GENERIC_KI_WAVE;
             };
         };
     }
 
-    private static DBSagasEntity.KiSkillType finisherFor(AmbientFighterEntity fighter, int variant) {
+    private static LivingWorldSagasEntity.KiSkillType finisherFor(AmbientFighterEntity fighter, int variant) {
         return switch (fighter.getRace()) {
-            case HUMAN -> (variant & 1) == 0 ? DBSagasEntity.KiSkillType.KIENZAN : DBSagasEntity.KiSkillType.MASENKO;
-            case SAIYAN -> (variant & 1) == 0 ? DBSagasEntity.KiSkillType.BIG_BANG : DBSagasEntity.KiSkillType.FINAL_FLASH;
-            case NAMEKIAN -> DBSagasEntity.KiSkillType.MAKANKOSAPPO;
-            case MAJIN -> (variant & 1) == 0 ? DBSagasEntity.KiSkillType.KI_EXPLOSION : DBSagasEntity.KiSkillType.KAMEHAMEHA;
-            case FROST_DEMON -> DBSagasEntity.KiSkillType.DEATH_BALL;
-            case BIO_ANDROID -> DBSagasEntity.KiSkillType.TRIPLE_LASER;
-            case ZAARAKIN, ANTORANIAN -> DBSagasEntity.KiSkillType.KI_SMALL;
+            case HUMAN -> (variant & 1) == 0 ? LivingWorldSagasEntity.KiSkillType.KIENZAN : LivingWorldSagasEntity.KiSkillType.MASENKO;
+            case SAIYAN -> (variant & 1) == 0 ? LivingWorldSagasEntity.KiSkillType.BIG_BANG : LivingWorldSagasEntity.KiSkillType.FINAL_FLASH;
+            case NAMEKIAN -> LivingWorldSagasEntity.KiSkillType.MAKANKOSAPPO;
+            case MAJIN -> (variant & 1) == 0 ? LivingWorldSagasEntity.KiSkillType.KI_EXPLOSION : LivingWorldSagasEntity.KiSkillType.KAMEHAMEHA;
+            case FROST_DEMON -> LivingWorldSagasEntity.KiSkillType.DEATH_BALL;
+            case BIO_ANDROID -> LivingWorldSagasEntity.KiSkillType.TRIPLE_LASER;
+            case ZAARAKIN, ANTORANIAN -> LivingWorldSagasEntity.KiSkillType.KI_SMALL;
         };
     }
 
@@ -439,11 +440,11 @@ public final class FighterCombatDirector {
             if (distanceSq <= 20.25D) {
                 state.standoffTicks = 0;
                 state.actionCooldown = Math.min(state.actionCooldown, 3);
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.RUN);
+                fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.RUN);
             } else {
                 state.standoffTicks--;
                 holdDramaticPose(fighter, target);
-                if (state.standoffTicks == 0) fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.RUN);
+                if (state.standoffTicks == 0) fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.RUN);
                 return;
             }
         }
@@ -598,7 +599,7 @@ public final class FighterCombatDirector {
                 fighter.setFlyingFast(phase >= 1 || fighter.getArchetype() == FighterArchetype.SPEEDSTER);
                 fighter.moveTowardsTargetInAir(target);
             } else {
-                fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.RUN);
+                fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.RUN);
                 fighter.getNavigation().moveTo(target, fighter.getArchetype() == FighterArchetype.SPEEDSTER ? 1.34D : 1.20D);
             }
             if (phase >= 1 && fighter.getArchetype() == FighterArchetype.SPEEDSTER
@@ -610,7 +611,7 @@ public final class FighterCombatDirector {
         }
 
         if (phase >= 1 && distanceSq > 32.0D && fighter.hasSkillReady()) {
-            DBSagasEntity.KiSkill skill = chooseReadySkill(fighter, distanceSq, false, state);
+            LivingWorldSagasEntity.KiSkill skill = chooseReadySkill(fighter, distanceSq, false, state);
             if (skill != null) {
                 if (isMajor(skill) && state.dialogueCooldown <= 0 && fighter.getRandom().nextFloat() < 0.30F) {
                     fighter.speak(FighterDialogue.major(fighter.getRandom(), fighter.getPersonality()), 42);
@@ -653,7 +654,7 @@ public final class FighterCombatDirector {
     private static void holdDramaticPose(AmbientFighterEntity fighter, LivingEntity target) {
         fighter.getNavigation().stop();
         fighter.setAttacking(false);
-        fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+        fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
         fighter.rotateBodyToTarget(target);
     }
 
@@ -775,7 +776,7 @@ public final class FighterCombatDirector {
             fighter.performProactiveTeleport(target);
             state.actionCooldown = 12;
             if (fighter.isComboReady() && distanceSq <= 100.0D) {
-                int combo = DBSagasEntity.ComboType.KI_CHARGE_ATTACK.getId();
+                int combo = LivingWorldSagasEntity.ComboType.KI_CHARGE_ATTACK.getId();
                 fighter.startCombo(combo);
                 rememberCombo(state, combo);
                 state.actionCooldown = 36;
@@ -787,14 +788,14 @@ public final class FighterCombatDirector {
                 && (fighter.getPersonality() == FighterPersonality.AGGRESSIVE
                 || fighter.getPersonality() == FighterPersonality.HEROIC
                 || phase >= 2)) {
-            int combo = DBSagasEntity.ComboType.KI_CHARGE_ATTACK.getId();
+            int combo = LivingWorldSagasEntity.ComboType.KI_CHARGE_ATTACK.getId();
             fighter.startCombo(combo);
             rememberCombo(state, combo);
             state.actionCooldown = 36;
             return;
         }
 
-        DBSagasEntity.KiSkill punish = chooseReadySkill(fighter, distanceSq, true, state);
+        LivingWorldSagasEntity.KiSkill punish = chooseReadySkill(fighter, distanceSq, true, state);
         if (punish != null) {
             fighter.startSkill(punish);
             applyControlSkillPenalty(punish);
@@ -812,7 +813,7 @@ public final class FighterCombatDirector {
         // possible instead of always taking the safe barrier/teleport response.
         if (target instanceof DBSagasEntity sagaTarget && isCastingClashBeam(sagaTarget)
                 && distanceSq >= 49.0D && distanceSq <= 900.0D) {
-            DBSagasEntity.KiSkill answer = findReadyClashBeam(fighter);
+            LivingWorldSagasEntity.KiSkill answer = findReadyClashBeam(fighter);
             if (answer != null && fighter.getRandom().nextFloat() < 0.82F) {
                 fighter.rotateBodyToTarget(target);
                 fighter.speakKey(fighter.getPersonality() == FighterPersonality.PROUD
@@ -832,7 +833,7 @@ public final class FighterCombatDirector {
             state.dialogueCooldown = 90;
         }
 
-        DBSagasEntity.KiSkill defensive = findReadyByRole(fighter, DBSagasEntity.SkillRole.DEFENSIVE);
+        LivingWorldSagasEntity.KiSkill defensive = findReadyByRole(fighter, LivingWorldSagasEntity.SkillRole.DEFENSIVE);
         if (defensive != null && distanceSq > 12.0D) {
             fighter.startSkill(defensive);
             applyControlSkillPenalty(defensive);
@@ -849,7 +850,7 @@ public final class FighterCombatDirector {
         }
 
         if (fighter.getPersonality() == FighterPersonality.AGGRESSIVE && distanceSq <= 49.0D && fighter.isComboReady()) {
-            int combo = DBSagasEntity.ComboType.KI_CHARGE_ATTACK.getId();
+            int combo = LivingWorldSagasEntity.ComboType.KI_CHARGE_ATTACK.getId();
             fighter.startCombo(combo);
             rememberCombo(state, combo);
             state.actionCooldown = 35;
@@ -885,7 +886,7 @@ public final class FighterCombatDirector {
 
         if (distanceSq > 64.0D && fighter.getArchetype() == FighterArchetype.KI_SPECIALIST
                 && fighter.hasSkillReady() && fighter.getRandom().nextFloat() < 0.30F) {
-            DBSagasEntity.KiSkill reply = chooseReadySkill(fighter, distanceSq, true, state);
+            LivingWorldSagasEntity.KiSkill reply = chooseReadySkill(fighter, distanceSq, true, state);
             if (reply != null) {
                 fighter.startSkill(reply);
                 applyControlSkillPenalty(reply);
@@ -906,8 +907,8 @@ public final class FighterCombatDirector {
         if (!pressesOpening || fighter.getRandom().nextFloat() >= 0.38F) return;
 
         int combo = fighter.getArchetype() == FighterArchetype.SPEEDSTER
-                ? DBSagasEntity.ComboType.RAPID_KICKS.getId()
-                : DBSagasEntity.ComboType.BASIC.getId();
+                ? LivingWorldSagasEntity.ComboType.RAPID_KICKS.getId()
+                : LivingWorldSagasEntity.ComboType.BASIC.getId();
         fighter.startCombo(combo);
         rememberCombo(state, combo);
         state.actionCooldown = 24;
@@ -1031,7 +1032,7 @@ public final class FighterCombatDirector {
         return EntityOwnerRelation.HOSTILE;
     }
 
-    private static void applyControlSkillPenalty(DBSagasEntity.KiSkill skill) {
+    private static void applyControlSkillPenalty(LivingWorldSagasEntity.KiSkill skill) {
         if (skill == null) return;
         // Oozaru Roar, Blue Hurricane and Majin Candy are the native saga skills most able
         // to lock a target down. LW fighters wait roughly three times longer before reusing them.
@@ -1039,7 +1040,7 @@ public final class FighterCombatDirector {
             skill.currentCooldown = Math.max(skill.currentCooldown, skill.cooldownMax * 3);
     }
 
-    private static void rememberSkill(FightState state, DBSagasEntity.KiSkill skill) {
+    private static void rememberSkill(FightState state, LivingWorldSagasEntity.KiSkill skill) {
         if (skill == null) return;
         if (state.lastSkillId == skill.id) state.sameSkillStreak++;
         else state.sameSkillStreak = 1;
@@ -1053,11 +1054,11 @@ public final class FighterCombatDirector {
     }
 
     private static void stageOpeningCooldowns(AmbientFighterEntity fighter) {
-        for (DBSagasEntity.KiSkill skill : fighter.getSkillPool()) {
-            if (skill.role == DBSagasEntity.SkillRole.RANGED_TRAVEL
-                    || skill.role == DBSagasEntity.SkillRole.HITSCAN
-                    || skill.role == DBSagasEntity.SkillRole.AOE_BURST
-                    || skill.role == DBSagasEntity.SkillRole.ZONING) {
+        for (LivingWorldSagasEntity.KiSkill skill : fighter.getSkillPool()) {
+            if (skill.role == LivingWorldSagasEntity.SkillRole.RANGED_TRAVEL
+                    || skill.role == LivingWorldSagasEntity.SkillRole.HITSCAN
+                    || skill.role == LivingWorldSagasEntity.SkillRole.AOE_BURST
+                    || skill.role == LivingWorldSagasEntity.SkillRole.ZONING) {
                 skill.currentCooldown = Math.max(skill.currentCooldown, 105);
             }
         }
@@ -1072,21 +1073,21 @@ public final class FighterCombatDirector {
         // select the stun combo independently and make the configured rarity meaningless.
         switch (fighter.getArchetype()) {
             case BRAWLER -> fighter.setAllowedCombos(cooldown,
-                    DBSagasEntity.ComboType.BASIC,
-                    variant % 2 == 0 ? DBSagasEntity.ComboType.METEOR_COMBINATION : DBSagasEntity.ComboType.RAPID_KICKS);
+                    LivingWorldSagasEntity.ComboType.BASIC,
+                    variant % 2 == 0 ? LivingWorldSagasEntity.ComboType.METEOR_COMBINATION : LivingWorldSagasEntity.ComboType.RAPID_KICKS);
             case MARTIAL_ARTIST -> fighter.setAllowedCombos(cooldown,
-                    DBSagasEntity.ComboType.BASIC,
-                    DBSagasEntity.ComboType.RAPID_KICKS,
-                    DBSagasEntity.ComboType.METEOR_COMBINATION);
+                    LivingWorldSagasEntity.ComboType.BASIC,
+                    LivingWorldSagasEntity.ComboType.RAPID_KICKS,
+                    LivingWorldSagasEntity.ComboType.METEOR_COMBINATION);
             case GUARDIAN -> fighter.setAllowedCombos(cooldown + 7,
-                    DBSagasEntity.ComboType.BASIC,
-                    DBSagasEntity.ComboType.METEOR_COMBINATION);
+                    LivingWorldSagasEntity.ComboType.BASIC,
+                    LivingWorldSagasEntity.ComboType.METEOR_COMBINATION);
             case KI_SPECIALIST -> fighter.setAllowedCombos(cooldown + 10,
-                    DBSagasEntity.ComboType.BASIC,
-                    DBSagasEntity.ComboType.RAPID_KICKS);
+                    LivingWorldSagasEntity.ComboType.BASIC,
+                    LivingWorldSagasEntity.ComboType.RAPID_KICKS);
             case SPEEDSTER -> fighter.setAllowedCombos(cooldown,
-                    DBSagasEntity.ComboType.BASIC,
-                    DBSagasEntity.ComboType.RAPID_KICKS);
+                    LivingWorldSagasEntity.ComboType.BASIC,
+                    LivingWorldSagasEntity.ComboType.RAPID_KICKS);
         }
     }
 
@@ -1098,7 +1099,7 @@ public final class FighterCombatDirector {
         boolean aerial = fighter.canFly() && (fighter.isFlying()
                 || target.getY() - fighter.getY() > 2.5D
                 || target instanceof DBSagasEntity saga && saga.isFlying());
-        int airCombo = DBSagasEntity.ComboType.AIR.getId();
+        int airCombo = LivingWorldSagasEntity.ComboType.AIR.getId();
         boolean airRecentlyUsed = state.lastComboId == airCombo && state.fightTicks - state.lastComboTick < 600;
         boolean targetAlreadyStunned = target.hasEffect(MainEffects.STUN.get());
         if (aerial && phase >= 1 && !airRecentlyUsed && !targetAlreadyStunned
@@ -1106,56 +1107,56 @@ public final class FighterCombatDirector {
             return airCombo;
         }
 
-        if (phase <= 0) return DBSagasEntity.ComboType.BASIC.getId();
+        if (phase <= 0) return LivingWorldSagasEntity.ComboType.BASIC.getId();
 
         if (phase >= 2 && fighter.getRank() != FighterRank.ROOKIE) {
             if ((style == FighterArchetype.BRAWLER || style == FighterArchetype.GUARDIAN)
                     && fighter.getRandom().nextFloat() < 0.68F) {
-                return DBSagasEntity.ComboType.METEOR_COMBINATION.getId();
+                return LivingWorldSagasEntity.ComboType.METEOR_COMBINATION.getId();
             }
             if (style == FighterArchetype.MARTIAL_ARTIST && variant % 3 == 0
                     && fighter.getRandom().nextFloat() < 0.58F) {
-                return DBSagasEntity.ComboType.METEOR_COMBINATION.getId();
+                return LivingWorldSagasEntity.ComboType.METEOR_COMBINATION.getId();
             }
         }
 
         if (style == FighterArchetype.SPEEDSTER || style == FighterArchetype.MARTIAL_ARTIST
                 || (style == FighterArchetype.BRAWLER && (variant & 1) == 1)) {
-            return DBSagasEntity.ComboType.RAPID_KICKS.getId();
+            return LivingWorldSagasEntity.ComboType.RAPID_KICKS.getId();
         }
-        return DBSagasEntity.ComboType.BASIC.getId();
+        return LivingWorldSagasEntity.ComboType.BASIC.getId();
     }
 
-    private static DBSagasEntity.KiSkill chooseReadySkill(AmbientFighterEntity fighter,
+    private static LivingWorldSagasEntity.KiSkill chooseReadySkill(AmbientFighterEntity fighter,
                                                            double distanceSq, boolean fastOnly,
                                                            FightState state) {
-        DBSagasEntity.KiSkillType signature = signatureType(fighter);
-        DBSagasEntity.KiSkill best = null;
+        LivingWorldSagasEntity.KiSkillType signature = signatureType(fighter);
+        LivingWorldSagasEntity.KiSkill best = null;
         int bestScore = Integer.MIN_VALUE;
 
-        for (DBSagasEntity.KiSkill skill : fighter.getSkillPool()) {
-            if (skill.currentCooldown > 0 || skill.role == DBSagasEntity.SkillRole.DEFENSIVE) continue;
-            if (fastOnly && skill.role != DBSagasEntity.SkillRole.PROJECTILE_FAST
-                    && skill.role != DBSagasEntity.SkillRole.HITSCAN) continue;
+        for (LivingWorldSagasEntity.KiSkill skill : fighter.getSkillPool()) {
+            if (skill.currentCooldown > 0 || skill.role == LivingWorldSagasEntity.SkillRole.DEFENSIVE) continue;
+            if (fastOnly && skill.role != LivingWorldSagasEntity.SkillRole.PROJECTILE_FAST
+                    && skill.role != LivingWorldSagasEntity.SkillRole.HITSCAN) continue;
 
             int score = 0;
             if (FighterArsenalManager.isSword(fighter.getMainHandItem())) score -= 6;
-            DBSagasEntity.KiSkillType type = DBSagasEntity.KiSkillType.fromId(skill.id);
+            LivingWorldSagasEntity.KiSkillType type = LivingWorldSagasEntity.KiSkillType.fromId(skill.id);
             if (type == signature) score += 5; // preference, not repetition lock-in
 
             if (distanceSq > 225.0D) {
-                if (skill.role == DBSagasEntity.SkillRole.RANGED_TRAVEL) score += 7;
-                if (skill.role == DBSagasEntity.SkillRole.HITSCAN) score += 6;
-                if (skill.role == DBSagasEntity.SkillRole.ZONING) score += 2;
+                if (skill.role == LivingWorldSagasEntity.SkillRole.RANGED_TRAVEL) score += 7;
+                if (skill.role == LivingWorldSagasEntity.SkillRole.HITSCAN) score += 6;
+                if (skill.role == LivingWorldSagasEntity.SkillRole.ZONING) score += 2;
             } else if (distanceSq > 81.0D) {
-                if (skill.role == DBSagasEntity.SkillRole.PROJECTILE_FAST) score += 6;
-                if (skill.role == DBSagasEntity.SkillRole.RANGED_TRAVEL) score += 5;
-                if (skill.role == DBSagasEntity.SkillRole.HITSCAN) score += 4;
-                if (skill.role == DBSagasEntity.SkillRole.ZONING) score += 4;
+                if (skill.role == LivingWorldSagasEntity.SkillRole.PROJECTILE_FAST) score += 6;
+                if (skill.role == LivingWorldSagasEntity.SkillRole.RANGED_TRAVEL) score += 5;
+                if (skill.role == LivingWorldSagasEntity.SkillRole.HITSCAN) score += 4;
+                if (skill.role == LivingWorldSagasEntity.SkillRole.ZONING) score += 4;
             } else {
-                if (skill.role == DBSagasEntity.SkillRole.AOE_BURST) score += 7;
-                if (skill.role == DBSagasEntity.SkillRole.PROJECTILE_FAST) score += 5;
-                if (skill.role == DBSagasEntity.SkillRole.ZONING) score += 4;
+                if (skill.role == LivingWorldSagasEntity.SkillRole.AOE_BURST) score += 7;
+                if (skill.role == LivingWorldSagasEntity.SkillRole.PROJECTILE_FAST) score += 5;
+                if (skill.role == LivingWorldSagasEntity.SkillRole.ZONING) score += 4;
             }
 
             // Short-term move memory: a signature remains recognizable, but repeating
@@ -1177,23 +1178,23 @@ public final class FighterCombatDirector {
         return best;
     }
 
-    private static DBSagasEntity.KiSkillType signatureType(AmbientFighterEntity fighter) {
+    private static LivingWorldSagasEntity.KiSkillType signatureType(AmbientFighterEntity fighter) {
         int variant = combatVariant(fighter);
         if (fighter.getRank() == FighterRank.VETERAN && variant >= 6) return finisherFor(fighter, variant);
         return switch (fighter.getArchetype()) {
             case BRAWLER -> variant >= 6 ? finisherFor(fighter, variant) : null;
             case MARTIAL_ARTIST -> switch (variant % 3) {
-                case 0 -> DBSagasEntity.KiSkillType.KI_SMALL;
+                case 0 -> LivingWorldSagasEntity.KiSkillType.KI_SMALL;
                 case 1 -> clashBeamFor(fighter, variant);
-                default -> DBSagasEntity.KiSkillType.KI_VOLLEY;
+                default -> LivingWorldSagasEntity.KiSkillType.KI_VOLLEY;
             };
             case KI_SPECIALIST -> clashBeamFor(fighter, variant);
             case SPEEDSTER -> switch (variant % 3) {
-                case 0 -> DBSagasEntity.KiSkillType.KI_LASER;
-                case 1 -> DBSagasEntity.KiSkillType.KI_SMALL;
-                default -> DBSagasEntity.KiSkillType.KI_VOLLEY;
+                case 0 -> LivingWorldSagasEntity.KiSkillType.KI_LASER;
+                case 1 -> LivingWorldSagasEntity.KiSkillType.KI_SMALL;
+                default -> LivingWorldSagasEntity.KiSkillType.KI_VOLLEY;
             };
-            case GUARDIAN -> DBSagasEntity.KiSkillType.KI_BARRIER;
+            case GUARDIAN -> LivingWorldSagasEntity.KiSkillType.KI_BARRIER;
         };
     }
 
@@ -1229,7 +1230,7 @@ public final class FighterCombatDirector {
         if (state.closeIdleTicks < 7) return;
         state.closeIdleTicks = 0;
         state.actionCooldown = 0;
-        fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.RUN);
+        fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.RUN);
 
         int currentPhase = phase(state.fightTicks,
                 fighter.getMaxHealth() <= 0.0F ? 1.0F : fighter.getHealth() / fighter.getMaxHealth());
@@ -1238,7 +1239,7 @@ public final class FighterCombatDirector {
         // immediately become combat rather than a synthetic shove.
         if (fighter.isComboReady()) {
             int combo = chooseCloseCombo(fighter, target, state, Math.max(1, currentPhase));
-            if (combo < 0) combo = DBSagasEntity.ComboType.BASIC.getId();
+            if (combo < 0) combo = LivingWorldSagasEntity.ComboType.BASIC.getId();
             fighter.startCombo(combo);
             rememberCombo(state, combo);
             state.actionCooldown = currentPhase >= 2 ? 12 : 18;
@@ -1359,8 +1360,8 @@ public final class FighterCombatDirector {
         if (fighter.isCasting() || other.isCasting() || fighter.isCharge() || other.isCharge()) return false;
         if (other.getTarget() != fighter) return false;
 
-        DBSagasEntity.KiSkill ours = findReadyClashBeam(fighter);
-        DBSagasEntity.KiSkill theirs = findReadyClashBeam(other);
+        LivingWorldSagasEntity.KiSkill ours = findReadyClashBeam(fighter);
+        LivingWorldSagasEntity.KiSkill theirs = findReadyClashBeam(other);
         if (ours == null || theirs == null) return false;
 
         // Once conditions are right this is deliberately quite likely; 0.6.7's job is
@@ -1399,21 +1400,21 @@ public final class FighterCombatDirector {
 
     private static boolean isCastingClashBeam(DBSagasEntity entity) {
         if (!entity.isCasting()) return false;
-        DBSagasEntity.KiSkillType type = DBSagasEntity.KiSkillType.fromId(entity.getSkillType());
-        return type != null && type.getRole() == DBSagasEntity.SkillRole.RANGED_TRAVEL;
+        LivingWorldSagasEntity.KiSkillType type = LivingWorldSagasEntity.KiSkillType.fromId(entity.getSkillType());
+        return type != null && type.getRole() == LivingWorldSagasEntity.SkillRole.RANGED_TRAVEL;
     }
 
-    private static DBSagasEntity.KiSkill findReadyClashBeam(AmbientFighterEntity fighter) {
-        for (DBSagasEntity.KiSkill skill : fighter.getSkillPool()) {
+    private static LivingWorldSagasEntity.KiSkill findReadyClashBeam(AmbientFighterEntity fighter) {
+        for (LivingWorldSagasEntity.KiSkill skill : fighter.getSkillPool()) {
             if (skill.currentCooldown > 0) continue;
-            DBSagasEntity.KiSkillType type = DBSagasEntity.KiSkillType.fromId(skill.id);
-            if (type != null && type.getRole() == DBSagasEntity.SkillRole.RANGED_TRAVEL) return skill;
+            LivingWorldSagasEntity.KiSkillType type = LivingWorldSagasEntity.KiSkillType.fromId(skill.id);
+            if (type != null && type.getRole() == LivingWorldSagasEntity.SkillRole.RANGED_TRAVEL) return skill;
         }
         return null;
     }
 
-    private static DBSagasEntity.KiSkill findReadyByRole(AmbientFighterEntity fighter, DBSagasEntity.SkillRole role) {
-        for (DBSagasEntity.KiSkill skill : fighter.getSkillPool()) {
+    private static LivingWorldSagasEntity.KiSkill findReadyByRole(AmbientFighterEntity fighter, LivingWorldSagasEntity.SkillRole role) {
+        for (LivingWorldSagasEntity.KiSkill skill : fighter.getSkillPool()) {
             if (skill.currentCooldown <= 0 && skill.role == role) return skill;
         }
         return null;
@@ -1441,10 +1442,10 @@ public final class FighterCombatDirector {
         return fighter.getRank() == FighterRank.VETERAN && fighter.getRandom().nextFloat() < 0.05F;
     }
 
-    private static boolean isMajor(DBSagasEntity.KiSkill skill) {
-        return skill.role == DBSagasEntity.SkillRole.RANGED_TRAVEL
-                || skill.role == DBSagasEntity.SkillRole.HITSCAN
-                || skill.role == DBSagasEntity.SkillRole.AOE_BURST;
+    private static boolean isMajor(LivingWorldSagasEntity.KiSkill skill) {
+        return skill.role == LivingWorldSagasEntity.SkillRole.RANGED_TRAVEL
+                || skill.role == LivingWorldSagasEntity.SkillRole.HITSCAN
+                || skill.role == LivingWorldSagasEntity.SkillRole.AOE_BURST;
     }
 
     private static int phase(int fightTicks, float healthRatio) {
@@ -1542,3 +1543,7 @@ public final class FighterCombatDirector {
         }
     }
 }
+
+
+
+

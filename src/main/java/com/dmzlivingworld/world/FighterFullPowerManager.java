@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
 import net.minecraft.network.chat.Component;
@@ -62,7 +63,7 @@ public final class FighterFullPowerManager {
         fighter.setSprinting(false);
         fighter.setPose(Pose.STANDING);
         fighter.setAmbientPose(0);
-        fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+        fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
 
         long now = fighter.level().getGameTime();
         fighter.getPersistentData().putLong(START, now);
@@ -104,7 +105,7 @@ public final class FighterFullPowerManager {
             fighter.suppressActivityAura();
             fighter.setAmbientPose(0);
             fighter.setPose(Pose.STANDING);
-            fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+            fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
             clearMarkers(fighter);
             return false;
         }
@@ -116,7 +117,7 @@ public final class FighterFullPowerManager {
         fighter.setSprinting(false);
         fighter.setPose(Pose.STANDING);
         fighter.setAmbientPose(0);
-        fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+        fighter.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
 
         return true;
     }
@@ -128,3 +129,5 @@ public final class FighterFullPowerManager {
         fighter.finishFullPowerState();
     }
 }
+
+

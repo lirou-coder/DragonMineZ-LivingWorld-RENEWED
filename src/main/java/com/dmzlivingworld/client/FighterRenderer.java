@@ -7,15 +7,13 @@ import com.dmzlivingworld.client.layer.FighterHairLayer;
 import com.dmzlivingworld.client.layer.FighterNativeAccessoryLayer;
 import com.dmzlivingworld.client.layer.HerobrineEyesLayer;
 import com.dmzlivingworld.client.layer.FighterIsolatedHeldItemLayer;
+import com.dmzlivingworld.client.layer.LWSagaArmorLayer;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.world.WorldMenaceManager;
-import com.dragonminez.client.init.entities.renderer.sagas.DBSagasRenderer;
-import com.dragonminez.client.init.entities.renderer.sagas.layer.DMZSagaArmorLayer;
 import com.dragonminez.client.render.util.IrisCompat;
 import com.dragonminez.client.render.util.PlayerEffectQueue;
 import com.dragonminez.client.systems.kisense.KiSenseScan;
 import com.dragonminez.client.systems.kisense.KiSenseState;
-import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
 import com.dragonminez.mixin.client.GeoModelAccessor;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -33,7 +31,6 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import software.bernie.geckolib.renderer.GeoEntityRenderer;
 
-import java.lang.reflect.Method;
 
 /**
  * Multi-race Living World fighter renderer.
@@ -47,10 +44,7 @@ import java.lang.reflect.Method;
 public final class FighterRenderer extends GeoEntityRenderer<AmbientFighterEntity> {
     private static final ResourceLocation FISHING_HOOK_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/fishing_hook.png");
     private static final RenderType FISHING_HOOK_RENDER = RenderType.entityCutoutNoCull(FISHING_HOOK_TEXTURE);
-    private final DBSagasRenderer<AmbientFighterEntity> nativeSagaEffects;
-    private final Method drawEffectsInline;
-    private final Method drawEffectsDeferred;
-    private boolean nativeEffectsUnavailable;
+    private final LWSagasEffectsRenderer nativeSagaEffects;
 
     public FighterRenderer(EntityRendererProvider.Context context) {
         super(context, new FighterModel());
@@ -60,7 +54,7 @@ public final class FighterRenderer extends GeoEntityRenderer<AmbientFighterEntit
         addRenderLayer(new HerobrineEyesLayer(this));
         // Reuse DMZ 2.1.3's own saga equipment renderers. Living Arsenal stores
         // genuine ItemStacks in the entity slots; these layers are the native visual path.
-        addRenderLayer(new DMZSagaArmorLayer<>(this));
+        addRenderLayer(new LWSagaArmorLayer<>(this));
         // R36: preserve DMZ's exact right_hand_item placement and normal ItemRenderer path,
         // but isolate mutable GeoItem renderer/model state from same-type weapons owned/rendered by the player.
         addRenderLayer(new FighterIsolatedHeldItemLayer(this));
@@ -69,26 +63,7 @@ public final class FighterRenderer extends GeoEntityRenderer<AmbientFighterEntit
         // Targeted bridge for the exact DMZ 2.1.3 runtime this addon supports.
         // The methods are private in DMZ, so reflection lets us reuse the exact
         // native saga aura implementation without copying/reinventing its shader.
-        DBSagasRenderer<AmbientFighterEntity> effects = null;
-        Method inline = null;
-        Method deferred = null;
-        try {
-            effects = new DBSagasRenderer<>(context);
-            inline = DBSagasRenderer.class.getDeclaredMethod(
-                    "drawEffectsInline", DBSagasEntity.class, PoseStack.class,
-                    float.class, boolean.class, boolean.class);
-            inline.setAccessible(true);
-            deferred = DBSagasRenderer.class.getDeclaredMethod(
-                    "drawEffects", DBSagasEntity.class, Matrix4f.class,
-                    float.class, boolean.class, boolean.class);
-            deferred.setAccessible(true);
-        } catch (ReflectiveOperationException ignored) {
-            // If DMZ changes these internals in a future version, rendering the
-            // fighter itself must remain safe. This addon targets DMZ 2.1.3.
-        }
-        nativeSagaEffects = effects;
-        drawEffectsInline = inline;
-        drawEffectsDeferred = deferred;
+        nativeSagaEffects = new LWSagasEffectsRenderer(context);
     }
 
     @Override
@@ -213,8 +188,6 @@ public final class FighterRenderer extends GeoEntityRenderer<AmbientFighterEntit
     }
 
     private void renderNativeSagaEffects(AmbientFighterEntity entity, PoseStack poseStack, float partialTick) {
-        if (nativeEffectsUnavailable || nativeSagaEffects == null || drawEffectsInline == null) return;
-
         // A fusion partner is retained as an invisible passenger. Never render a detached
         // DMZ aura for an invisible fighter while the server-side aura state synchronizes.
         boolean aura = !entity.isInvisible()
@@ -222,23 +195,12 @@ public final class FighterRenderer extends GeoEntityRenderer<AmbientFighterEntit
         boolean lightning = entity.isLightning();
         if (!aura && !lightning) return;
 
-        try {
-            if (IrisCompat.isShaderPackInUse() && drawEffectsDeferred != null) {
+        if (IrisCompat.isShaderPackInUse()) {
                 Matrix4f capturedMatrix = new Matrix4f(poseStack.last().pose());
-                PlayerEffectQueue.addEntityEffect(() -> {
-                    try {
-                        drawEffectsDeferred.invoke(nativeSagaEffects, entity, capturedMatrix,
-                                partialTick, aura, lightning);
-                    } catch (ReflectiveOperationException ignored) {
-                        nativeEffectsUnavailable = true;
-                    }
-                });
-            } else {
-                drawEffectsInline.invoke(nativeSagaEffects, entity, poseStack,
-                        partialTick, aura, lightning);
-            }
-        } catch (ReflectiveOperationException ignored) {
-            nativeEffectsUnavailable = true;
+                PlayerEffectQueue.addEntityEffect(() -> nativeSagaEffects.drawEffects(
+                        entity, capturedMatrix, partialTick, aura, lightning));
+        } else {
+            nativeSagaEffects.drawEffectsInline(entity, poseStack, partialTick, aura, lightning);
         }
     }
 

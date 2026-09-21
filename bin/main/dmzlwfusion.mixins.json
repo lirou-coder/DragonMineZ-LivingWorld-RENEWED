@@ -19,6 +19,7 @@
     ,"PlayerRestMonsterMixin"
     ,"WishTypeAdapterMixin"
     ,"TargetHelperCompanionMixin"
+    ,"ArgumentCommandNodeAccessor"
   ],
   "client": [
     "FighterModelAnimationMixin",

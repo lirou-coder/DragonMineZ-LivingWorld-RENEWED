@@ -4,6 +4,7 @@ import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.config.LivingWorldClientConfig;
 import com.dmzlivingworld.entity.LWEntities;
+import com.dmzlivingworld.entity.WorldMenaceFighterEntity;
 import com.dmzlivingworld.network.LWNetwork;
 import com.dmzlivingworld.client.particle.LWKiTrainingParticles;
 import com.dmzlwfusion.network.FusionAnimationNetwork;
@@ -15,6 +16,8 @@ import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.monster.Monster;
 
 /**
  * DragonMine Z: Living World — roaming encounter branch.
@@ -29,6 +32,7 @@ public final class LivingWorldMod {
     public static final String MOD_ID = "dmzlivingworld";
 
     public LivingWorldMod() {
+        verifyNeutralFighterHierarchy();
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         LWEntities.ENTITY_TYPES.register(modBus);
         LWKiTrainingParticles.TYPES.register(modBus);
@@ -37,6 +41,16 @@ public final class LivingWorldMod {
         DBZMeditation.init(modBus);
         modBus.addListener(this::commonSetup);
         modBus.addListener(this::registerAttributes);
+    }
+
+    private static void verifyNeutralFighterHierarchy() {
+        if (Monster.class.isAssignableFrom(AmbientFighterEntity.class)
+                || Enemy.class.isAssignableFrom(AmbientFighterEntity.class)) {
+            throw new IllegalStateException("Ambient fighters must not inherit Monster or Enemy");
+        }
+        if (!Enemy.class.isAssignableFrom(WorldMenaceFighterEntity.class)) {
+            throw new IllegalStateException("World Menaces must retain the Enemy classification");
+        }
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
@@ -51,5 +65,6 @@ public final class LivingWorldMod {
 
     private void registerAttributes(EntityAttributeCreationEvent event) {
         event.put(LWEntities.AMBIENT_FIGHTER.get(), AmbientFighterEntity.createAttributes().build());
+        event.put(LWEntities.WORLD_MENACE_FIGHTER.get(), AmbientFighterEntity.createAttributes().build());
     }
 }

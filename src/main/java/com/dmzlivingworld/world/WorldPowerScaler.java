@@ -140,7 +140,7 @@ public final class WorldPowerScaler {
         double melee = Math.max(0.0D, kill.getMeleeDamage());
         double ki = Math.max(0.0D, kill.getKiDamage());
         double reference = ModList.get().isLoaded("dmzrevamp")
-                ? hp / 2.0D + melee + ki + revampDefense(kill)
+                ? (hp + melee + ki + revampDefense(kill)) / 2.0D
                 : (hp + melee + ki) / 2.0D;
         return Double.isFinite(reference) ? reference : -1.0D;
     }

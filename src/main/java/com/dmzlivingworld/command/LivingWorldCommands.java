@@ -11,6 +11,8 @@ import com.dmzlivingworld.entity.FighterArchetype;
 import com.dmzlivingworld.entity.FighterPersonality;
 import com.dmzlivingworld.entity.FighterRace;
 import com.dmzlivingworld.entity.FighterRank;
+import com.dmzlivingworld.entity.LWEntities;
+import com.dmzlwfusion.mixin.ArgumentCommandNodeAccessor;
 import com.dmzlivingworld.world.AmbientFighterSpawner;
 import com.dmzlivingworld.world.AntagonistWorldData;
 import com.dmzlivingworld.world.DynamicEncounterManager;
@@ -64,11 +66,16 @@ import com.dmzlivingworld.world.ReactiveWorldManager;
 import com.dmzlivingworld.world.FactionHornManager;
 import com.dmzlivingworld.world.FighterDebugSpectateManager;
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -97,6 +104,7 @@ public final class LivingWorldCommands {
 
     @SubscribeEvent
     public static void register(RegisterCommandsEvent event) {
+        hideInternalWorldMenaceFromSummonSuggestions(event);
         event.getDispatcher().register(
                 Commands.literal("lw")
                         .requires(source -> source.hasPermission(2))
@@ -451,6 +459,23 @@ public final class LivingWorldCommands {
                         .then(Commands.literal("settings")
                                 .executes(ctx -> openSettings(ctx.getSource().getPlayerOrException())))
         );
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void hideInternalWorldMenaceFromSummonSuggestions(RegisterCommandsEvent event) {
+        CommandNode<CommandSourceStack> summon = event.getDispatcher().getRoot().getChild("summon");
+        if (summon == null) return;
+        CommandNode<CommandSourceStack> entity = summon.getChild("entity");
+        if (!(entity instanceof com.mojang.brigadier.tree.ArgumentCommandNode)) return;
+
+        SuggestionProvider<CommandSourceStack> filtered = (context, builder) ->
+                SharedSuggestionProvider.suggestResource(
+                        BuiltInRegistries.ENTITY_TYPE.stream()
+                                .filter(type -> type != LWEntities.WORLD_MENACE_FIGHTER.get())
+                                .filter(type -> type.isEnabled(context.getSource().enabledFeatures()) && type.canSummon())
+                                .map(net.minecraft.world.entity.EntityType::getKey),
+                        builder);
+        ((ArgumentCommandNodeAccessor) entity).dmzlivingworld$setCustomSuggestions(filtered);
     }
 
     private static int debugExperimentStatus(ServerPlayer player) {

@@ -33,6 +33,7 @@ public final class ClientModEvents {
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(LWEntities.AMBIENT_FIGHTER.get(), FighterRenderer::new);
+        event.registerEntityRenderer(LWEntities.WORLD_MENACE_FIGHTER.get(), FighterRenderer::new);
     }
 
     @SubscribeEvent

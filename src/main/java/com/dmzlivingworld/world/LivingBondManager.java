@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.compat.MeditationCompat;
 import com.dmzlivingworld.config.LivingWorldConfig;
@@ -666,13 +667,13 @@ public final class LivingBondManager {
                 travelData.putBoolean("LWCompanionComfortZone", true);
             }
             companion.setSprinting(false);
-            companion.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+            companion.setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
             return;
         }
         travelData.remove("LWCompanionComfortZone");
         boolean far = distanceSq > 20.0D * 20.0D;
         companion.setSprinting(far);
-        companion.setLocomotionMode(far ? DBSagasEntity.LocomotionMode.RUN : DBSagasEntity.LocomotionMode.WALK);
+        companion.setLocomotionMode(far ? LivingWorldSagasEntity.LocomotionMode.RUN : LivingWorldSagasEntity.LocomotionMode.WALK);
         if (companion.getNavigation().isDone() || companion.tickCount % 10 == 0)
             companion.getNavigation().moveTo(player, cautious ? 1.05D : far ? 1.42D : 1.16D);
     }
@@ -1212,7 +1213,7 @@ public final class LivingBondManager {
         fighter.getPersistentData().remove("LWCompanionRescueFlight");
         fighter.getPersistentData().remove("LWCompanionComfortZone");
         fighter.getPersistentData().remove("LWTravelFlightHolding");
-        fighter.setLocomotionMode(com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.IDLE);
+        fighter.setLocomotionMode(com.dmzlivingworld.entity.combat.LivingWorldSagasEntity.LocomotionMode.IDLE);
     }
 
     /** DMZ-facing ownership/team check used by relation, healing and buff targeting. */
@@ -1330,8 +1331,8 @@ public final class LivingBondManager {
         String invitation = invite == null ? "none" : invite.type.name().toLowerCase(java.util.Locale.ROOT);
         String companion = companionName(player);
         return "companion=" + (companion.isBlank() ? "none" : companion)
-                + " • pending invite=" + invitation
-                + " • Meditation=" + (MeditationCompat.isAvailable() ? "enabled" : "disabled");
+                + " â€¢ pending invite=" + invitation
+                + " â€¢ Meditation=" + (MeditationCompat.isAvailable() ? "enabled" : "disabled");
     }
 
     /** Manual group release. Internal cleanup must use clearCompanionInternal. */
@@ -1450,3 +1451,5 @@ public final class LivingBondManager {
             copy.getPersistentData().put(ROOT, old.getPersistentData().getCompound(ROOT).copy());
     }
 }
+
+

@@ -10,7 +10,8 @@ import com.dragonminez.common.init.MainParticles;
 import com.dragonminez.common.init.MainDamageTypes;
 import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
 import com.dragonminez.common.init.entities.sagas.helper.DBSagasAnimations;
-import com.dragonminez.common.init.entities.sagas.helper.DBSagasAnimationHandler;
+import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
+import com.dmzlivingworld.entity.combat.helper.LWDBSagasAnimationHandler;
 import com.dragonminez.common.combat.logic.weapon.WeaponRegistry;
 import com.dragonminez.common.combat.weapon.WeaponAttributes;
 import com.dragonminez.common.stats.StatsCapability;
@@ -99,6 +100,8 @@ import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.IronGolem;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.WanderingTrader;
@@ -115,9 +118,7 @@ import software.bernie.geckolib.core.animation.AnimationState;
 import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.core.object.PlayState;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -128,7 +129,7 @@ import java.util.UUID;
  * Living World supplies identity and high-level intent only. Once combat starts,
  * chasing, melee, dashing, aerial pursuit and Ki execution stay native to DMZ.
  */
-public final class AmbientFighterEntity extends DBSagasEntity {
+public class AmbientFighterEntity extends LivingWorldSagasEntity {
     private static final int DATA_VERSION = 23;
     private static final int MAX_DIALOGUE_HISTORY = 50;
     private static final int MAX_DIALOGUE_LENGTH = 240;
@@ -401,19 +402,16 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     private int clientWeaponAnimationWindow;
     private int renderedUnarmedTrainingStrike = Integer.MIN_VALUE;
 
-    public AmbientFighterEntity(EntityType<? extends Monster> type, Level level) {
+    public AmbientFighterEntity(EntityType<? extends LivingWorldSagasEntity> type, Level level) {
         super(type, level);
         DmzRevampMobDefenseCompat.neutralize(this);
         setTransformationDisabled(true);
         setDBZStyle(0);
 
-        // DBSagasEntity normally auto-acquires players/villagers/golems. Remove only
-        // those target goals; DMZ movement, melee, dash, flight and HurtByTargetGoal stay.
-        removeAutomaticHostilityGoals();
     }
 
     public static AttributeSupplier.Builder createAttributes() {
-        return DBSagasEntity.createAttributes();
+        return LivingWorldSagasEntity.createAttributes();
     }
 
     /**
@@ -447,7 +445,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                 state.getController().forceAnimationReset();
             return PlayState.STOP;
         }
-        return DBSagasAnimationHandler.attackPredicate(state);
+        return LWDBSagasAnimationHandler.attackPredicate(state);
     }
 
     private PlayState unarmedTrainingPredicate(AnimationState<AmbientFighterEntity> state) {
@@ -1428,7 +1426,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (isFlying()) setFlying(false);
         setFlyingFast(false);
         setNoGravity(false);
-        setLocomotionMode(DBSagasEntity.LocomotionMode.WALK);
+        setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.WALK);
         double moodPace = ReactiveWorldManager.movementPace(this);
         getNavigation().moveTo(destination.getX() + 0.5D, destination.getY(), destination.getZ() + 0.5D,
                 (isNonCombatant() ? 0.78D : 0.88D) * moodPace);
@@ -1452,7 +1450,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             // toward the same destination rather than vibrating in place forever.
             BlockPos feet = BlockPos.containing(target.x, target.y - 1.3D, target.z);
             clearIdleFlightTravel(true);
-            setLocomotionMode(DBSagasEntity.LocomotionMode.RUN);
+            setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.RUN);
             getNavigation().moveTo(feet.getX() + 0.5D, feet.getY(), feet.getZ() + 0.5D, 1.04D);
             return false;
         }
@@ -1797,6 +1795,16 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         // still scan because generated faction relationships/reputation can make them hostile.
         if (getAlignment() == FighterAlignment.NEUTRAL && !isFactionMember()) return;
 
+        // Heroes consistently protect the area from actual hostile mobs. Keep this scan
+        // outside ambientConflictRoll: that setting controls optional social conflicts,
+        // not the explicit hero-versus-monster relationship. Staggering it keeps the
+        // lookup inexpensive even when many fighters are loaded.
+        if (getAlignment() == FighterAlignment.GOOD
+                && Math.floorMod(tickCount + getId(), 20) == 0
+                && acquireNearbyHostileMob()) {
+            return;
+        }
+
         // Optional ambient aggression is deliberately sparse. Explicit duels, encounters,
         // faction scenes and HurtByTarget self-defense bypass this gate because they set targets directly.
         double conflictRoll = LivingWorldConfig.ambientConflictRoll();
@@ -1817,6 +1825,21 @@ public final class AmbientFighterEntity extends DBSagasEntity {
                     }
                     setTarget(target);
                 });
+    }
+
+    private boolean acquireNearbyHostileMob() {
+        return level().getEntitiesOfClass(
+                        LivingEntity.class,
+                        getBoundingBox().inflate(58.0D, 24.0D, 58.0D),
+                        target -> (target instanceof Enemy || target instanceof Monster)
+                                && isProactiveTarget(target))
+                .stream()
+                .min(Comparator.comparingDouble(this::distanceToSqr))
+                .map(target -> {
+                    setTarget(target);
+                    return getTarget() == target;
+                })
+                .orElse(false);
     }
 
     private double targetPriorityScore(LivingEntity target) {
@@ -1868,13 +1891,21 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     private boolean isThreatToEarth(LivingEntity target) {
         if (target instanceof AmbientFighterEntity other) return other.getAlignment() == FighterAlignment.BAD;
 
+        // Creepers must not enter reciprocal Fighter combat: pursuing one encourages
+        // an explosion while the Creeper itself is deliberately barred from targeting Fighters.
+        if (target instanceof Creeper) return false;
+
+        // Only GOOD fighters call this method through isProactiveTarget(). Any entity
+        // that Minecraft (or another mod) marks as an Enemy is therefore a threat that
+        // heroes may engage. NEUTRAL and BAD fighters still rely on HurtByTargetGoal
+        // and only fight these mobs after being attacked first.
+        if (target instanceof Enemy || target instanceof Monster) return true;
+
         ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(target.getType());
         if (key == null) return false;
 
-        // Vanilla monsters are safe to interpret as local threats. For DMZ itself,
-        // stay conservative and target only known hostile troop families rather than
-        // accidentally treating every saga character as evil.
-        if (target instanceof Monster && "minecraft".equals(key.getNamespace())) return LivingWorldConfig.attackMinecraftMobs();
+        // Some legacy DMZ hostile entities do not expose Minecraft's Enemy marker,
+        // so retain the known hostile-family fallback for those entities.
         if (!"dragonminez".equals(key.getNamespace())) return false;
 
         String path = key.getPath();
@@ -1887,7 +1918,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     private boolean isPowerAcceptableForProactiveFight(LivingEntity target) {
         // Civilians and ordinary vanilla threats don't need a scouter calculation.
-        if (!(target instanceof Player) && !(target instanceof DBSagasEntity) && !(target instanceof IBattlePower)) return true;
+        if (!(target instanceof Player) && !(target instanceof DBSagasEntity)
+                && !(target instanceof LivingWorldSagasEntity) && !(target instanceof IBattlePower)) return true;
 
         double targetPower = estimateBattlePower(target);
         if (targetPower <= 0.0D) return true;
@@ -1925,6 +1957,10 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     }
 
     private double estimateBattlePower(LivingEntity target) {
+        if (target instanceof LivingWorldSagasEntity fighterEntity) {
+            return Math.max(1, fighterEntity.getBattlePower());
+        }
+
         if (target instanceof DBSagasEntity sagaEntity) {
             return Math.max(1, sagaEntity.getBattlePower());
         }
@@ -2161,9 +2197,9 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (cinematicLaunchCooldown > 0 || attacker == null || !attacker.isComboing()) return;
 
         int combo = attacker.getComboId();
-        boolean meteor = combo == DBSagasEntity.ComboType.METEOR_COMBINATION.getId();
-        boolean air = combo == DBSagasEntity.ComboType.AIR.getId();
-        boolean rapid = combo == DBSagasEntity.ComboType.RAPID_KICKS.getId();
+        boolean meteor = combo == LivingWorldSagasEntity.ComboType.METEOR_COMBINATION.getId();
+        boolean air = combo == LivingWorldSagasEntity.ComboType.AIR.getId();
+        boolean rapid = combo == LivingWorldSagasEntity.ComboType.RAPID_KICKS.getId();
         if (!meteor && !air && !(rapid && attacker.getRandom().nextFloat() < 0.28F)) return;
 
         // 0.6.10 keeps the stronger impact spacing while reducing repetition. Major native
@@ -3045,7 +3081,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     private void hardResetPostSparState() {
         FighterCombatDirector.reset(this); interruptCombo(); stopCasting(); setAttacking(false); setAggressive(false);
         setKiCharge(false); setZanzokenState(false); setEvading(false); setFlyingFast(false);
-        setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE); getNavigation().stop(); setDeltaMovement(0.0D, 0.0D, 0.0D);
+        setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE); getNavigation().stop(); setDeltaMovement(0.0D, 0.0D, 0.0D);
     }
 
     private void enforcePostSparPeace() {
@@ -3086,7 +3122,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
     public boolean isAwakened() { return entityData.get(AWAKENED); }
     public boolean isAwakening() { return awakeningTicks > 0 || isTransforming(); }
     public float getDisplayScale() { return entityData.get(DISPLAY_SCALE); }
-    public String genderLabel() { return getRace().gendered() ? (isFemale() ? "Female" : "Male") : "—"; }
+    public String genderLabel() { return getRace().gendered() ? (isFemale() ? "Female" : "Male") : "â€”"; }
 
     public void setPersonality(FighterPersonality personality) {
         entityData.set(PERSONALITY, personality.id());
@@ -3563,7 +3599,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         setFishingActivity(false);
         setFlying(false);
         setFlyingFast(false);
-        setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+        setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
         setPose(Pose.STANDING);
         setDeltaMovement(Vec3.ZERO);
         setTarget(null);
@@ -4191,7 +4227,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             if (isMeditating() || isPreparingMeditation()) stopMeditation(false);
             setPose(Pose.STANDING);
             setAmbientPose(0);
-            setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+            setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
             setTarget(null);
             interruptCombo();
             stopCasting();
@@ -4272,10 +4308,10 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         setSocialLifeActivity(state.getBoolean("SocialActivity"));
         setSprinting(state.getBoolean("Sprinting"));
         try {
-            setLocomotionMode(com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.valueOf(
+            setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.valueOf(
                     state.getString("Locomotion")));
         } catch (IllegalArgumentException ignored) {
-            setLocomotionMode(com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.WALK);
+            setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.WALK);
         }
     }
     public String getRacialFormName() { RacialFormProfile form = getActiveRacialForm(); return form == null ? "" : form.displayName(); }
@@ -4583,7 +4619,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         setNoGravity(false);
         // Meditation owns a DMZ-native full-body movement state. Hand control back explicitly so
         // the next Meeting/Walk/ambient activity can never inherit a stale meditation/cross-leg clip.
-        setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+        setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
         setPose(Pose.STANDING);
         setAmbientPose(0);
         setDeltaMovement(getDeltaMovement().multiply(0.45D, 1.0D, 0.45D));
@@ -5012,7 +5048,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
             setInvulnerable(true);
             setStoryRole(STORY_CAPTIVE);
         }
-        setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
+        setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
         socialPlayerApproach = false;
         socialPowerDisplay = false;
         socialLifeActivity = false;
@@ -5659,75 +5695,12 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (fights <= 0 && legacyData.getInt("Fusions") <= 0 && getPlayerRivalBattles() <= 0) return "No major history yet";
         StringBuilder out = new StringBuilder();
         if (fights > 0) out.append(legacyData.getInt("Wins")).append(" wins / ").append(legacyData.getInt("Losses")).append(" losses");
-        if (legacyData.getInt("StrongestWinPower") > 0) out.append(" • best: ").append(legacyData.getString("StrongestWinName"))
+        if (legacyData.getInt("StrongestWinPower") > 0) out.append(" â€¢ best: ").append(legacyData.getString("StrongestWinName"))
                 .append(" (PL ").append(legacyData.getInt("StrongestWinPower")).append(')');
-        if (legacyData.getInt("Fusions") > 0) out.append(" • fusions ").append(legacyData.getInt("Fusions"));
-        if (getPlayerRivalBattles() > 0) out.append(" • rivalry ").append(getPlayerRivalBattles()).append(" fights");
-        if (legacyData.getBoolean("AntagonistRecognized")) out.append(" • antagonist ").append(legacyData.getString("AntagonistRole").toLowerCase(java.util.Locale.ROOT));
+        if (legacyData.getInt("Fusions") > 0) out.append(" â€¢ fusions ").append(legacyData.getInt("Fusions"));
+        if (getPlayerRivalBattles() > 0) out.append(" â€¢ rivalry ").append(getPlayerRivalBattles()).append(" fights");
+        if (legacyData.getBoolean("AntagonistRecognized")) out.append(" â€¢ antagonist ").append(legacyData.getString("AntagonistRole").toLowerCase(java.util.Locale.ROOT));
         return out.toString();
     }
 
-    /**
-     * Remove DBSagasEntity's default NearestAttackableTargetGoal wrappers while
-     * retaining HurtByTargetGoal and the rest of DMZ's native goal set.
-     * This is the proven 0.6.2 technique, narrowly scoped to target acquisition.
-     */
-    private void removeAutomaticHostilityGoals() {
-        try {
-            Class<?> type = getClass();
-            while (type != null) {
-                for (Field field : type.getDeclaredFields()) {
-                    if (!"net.minecraft.world.entity.ai.goal.GoalSelector".equals(field.getType().getName())) continue;
-                    field.setAccessible(true);
-                    Object selector = field.get(this);
-                    if (selector != null) removeNearestTargetWrappers(selector);
-                }
-                type = type.getSuperclass();
-            }
-        } catch (Throwable ignored) {
-            // If Forge/DMZ internals change, failing closed here is preferable to a crash.
-            // The debug status command makes unexpected hostility visible during testing.
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static void removeNearestTargetWrappers(Object selector) throws IllegalAccessException {
-        Class<?> type = selector.getClass();
-        while (type != null) {
-            for (Field field : type.getDeclaredFields()) {
-                field.setAccessible(true);
-                Object value;
-                try {
-                    value = field.get(selector);
-                } catch (Throwable ignored) {
-                    continue;
-                }
-                if (!(value instanceof Collection collection)) continue;
-                try {
-                    collection.removeIf(AmbientFighterEntity::wrapperContainsNearestTargetGoal);
-                } catch (UnsupportedOperationException ignored) {
-                }
-            }
-            type = type.getSuperclass();
-        }
-    }
-
-    private static boolean wrapperContainsNearestTargetGoal(Object wrapper) {
-        if (wrapper == null) return false;
-        if (wrapper.getClass().getName().contains("NearestAttackableTargetGoal")) return true;
-
-        Class<?> type = wrapper.getClass();
-        while (type != null) {
-            for (Field field : type.getDeclaredFields()) {
-                try {
-                    field.setAccessible(true);
-                    Object nested = field.get(wrapper);
-                    if (nested != null && nested.getClass().getName().contains("NearestAttackableTargetGoal")) return true;
-                } catch (Throwable ignored) {
-                }
-            }
-            type = type.getSuperclass();
-        }
-        return false;
-    }
 }

@@ -1,5 +1,6 @@
 package com.dmzlivingworld.client;
 
+import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterRace;
 import com.dmzlivingworld.world.WorldMenaceManager;
@@ -533,7 +534,7 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
      * while the fighter is otherwise idle enough for an emote to make sense.
      */
     private boolean applyStrongMoodPose(AmbientFighterEntity entity) {
-        if (entity.getTarget() != null || entity.isSocialPowerDisplay() || entity.isKaiokenActive() || entity.isFlying() || entity.isSprinting() || entity.getLocomotionMode() == com.dragonminez.common.init.entities.sagas.DBSagasEntity.LocomotionMode.RUN) return false;
+        if (entity.getTarget() != null || entity.isSocialPowerDisplay() || entity.isKaiokenActive() || entity.isFlying() || entity.isSprinting() || entity.getLocomotionMode() == com.dmzlivingworld.entity.combat.LivingWorldSagasEntity.LocomotionMode.RUN) return false;
         float strength = entity.getReactiveMoodStrength() / 100.0F;
         if (strength < 0.48F) return false;
 
@@ -988,3 +989,5 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
         return ResourceLocation.fromNamespaceAndPath("dmzlivingworld", path);
     }
 }
+
+
