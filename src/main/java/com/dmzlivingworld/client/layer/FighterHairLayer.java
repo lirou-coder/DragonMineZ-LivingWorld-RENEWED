@@ -2,7 +2,6 @@ package com.dmzlivingworld.client.layer;
 
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.world.WorldMenaceManager;
-import com.dmzlivingworld.world.SairensRaceCompat;
 import com.dragonminez.client.render.hair.HairRenderer;
 import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;

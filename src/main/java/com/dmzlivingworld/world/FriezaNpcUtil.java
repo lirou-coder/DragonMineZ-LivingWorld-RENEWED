@@ -18,7 +18,7 @@ public final class FriezaNpcUtil {
 
     public static Mob spawnSoldier(ServerLevel level, BlockPos pos, LivingEntity initialTarget,
                                    RandomSource random, String path, String... tags) {
-        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(new ResourceLocation("dragonminez", path));
+        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(ResourceLocation.fromNamespaceAndPath("dragonminez", path));
         if (type == null) return null;
         Entity entity = type.create(level);
         if (!(entity instanceof Mob mob)) return null;

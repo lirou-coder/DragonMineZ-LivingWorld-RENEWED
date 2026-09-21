@@ -1,5 +1,6 @@
 package com.dmzlivingworld.entity;
 
+import com.dmzlivingworld.compat.DmzRevampMobDefenseCompat;
 import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;
 import com.dragonminez.common.config.ConfigManager;
@@ -37,9 +38,7 @@ import com.dmzlivingworld.world.FighterInspectionManager;
 import com.dmzlivingworld.world.FighterIntentManager;
 import com.dmzlivingworld.world.FighterNpcSocialManager;
 import com.dmzlivingworld.world.FighterPromotionManager;
-import com.dmzlivingworld.world.FighterTechniqueManager;
 import com.dmzlivingworld.world.FactionManager;
-import com.dmzlivingworld.world.FactionRequestManager;
 import com.dmzlivingworld.world.FactionRole;
 import com.dmzlivingworld.world.FactionStructure;
 import com.dmzlivingworld.world.FactionWorldData;
@@ -49,7 +48,6 @@ import com.dmzlivingworld.world.WorldPowerScaler;
 import com.dmzlivingworld.world.WorldEraData;
 import com.dmzlivingworld.world.WorldEraProgression;
 import com.dmzlivingworld.world.FighterPowerStatScaler;
-import com.dmzlivingworld.world.BattlePowerFormula;
 import com.dmzlivingworld.world.NpcDefenseCalculator;
 import com.dmzlivingworld.world.NpcDefensePenetrationManager;
 import com.dmzlivingworld.world.NpcFormConfigBridge;
@@ -60,7 +58,6 @@ import com.dmzlivingworld.world.ReactiveWorldEventManager;
 import com.dmzlivingworld.world.ReactiveWorldManager;
 import com.dmzlivingworld.world.ReactiveMoodBehaviorManager;
 import com.dmzlivingworld.world.ReactiveInteractionManager;
-import com.dmzlivingworld.world.SparManager;
 import com.dmzlivingworld.world.LivingBondManager;
 import com.dmzlivingworld.world.MercyManager;
 import com.dmzlivingworld.world.PeacekeeperManager;
@@ -406,6 +403,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
 
     public AmbientFighterEntity(EntityType<? extends Monster> type, Level level) {
         super(type, level);
+        DmzRevampMobDefenseCompat.neutralize(this);
         setTransformationDisabled(true);
         setDBZStyle(0);
 
@@ -872,6 +870,10 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         } else if (!combatConfigured) {
             configureCombatProfile(false);
         }
+        // Overhaul attaches mob_defense to every non-player entity. Living World
+        // owns this fighter's defense, so keep the generic attribute inert for BP
+        // scans and damage mitigation even if another system rewrites its base.
+        if (tickCount == 1 || tickCount % 20 == 0) DmzRevampMobDefenseCompat.neutralize(this);
 
         // BP can be changed by encounters, factions, debug tools and compatibility modules.
         // Keep a cheap self-healing guard in addition to the explicit refresh API so no future
@@ -1275,7 +1277,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         double bestScore = Double.MAX_VALUE;
         for (Vec3 candidate : candidates) {
             BlockPos pos = BlockPos.containing(candidate);
-            if (!level().hasChunkAt(pos)) continue;
+            if (!level().hasChunk(pos.getX() >> 4, pos.getZ() >> 4)) continue;
             Vec3 move = candidate.subtract(position());
             Vec3 remaining = destination.subtract(position());
             // Never choose a fresh obstacle waypoint behind the fighter's current forward progress.
@@ -1503,7 +1505,8 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         away = away.normalize().scale(26.0D + getRandom().nextDouble() * 18.0D);
         Vec3 target = position().add(away).add(0.0D, 6.0D + getRandom().nextDouble() * 7.0D, 0.0D);
         BlockPos targetPos = BlockPos.containing(target);
-        if (!(level() instanceof ServerLevel serverLevel) || !serverLevel.hasChunkAt(targetPos)) return false;
+        if (!(level() instanceof ServerLevel serverLevel)
+                || !serverLevel.hasChunk(targetPos.getX() >> 4, targetPos.getZ() >> 4)) return false;
         CompoundTag data = getPersistentData();
         data.putBoolean("LWIdleFlightTravel", true);
         data.putBoolean("LWReactiveEscapeFlight", true);
@@ -3771,7 +3774,6 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (skillLevel <= 0 && getPersistentData().getBoolean(TEMPORARY_AWAKENING)
             && getRace() == FighterRace.BIO_ANDROID) skillLevel = 1;
         NpcFormConfigBridge.Form configured = NpcFormConfigBridge.form(getRace(), skillLevel);
-        RacialFormProfile form = NpcFormConfigBridge.profile(getRace(), skillLevel);
         if (configured == null || isRacialFormActive()) return;
         racialBasePower = getPermanentBattlePower();
         var attack = getAttribute(Attributes.ATTACK_DAMAGE);
@@ -4884,9 +4886,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (WorldMenaceManager.isHerobrine(this)) return;
         if (LWLang.isSpeechKey(text)) {
             if (com.dmzlwfusion.NpcFusionManager.isHiddenFusionPartner(this)) return;
-            entityData.set(SPEECH, text);
-            speechTicks = Math.max(20, ticks);
-            rememberDialogue(text);
+            acceptSpeech(text, ticks);
             return;
         }
         // Herobrine is entirely silent. Encounter notices belong to the player's UI/sound layer,
@@ -4899,9 +4899,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (clean.isBlank()) return;
         clean = DialogueLocalityManager.resolve(this, clean);
         if (clean == null || clean.isBlank()) return;
-        entityData.set(SPEECH, clean);
-        speechTicks = Math.max(20, ticks);
-        rememberDialogue(clean);
+        acceptSpeech(clean, ticks);
     }
 
     /** Sends a client-resolved dialogue key through the normal synchronized speech field. */
@@ -4909,26 +4907,36 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         if (level().isClientSide || key == null || key.isBlank()) return;
         if (WorldMenaceManager.isHerobrine(this)) return;
         if (com.dmzlwfusion.NpcFusionManager.isHiddenFusionPartner(this)) return;
-        String encoded = LWLang.speechKey(key);
-        entityData.set(SPEECH, encoded);
-        speechTicks = Math.max(20, ticks);
-        rememberDialogue(encoded);
+        acceptSpeech(LWLang.speechKey(key), ticks);
     }
 
     public void speakKey(String key, String fallback, int ticks, Object... arguments) {
         if (level().isClientSide || key == null || key.isBlank()) return;
         if (WorldMenaceManager.isHerobrine(this)) return;
         if (com.dmzlwfusion.NpcFusionManager.isHiddenFusionPartner(this)) return;
-        String encoded = LWLang.speechKey(key, fallback, arguments);
-        entityData.set(SPEECH, encoded);
-        speechTicks = Math.max(20, ticks);
-        rememberDialogue(encoded);
+        acceptSpeech(LWLang.speechKey(key, fallback, arguments), ticks);
     }
 
     public List<String> getDialogueHistory() { return List.copyOf(dialogueHistory); }
 
     /** User-facing dossier cleanup only; current speech and every other fighter memory remain intact. */
     public void clearDialogueHistory() { dialogueHistory.clear(); }
+
+    /**
+     * One central guard for every speech source. Comparing the encoded lang payload is
+     * intentional: the same key with different interpolation arguments is a different
+     * line, while two independent systems selecting the exact same result cannot make
+     * the fighter repeat it consecutively.
+     */
+    private void acceptSpeech(String text, int ticks) {
+        String clean = sanitizeDialogue(text);
+        if (clean.isBlank()) return;
+        if (!dialogueHistory.isEmpty()
+                && clean.equals(dialogueHistory.get(dialogueHistory.size() - 1))) return;
+        entityData.set(SPEECH, clean);
+        speechTicks = Math.max(20, ticks);
+        rememberDialogue(clean);
+    }
 
     private void rememberDialogue(String text) {
         if (text == null || text.isBlank()) return;
@@ -5682,7 +5690,7 @@ public final class AmbientFighterEntity extends DBSagasEntity {
         }
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings("unchecked")
     private static void removeNearestTargetWrappers(Object selector) throws IllegalAccessException {
         Class<?> type = selector.getClass();
         while (type != null) {

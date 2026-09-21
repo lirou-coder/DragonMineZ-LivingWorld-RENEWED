@@ -13,6 +13,7 @@ import java.lang.reflect.Method;
  * while the meditation carrier has the player mounted under training gravity. It calls DMZ's own DynamicGrowthService;
  * caps, disabled stats and server growth multipliers therefore remain authoritative.
  */
+@SuppressWarnings({"rawtypes", "unchecked"}) // Runtime enum type belongs to optional DMZ internals.
 public final class DMZGravityGrowthBridge {
     private static boolean attempted, available, logged;
     private static Capability<?> capability;

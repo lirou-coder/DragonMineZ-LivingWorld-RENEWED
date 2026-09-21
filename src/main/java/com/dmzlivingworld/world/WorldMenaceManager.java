@@ -38,6 +38,7 @@ import com.mojang.logging.LogUtils;
 
 /** Singleton recurring Herobrine easter-egg fighter and World Menace journal source. */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@SuppressWarnings("unused") // Session fields preserve compatibility across behavior revisions.
 public final class WorldMenaceManager {
     public static final String HEROBRINE_TAG = "LWWorldMenaceHerobrine";
     private static final int MIN_RETURN = 48_000; // 2 Minecraft days

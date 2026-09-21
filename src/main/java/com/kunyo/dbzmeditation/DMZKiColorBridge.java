@@ -24,6 +24,7 @@ import java.lang.reflect.Method;
  * Outline color remains a separate concern. It is NEVER allowed to replace
  * meditation ki/aura color.
  */
+@SuppressWarnings("unused")
 public final class DMZKiColorBridge {
     private static final float[] WHITE =
         new float[] {1.0F, 1.0F, 1.0F};

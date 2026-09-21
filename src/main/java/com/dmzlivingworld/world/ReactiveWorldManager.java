@@ -11,12 +11,12 @@ import net.minecraft.server.level.ServerLevel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 
 /**
  * Small persistent social state used by the Reactive World layer.
  * Temperament is stable; mood and recent social impressions change with circumstances.
  */
+@SuppressWarnings("unused")
 public final class ReactiveWorldManager {
     public static final String ROOT = "LWReactiveWorld";
     private static final String TEMPERAMENT = "Temperament";
@@ -254,6 +254,8 @@ public final class ReactiveWorldManager {
             case FISHING, EATING -> {
                 if (mood(fighter) == Mood.WEARY || mood(fighter) == Mood.IRRITATED) react(fighter, Mood.CONTENT, "taking a proper break", 600);
             }
+            // These activities currently have no mood consequence.
+            default -> { }
         }
     }
 

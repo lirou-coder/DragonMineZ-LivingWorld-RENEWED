@@ -13,7 +13,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 public final class LWNetwork {
         private static final String PROTOCOL = "38.5";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(LivingWorldMod.MOD_ID, "main"),
+            ResourceLocation.fromNamespaceAndPath(LivingWorldMod.MOD_ID, "main"),
             () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
     private static int nextId;
     private static boolean registered;

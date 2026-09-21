@@ -8,6 +8,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 
 /** Small, persistent combat growth earned from lived training and real NPC battles. */
+@SuppressWarnings("unused")
 public final class FighterBattleGrowthManager {
     private static final String GROWTH = "LWCombatGrowth";
     private static final String BATTLES = "LWCombatGrowthBattles";

@@ -1,7 +1,6 @@
 package com.dmzlivingworld.network;
 
 import com.dmzlivingworld.entity.AmbientFighterEntity;
-import net.minecraft.world.InteractionHand;
 import com.dmzlivingworld.world.FighterLifeJoinManager;
 import com.dmzlivingworld.world.LivingBondManager;
 import com.dmzlivingworld.world.FighterSocialManager;

@@ -1,6 +1,5 @@
 package com.dmzlivingworld.world;
 
-import com.dmzlivingworld.compat.MeditationCompat;
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.config.LivingWorldConfig;

@@ -27,6 +27,7 @@ import java.util.UUID;
  * without becoming a passive friendship farm.
  */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@SuppressWarnings("unused")
 public final class FighterPlayerSocialManager {
     private static final String NEXT = "LWNextPlayerSocial";
     private static final String NEXT_REMARK = "LWNextPlayerRemark";

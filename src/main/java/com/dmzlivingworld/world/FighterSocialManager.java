@@ -13,6 +13,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 /** Natural social contact: conversation introduces people, while shared experiences build real trust. */
+@SuppressWarnings("unused")
 public final class FighterSocialManager {
     private FighterSocialManager() {}
 

@@ -25,6 +25,7 @@ import java.util.UUID;
  * current local encounter, and revokes that mercy if the player kills one of their allies.
  */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@SuppressWarnings("unused")
 public final class MercyManager {
     private static final String PENDING_PLAYER = "LWMercyPendingPlayer";
     private static final String PENDING_AT = "LWMercyPendingAt";

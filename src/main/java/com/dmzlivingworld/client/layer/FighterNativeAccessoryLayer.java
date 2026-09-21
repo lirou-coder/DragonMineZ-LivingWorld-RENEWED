@@ -3,7 +3,6 @@ package com.dmzlivingworld.client.layer;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.FighterSpecialItemManager;
-import com.dmzlivingworld.world.FighterAfterlifeManager;
 import com.dragonminez.client.render.util.ModRenderTypes;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -225,6 +224,6 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
     }
 
     private static ResourceLocation dmz(String path) {
-        return new ResourceLocation("dragonminez", path);
+        return ResourceLocation.fromNamespaceAndPath("dragonminez", path);
     }
 }

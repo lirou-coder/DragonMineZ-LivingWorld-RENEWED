@@ -3,7 +3,6 @@ package com.dmzlivingworld.world;
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dragonminez.common.init.entities.ki.AbstractKiProjectile;
-import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
 import com.dragonminez.common.stats.StatsCapability;
 import com.dragonminez.common.stats.StatsProvider;
 import net.minecraft.world.entity.Entity;

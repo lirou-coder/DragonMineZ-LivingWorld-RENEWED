@@ -24,30 +24,27 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
-import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.joml.Vector3f;
 
+@SuppressWarnings({"unused", "removal"}) // Reflection/render helpers and Forge 1.20 context API.
 public final class DBZMeditation {
     public static final String MODID = "dbzmeditation";
     /** Forge owner mod id; assets/legacy NBT retain the historic dbzmeditation namespace. */
@@ -174,12 +171,14 @@ public final class DBZMeditation {
      * entire system can be tuned in one place.
      */
     private static final double KI_VISUAL_Y_LIFT = 0.82D;
-    private static boolean initialized;
+    private static final java.util.concurrent.atomic.AtomicBoolean INITIALIZED =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     /** Initializes the former standalone meditation module inside Living World. */
-    public static synchronized void init(IEventBus modEventBus) {
-        if (initialized) return;
-        initialized = true;
+    public static void init(IEventBus modEventBus) {
+        // Never hold DBZMeditation's class monitor while Forge is discovering event
+        // handlers on parallel construction threads. Atomic idempotence is sufficient.
+        if (!INITIALIZED.compareAndSet(false, true)) return;
         ModLoadingContext.get().registerConfig(
             ModConfig.Type.SERVER, MeditationConfig.SERVER_SPEC, "dmzlivingworld-meditation-server.toml"
         );
@@ -2171,7 +2170,7 @@ public final class DBZMeditation {
             player.getServer()
                 .getAdvancements()
                 .getAdvancement(
-                    new ResourceLocation(MODID, id)
+                    ResourceLocation.fromNamespaceAndPath(MODID, id)
                 );
 
         if (advancement == null) {

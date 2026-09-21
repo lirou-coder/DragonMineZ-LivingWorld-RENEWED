@@ -27,11 +27,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /** Context-aware, paced NPC-to-NPC conversations for the Reactive World layer. */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@SuppressWarnings("unused")
 public final class FighterNpcSocialManager {
     private static final String SOCIAL_ID = "NpcSocialIdentity";
     private static final String BONDS = "NpcSocialBonds";

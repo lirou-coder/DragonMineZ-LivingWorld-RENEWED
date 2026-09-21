@@ -32,6 +32,7 @@ import java.util.UUID;
  * scientist's current permanent development rather than staying at saga-default strength forever.
  */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@SuppressWarnings("removal") // DMZ's 1.20 entity API still exposes this spawn initializer.
 public final class FighterScientistManager {
     private static final String ROLLED = "LWScientistRollV1";
     private static final String SCIENTIST = "LWScientist";
@@ -590,7 +591,6 @@ public final class FighterScientistManager {
     }
 
 
-    @SuppressWarnings("unchecked")
     private static EntityType<? extends SagaSaibamanEntity> nativeSaibamanType(int index) {
         return switch (Math.max(0, Math.min(5, index))) {
             case 0 -> MainEntities.SAGA_SAIBAMAN.get();

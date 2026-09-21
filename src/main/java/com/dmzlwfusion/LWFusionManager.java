@@ -39,6 +39,7 @@ import java.util.UUID;
  * that DMZ's FusionLogic writes for player-player fusion. The only custom part
  * is representing the NPC partner while the fusion is active.
  */
+@SuppressWarnings("unused")
 public final class LWFusionManager {
     private static final String ROOT = "DMZLWFusionBridge";
     private static final String DEBUG_ROOT = "DMZLWFusionDebug";

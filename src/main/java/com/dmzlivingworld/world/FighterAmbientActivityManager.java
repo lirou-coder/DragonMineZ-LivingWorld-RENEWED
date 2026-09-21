@@ -12,7 +12,7 @@ import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -35,7 +35,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.GameRules;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
@@ -43,6 +42,7 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -60,6 +60,7 @@ import java.util.UUID;
  * persisted as fighter equipment.
  */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@SuppressWarnings("unused") // Alternate activity helpers remain available to configured routines.
 public final class FighterAmbientActivityManager {
     private static final String TEMP_ITEM = "LWTemporaryActivityItem";
     private static final String TEMP_ITEM_VERSION = "LWTemporaryActivityItemVersion";
@@ -664,7 +665,6 @@ public final class FighterAmbientActivityManager {
                 fighter.setPose(Pose.STANDING);
                 long cycle = session.kiVariant == 0 ? 140L : 360L;
                 long phase = Math.floorMod(now - session.started, cycle);
-                boolean charging = session.kiVariant == 0 ? phase < 95L : phase < 330L;
                 fighter.setAmbientPose(session.kiVariant == 0 ? 23 : 24);
                 fighter.setLocomotionMode(DBSagasEntity.LocomotionMode.IDLE);
                 fighter.setSprinting(false);
@@ -1100,7 +1100,7 @@ public final class FighterAmbientActivityManager {
         if (entity instanceof AgeableMob ageable && ageable.isBaby()) return false;
         if (entity instanceof Cow || entity instanceof Pig || entity instanceof Chicken
                 || entity instanceof Sheep || entity instanceof Rabbit) return true;
-        var id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        var id = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
         if (id == null || !"dragonminez".equals(id.getNamespace())) return false;
         String path = id.getPath().toLowerCase(Locale.ROOT);
         if (path.contains("baby")) return false;
@@ -1123,7 +1123,7 @@ public final class FighterAmbientActivityManager {
 
     private static boolean isMeatLike(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
-        var id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        var id = ForgeRegistries.ITEMS.getKey(stack.getItem());
         if (id == null) return false;
         String path = id.getPath().toLowerCase(Locale.ROOT);
         return path.contains("beef") || path.contains("pork") || path.contains("chicken")
@@ -1291,7 +1291,7 @@ public final class FighterAmbientActivityManager {
                     current.y + fighter.getRandom().nextDouble() * 28.0D - 12.0D));
             BlockPos targetBlock = BlockPos.containing(x, y, z);
             // Never force-load a chunk merely for leisure flight.
-            if (level.hasChunkAt(targetBlock)) return new Vec3(x, y, z);
+            if (level.hasChunk(targetBlock.getX() >> 4, targetBlock.getZ() >> 4)) return new Vec3(x, y, z);
         }
         double fallbackY = Math.min(level.getMaxBuildHeight() - 10.0D,
                 Math.max(level.getMinBuildHeight() + 6.0D, Math.max(current.y, anchor.y + 10.0D)));
@@ -2162,7 +2162,8 @@ public final class FighterAmbientActivityManager {
 
     private static String friendlyBlockName(BlockState state) {
         if (state == null || state.isAir()) return "flower";
-        String path = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+        ResourceLocation blockId = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        String path = blockId == null ? "" : blockId.getPath();
         if (path == null || path.isBlank()) return "flower";
         String[] parts = path.replace('_', ' ').split(" ");
         StringBuilder out = new StringBuilder();

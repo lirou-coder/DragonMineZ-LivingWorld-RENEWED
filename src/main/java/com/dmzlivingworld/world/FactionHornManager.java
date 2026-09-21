@@ -84,7 +84,7 @@ public final class FactionHornManager {
         leader.startUsingItem(InteractionHand.OFF_HAND);
         leader.setAmbientPose(6);
         leader.getPersistentData().putLong(USE_END, now + 30L);
-        SoundEvent horn = ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("minecraft", "item.goat_horn.sound.0"));
+        SoundEvent horn = ForgeRegistries.SOUND_EVENTS.getValue(ResourceLocation.fromNamespaceAndPath("minecraft", "item.goat_horn.sound.0"));
         if (horn != null) leader.level().playSound(null, leader.blockPosition(), horn, SoundSource.NEUTRAL, 1.7F, 0.94F + leader.getRandom().nextFloat() * 0.10F);
         leader.flareAura(75);
         leader.speak(desperate ? rallyLine(leader, true) : rallyLine(leader, false), 72);

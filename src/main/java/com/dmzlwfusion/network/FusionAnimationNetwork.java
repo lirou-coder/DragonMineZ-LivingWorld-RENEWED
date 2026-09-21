@@ -10,7 +10,7 @@ public final class FusionAnimationNetwork {
     private static final String PROTOCOL = "1";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(com.dmzlivingworld.LivingWorldMod.MOD_ID, "fusion_animation"),
+            ResourceLocation.fromNamespaceAndPath(com.dmzlivingworld.LivingWorldMod.MOD_ID, "fusion_animation"),
             () -> PROTOCOL,
             PROTOCOL::equals,
             PROTOCOL::equals

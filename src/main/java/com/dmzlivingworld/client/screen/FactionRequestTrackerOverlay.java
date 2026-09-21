@@ -20,6 +20,7 @@ import net.minecraftforge.fml.common.Mod;
  * so navigation never says "HERE" while the mission still expects hidden movement or waiting.
  */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
+@SuppressWarnings("unused")
 public final class FactionRequestTrackerOverlay {
     private static volatile FactionRequestTrackerPacket current = FactionRequestTrackerPacket.clear();
     private static volatile String cachedLiveProgress = "";

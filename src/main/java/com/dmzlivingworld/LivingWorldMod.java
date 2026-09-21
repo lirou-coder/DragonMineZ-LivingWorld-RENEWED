@@ -24,6 +24,7 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
  * personality/power-aware decisions and the older Frieza hunt loop.
  */
 @Mod(LivingWorldMod.MOD_ID)
+@SuppressWarnings("removal")
 public final class LivingWorldMod {
     public static final String MOD_ID = "dmzlivingworld";
 
@@ -39,11 +40,13 @@ public final class LivingWorldMod {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> {
-            LWNetwork.register();
-            FusionAnimationNetwork.register();
-            DBZMeditation.commonSetup();
-        });
+        // These calls only register SimpleChannel messages. Keeping them inside an
+        // enqueueWork future makes Forge's parallel mod-gather barrier wait for work
+        // which does not require the main thread and used to be able to deadlock with
+        // class/event-bus initialization. Register them directly during common setup.
+        LWNetwork.register();
+        FusionAnimationNetwork.register();
+        DBZMeditation.commonSetup();
     }
 
     private void registerAttributes(EntityAttributeCreationEvent event) {

@@ -10,7 +10,6 @@ import net.minecraft.world.entity.Entity;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Presentation-only consciousness layer. It never owns combat, routine, travel, meditation or a
@@ -210,7 +209,8 @@ public final class FighterLivelinessManager {
         long now = level.getGameTime();
         if (!d.contains(IDLE_ANCHOR) || now >= d.getLong(IDLE_ANCHOR_UNTIL)) return null;
         BlockPos anchor = BlockPos.of(d.getLong(IDLE_ANCHOR));
-        if (anchor.distSqr(fighter.blockPosition()) > 48.0D * 48.0D || !level.hasChunkAt(anchor)) return null;
+        if (anchor.distSqr(fighter.blockPosition()) > 48.0D * 48.0D
+                || !level.hasChunk(anchor.getX() >> 4, anchor.getZ() >> 4)) return null;
         return anchor;
     }
 
@@ -234,7 +234,8 @@ public final class FighterLivelinessManager {
         CompoundTag favorites = d.getCompound(FAVORITES);
         if (!favorites.contains(type.name())) return null;
         BlockPos remembered = BlockPos.of(favorites.getLong(type.name()));
-        if (remembered.distSqr(fighter.blockPosition()) > 64.0D * 64.0D || !level.hasChunkAt(remembered)) return null;
+        if (remembered.distSqr(fighter.blockPosition()) > 64.0D * 64.0D
+                || !level.hasChunk(remembered.getX() >> 4, remembered.getZ() >> 4)) return null;
         return AmbientFighterSpawner.findSafeGroundAround(level, remembered, fighter.getRandom(), 0, 3, 8);
     }
 }

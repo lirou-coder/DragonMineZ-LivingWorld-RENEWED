@@ -3,7 +3,7 @@ package com.dmzlivingworld.client.screen;
 import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.network.SupplyItemSnapshot;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -77,8 +77,8 @@ final class SupplyInventoryClient {
     private static Item resolve(String id) {
         if (id == null || id.isBlank()) return Items.AIR;
         try {
-            ResourceLocation key = new ResourceLocation(id);
-            return BuiltInRegistries.ITEM.get(key);
+            ResourceLocation key = ResourceLocation.parse(id);
+            return ForgeRegistries.ITEMS.getValue(key);
         } catch (RuntimeException ignored) {
             return Items.AIR;
         }

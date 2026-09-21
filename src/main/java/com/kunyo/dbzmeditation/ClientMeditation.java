@@ -34,24 +34,25 @@ import java.util.Set;
     value = Dist.CLIENT,
     bus = Mod.EventBusSubscriber.Bus.MOD
 )
+@SuppressWarnings("unused") // Several render hooks are invoked by Forge/mixin integration.
 public final class ClientMeditation {
     private static final ResourceLocation ANIME_KI_MOTE_TEXTURE =
-        new ResourceLocation(
+        ResourceLocation.fromNamespaceAndPath(
             DBZMeditation.MODID,
             "textures/particle/anime_ki_mote.png"
         );
     private static final ResourceLocation ANIME_KI_WISP_TEXTURE =
-        new ResourceLocation(
+        ResourceLocation.fromNamespaceAndPath(
             DBZMeditation.MODID,
             "textures/particle/anime_ki_wisp.png"
         );
     private static final ResourceLocation ANIME_GROUND_FLARE_TEXTURE =
-        new ResourceLocation(
+        ResourceLocation.fromNamespaceAndPath(
             DBZMeditation.MODID,
             "textures/particle/anime_ground_flare.png"
         );
     private static final ResourceLocation KI_GLOW_TEXTURE =
-        new ResourceLocation(
+        ResourceLocation.fromNamespaceAndPath(
             DBZMeditation.MODID,
             "textures/particle/ki_glow.png"
         );

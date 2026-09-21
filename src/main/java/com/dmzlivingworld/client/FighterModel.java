@@ -4,7 +4,6 @@ import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterRace;
 import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.SairensRaceCompat;
-import com.dragonminez.common.config.ConfigManager;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
 import software.bernie.geckolib.constant.DataTickets;
@@ -47,13 +46,11 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
     private static final Map<AmbientFighterEntity, Integer> NAP_POSE_ENTER = new WeakHashMap<>();
     private static final Map<AmbientFighterEntity, Integer> KI_TRAIN_POSE_ENTER = new WeakHashMap<>();
     private static final ResourceLocation HEROBRINE = lw("geo/entity/herobrine.geo.json");
-    private static final ResourceLocation HEROBRINE_TEXTURE = new ResourceLocation("minecraft", "textures/entity/player/wide/steve.png");
+    private static final ResourceLocation HEROBRINE_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/player/wide/steve.png");
     private static final ResourceLocation HUMAN = dmz("geo/entity/races/human.geo.json");
-    private static final ResourceLocation HUMAN_SLIM = dmz("geo/entity/races/human_slim.geo.json");
     // DragonMineZ's actual female/buffed Human-Saiyan geometry contains the native
     // "boobas" chest bone. human_slim.geo.json is only a slim-arm model and does
     // not contain the female chest geometry, which made LW women read as slim men.
-    private static final ResourceLocation HUMAN_FEMALE = dmz("geo/entity/races/hbuffed_fem.geo.json");
     private static final ResourceLocation FROST = dmz("geo/entity/races/frostdemon.geo.json");
     private static final ResourceLocation MAJIN = dmz("geo/entity/races/majin.geo.json");
     private static final ResourceLocation MAJIN_SLIM = dmz("geo/entity/races/majin_slim.geo.json");
@@ -984,10 +981,10 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
     }
 
     private static ResourceLocation dmz(String path) {
-        return new ResourceLocation("dragonminez", path);
+        return ResourceLocation.fromNamespaceAndPath("dragonminez", path);
     }
 
     private static ResourceLocation lw(String path) {
-        return new ResourceLocation("dmzlivingworld", path);
+        return ResourceLocation.fromNamespaceAndPath("dmzlivingworld", path);
     }
 }

@@ -17,6 +17,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 
 /** Responsive integrated editor for Living World + Meditation + client readability. */
 @OnlyIn(Dist.CLIENT)
+@SuppressWarnings("unused")
 public final class WorldSettingsScreen extends Screen implements LivingWorldScreenMarker {
     private static final int[] FIGHTER_CAPS = {0, 8, 12, 20, 30, 40, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096};
     private static final int[] HOSTILE_CAPS = {0, 2, 4, 6, 8, 10, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096};
@@ -59,7 +60,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
 
     // Meditation client values
     private boolean medHud, medSummary, medNativeAnimation, medFocusSeal, medFirstPersonAura, medStageFx, medNpcFx;
-    private int medSummarySeconds, medHudOffset, medAuraIntensity, medSealIntensity, medSealSize;
+    private int medHudOffset, medAuraIntensity, medSealIntensity, medSealSize;
 
     private int panelLeft, panelTop, panelWidth, panelHeight, contentTop, footerY, rowHeight;
     private String status = "";
@@ -150,7 +151,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     }
 
     private void loadMeditationClient(MeditationConfig.ClientSnapshot v) {
-        medHud=v.focusHud(); medSummary=v.sessionSummary(); medSummarySeconds=v.sessionSummarySeconds();
+        medHud=v.focusHud(); medSummary=v.sessionSummary();
         medNativeAnimation=v.nativeAnimation(); medHudOffset=v.hudTopOffset(); medAuraIntensity=v.auraIntensityPercent();
         medFocusSeal=v.focusSealEnabled(); medSealIntensity=v.focusSealIntensityPercent(); medSealSize=v.focusSealRadiusPercent();
         medFirstPersonAura=v.firstPersonAura(); medStageFx=v.stageTransitionEffects(); medNpcFx=v.npcMeditationEffects();

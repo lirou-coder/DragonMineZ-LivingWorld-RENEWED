@@ -27,7 +27,6 @@ import com.dmzlivingworld.world.FighterDailyRoutineManager;
 import com.dmzlivingworld.world.FighterNpcSocialManager;
 import com.dmzlivingworld.world.FighterLifeJoinManager;
 import com.dmzlivingworld.world.FighterInspectionManager;
-import com.dmzlivingworld.world.FighterInstantTransmissionManager;
 import com.dmzlivingworld.world.FighterPowerCompareManager;
 import com.dmzlivingworld.world.FighterPowerSpikeReactionManager;
 import com.dmzlivingworld.world.FighterPracticeSparManager;
@@ -46,14 +45,12 @@ import com.dmzlivingworld.world.PlayerWorldManager;
 import com.dmzlivingworld.world.LivingBondManager;
 import com.dmzlivingworld.world.FactionRequestManager;
 import com.dmzlivingworld.world.PrisonerWorldData;
-import com.dmzlivingworld.compat.MeditationCompat;
 import com.dmzlivingworld.world.FactionEncounterManager;
 import com.dmzlivingworld.world.FactionRealm;
 import com.dmzlivingworld.world.LivingWorldDimensions;
 import com.dmzlivingworld.world.FactionRole;
 import com.dmzlivingworld.world.FactionManager;
 import com.dmzlivingworld.world.FactionWorldData;
-import com.dmzlivingworld.world.FactionActivityRegistry;
 import com.dmzlivingworld.world.PeacekeeperManager;
 import com.dmzlivingworld.world.WorldFaction;
 import com.dmzlivingworld.world.WantedManager;
@@ -61,7 +58,6 @@ import com.dmzlivingworld.world.WantedWorldData;
 import com.dmzlivingworld.world.WorldMenaceData;
 import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.RedRibbonExperimentManager;
-import com.dmzlivingworld.world.RedRibbonExperimentData;
 import com.dmzlivingworld.world.NpcPlayerDamageManager;
 import com.dmzlivingworld.world.SairensRaceCompat;
 import com.dmzlivingworld.world.ReactiveWorldManager;
@@ -480,7 +476,6 @@ public final class LivingWorldCommands {
         }
 
         if (herobrineKnown) {
-            WorldMenaceData data = WorldMenaceData.get(player.serverLevel());
             java.util.UUID menaceId = WorldMenaceManager.dossierRecordId();
             lines.add("@person:" + menaceId + "|!! " + dossierText("menace.entry", "%s  •  WORLD MENACE  •  %s",
                     "Herobrine", WorldMenaceManager.status(player)));
@@ -1532,7 +1527,7 @@ public final class LivingWorldCommands {
     }
 
     private static int bondClearCompanion(ServerPlayer player) {
-        LivingBondManager.clearCompanion(player);
+        if (!LivingBondManager.clearCompanion(player)) return 0;
         player.displayClientMessage(Component.literal("[Living World] You are no longer travelling with that companion.").withStyle(ChatFormatting.GRAY), false);
         return Command.SINGLE_SUCCESS;
     }

@@ -146,7 +146,7 @@ public final class FighterIsolatedHeldItemLayer extends GeoRenderLayer<AmbientFi
     }
 
     private static ResourceLocation dmz(String path) {
-        return new ResourceLocation("dragonminez", path);
+        return ResourceLocation.fromNamespaceAndPath("dragonminez", path);
     }
 
     /**

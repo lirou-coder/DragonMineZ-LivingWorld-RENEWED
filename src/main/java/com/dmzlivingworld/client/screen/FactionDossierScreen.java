@@ -43,7 +43,6 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
     private int panelWidth;
     private int panelHeight;
     private int navWidth;
-    private int peopleRefreshTicks;
 
     private record VisualLine(FormattedCharSequence text, String rawText, int color, int gapBefore, int factionSlot, UUID personRecordId, String clearAction, boolean heading, boolean fallen) {}
     private record MemberBlock(List<FormattedCharSequence> lines, String rawText, int color, int gapBefore, boolean heading) {}
@@ -77,7 +76,6 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
         this.actionTarget = packet.actionTarget();
         this.rawLines = packet.lines();
         this.portraitSnapshots = packet.portraits();
-        this.peopleRefreshTicks = 0;
         if (minecraft != null && width > 0 && height > 0) {
             if (portraitsChanged) buildPortraitEntities();
             if (linesChanged) rebuildLines();

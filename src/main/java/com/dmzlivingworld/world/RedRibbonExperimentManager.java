@@ -17,7 +17,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -35,6 +34,7 @@ import java.util.UUID;
  * rules only remove social ownership/People/IT and give it a unique engineered growth curve.
  */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@SuppressWarnings("removal") // DMZ's 1.20 entity API still exposes this spawn initializer.
 public final class RedRibbonExperimentManager {
     public static final String TAG = "LWWorldMenaceRedRibbonExperiment";
     private static final String PLAYER_SPOTTED = "LWRRExperimentSpotted";
@@ -422,7 +422,7 @@ public final class RedRibbonExperimentManager {
 
     private static boolean spawnRedRibbonSoldier(ServerLevel level, AmbientFighterEntity experiment,
                                                   net.minecraft.world.entity.LivingEntity target, int salt) {
-        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(new ResourceLocation("dragonminez", "red_ribbon_soldier"));
+        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(ResourceLocation.fromNamespaceAndPath("dragonminez", "red_ribbon_soldier"));
         if (type == null) return false;
         Entity raw = type.create(level); if (!(raw instanceof Mob soldier)) return false;
         double angle = (Math.PI * 2.0D / 4.0D) * salt + experiment.getRandom().nextDouble() * 0.7D;
@@ -458,7 +458,7 @@ public final class RedRibbonExperimentManager {
             AmbientFighterEntity loaded = findLoaded(server, data.entityId());
             if (loaded != null) { enforceIdentity(loaded); return; }
             BlockPos last = BlockPos.containing(data.x(), data.y(), data.z());
-            if (level.hasChunkAt(last)) {
+            if (level.hasChunk(last.getX() >> 4, last.getZ() >> 4)) {
                 // If the recorded chunk is already loaded and the exact singleton is absent, recover the logical body.
                 ServerPlayer anchor = closestPlayer(level, last);
                 if (anchor != null) spawn(level, anchor, data, false);

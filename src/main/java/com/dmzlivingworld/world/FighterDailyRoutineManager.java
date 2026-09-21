@@ -28,6 +28,7 @@ import java.util.UUID;
  * interrupt it. Plans are stable for the whole Minecraft day and use only small deterministic
  * variation after personality/goals/hobbies/relevance have done the real decision-making.
  */
+@SuppressWarnings("unused")
 public final class FighterDailyRoutineManager {
     private static String routineText(String key, String fallback, Object... args) {
         return LWLang.speechKey("profile.routine." + key, fallback, args);

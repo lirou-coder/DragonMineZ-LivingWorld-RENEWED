@@ -14,7 +14,6 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -22,7 +21,6 @@ import net.minecraftforge.fml.common.Mod;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -889,7 +887,7 @@ public final class FighterMemoryManager {
      * the medium relevance profile can only change how productive/frequent that earned training is.
      */
     public static void tickPersistentLives(ServerPlayer player, long now) {
-        if (player == null || !(player.level() instanceof ServerLevel level)) return;
+        if (player == null) return;
         CompoundTag root = getRoot(player);
         ListTag list = root.getList(RIVALS_KEY, Tag.TAG_COMPOUND);
         boolean changed = false;

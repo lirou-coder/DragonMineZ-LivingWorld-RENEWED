@@ -12,6 +12,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 
 /** A custom anime ki sigil that follows a curved diagonal meditation path. */
+@SuppressWarnings("unused")
 public final class MeditationGlyphParticle extends TextureSheetParticle {
     private final SpriteSet sprites;
     private final Vec3 start;

@@ -348,7 +348,7 @@ public final class AmbientFighterSpawner {
             int z = Mth.floor(center.getZ() + 0.5D + Math.sin(angle) * distance);
 
             BlockPos rough = new BlockPos(x, center.getY(), z);
-            if (!level.hasChunkAt(rough)) continue;
+            if (!level.hasChunk(rough.getX() >> 4, rough.getZ() >> 4)) continue;
 
             int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
             BlockPos spawnPos = new BlockPos(x, y, z);
@@ -368,7 +368,7 @@ public final class AmbientFighterSpawner {
             int x = Mth.floor(center.getX() + 0.5D + Math.cos(angle) * distance);
             int z = Mth.floor(center.getZ() + 0.5D + Math.sin(angle) * distance);
             BlockPos rough = new BlockPos(x, center.getY(), z);
-            if (!level.hasChunkAt(rough)) continue;
+            if (!level.hasChunk(rough.getX() >> 4, rough.getZ() >> 4)) continue;
             int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
             BlockPos spawnPos = new BlockPos(x, y, z);
             if (!level.getWorldBorder().isWithinBounds(spawnPos) || !isUsableGround(level, spawnPos)) continue;

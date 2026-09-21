@@ -13,6 +13,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 import java.util.Comparator;
 
 /** Water safety, slow recovery, simple unsticking and sparse reactions to ordinary Minecraft life. */
+@SuppressWarnings("removal") // Forge 1.20 fluid-eye query retained for exact gameplay semantics.
 public final class FighterEnvironmentManager {
     private FighterEnvironmentManager() {}
 

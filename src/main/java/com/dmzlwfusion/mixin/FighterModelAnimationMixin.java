@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(targets = "com.dmzlivingworld.client.FighterModel", remap = false)
 public abstract class FighterModelAnimationMixin {
     private static final ResourceLocation LWFUSION_ANIMS =
-            new ResourceLocation(com.dmzlivingworld.LivingWorldMod.MOD_ID, "animations/entity/lw_fusion.animation.json");
+            ResourceLocation.fromNamespaceAndPath(com.dmzlivingworld.LivingWorldMod.MOD_ID, "animations/entity/lw_fusion.animation.json");
 
     @Inject(
             method = "getAnimationResource(Lcom/dmzlivingworld/entity/AmbientFighterEntity;)Lnet/minecraft/resources/ResourceLocation;",

@@ -32,6 +32,7 @@ import java.util.Locale;
  * get a richer, personal screen with live model, relationship, equipment, story and combat tabs.
  */
 @OnlyIn(Dist.CLIENT)
+@SuppressWarnings("unused")
 public final class FighterProfileScreen extends Screen implements LivingWorldScreenMarker {
     private enum Tab { OVERVIEW("overview", "Overview"), STORY("story", "Story"), COMBAT("combat", "Combat"), SCIENCE("science", "Science"), MESSAGES("messages", "Messages");
         private final String key;
@@ -632,7 +633,6 @@ public final class FighterProfileScreen extends Screen implements LivingWorldScr
                 : new String[]{LWLang.string("screen.fighter.action.talk", "Talk"), LWLang.string("screen.fighter.action.spar", "Spar"), LWLang.string("screen.fighter.action.go_along", "Go Along"), profile.travellingCompanion() ? LWLang.string("screen.fighter.action.let_go", "Let go") : LWLang.string("screen.fighter.action.come_along", "Come Along"), LWLang.string("screen.fighter.action.fusion", "Fusion"), LWLang.string("screen.fighter.action.meditate", "Meditate"), LWLang.string("screen.fighter.action.full_power", "Go Full Power")};
         int gap = 5;
         int cols = twoRowLiveFooter() ? (actions.length > 6 ? 4 : 3) : actions.length;
-        int rows = (actions.length + cols - 1) / cols;
         int startX = panelLeft + 12;
         int available = panelWidth - 24 - gap * (cols - 1);
         int actionWidth = Math.max(24, available / cols);

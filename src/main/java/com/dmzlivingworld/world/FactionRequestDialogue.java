@@ -5,6 +5,7 @@ import com.dmzlivingworld.client.LWLang;
 import java.util.Locale;
 
 /** Mission-specific dialogue pools for faction requests. */
+@SuppressWarnings("unused")
 public final class FactionRequestDialogue {
     private FactionRequestDialogue() {}
 

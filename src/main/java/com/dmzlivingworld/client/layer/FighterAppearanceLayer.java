@@ -5,7 +5,6 @@ import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.RedRibbonExperimentManager;
 import com.dmzlivingworld.world.SairensRaceCompat;
 import com.dragonminez.client.util.ColorUtils;
-import com.dragonminez.common.config.ConfigManager;
 import com.dragonminez.client.render.util.ModRenderTypes;
 import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;
@@ -14,7 +13,6 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.EquipmentSlot;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
 import software.bernie.geckolib.renderer.GeoRenderer;
 import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
@@ -350,7 +348,7 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
     }
 
     private static float[] rgb(String hex) { return ColorUtils.hexToRgb(hex); }
-    private static ResourceLocation dmz(String path) { return new ResourceLocation("dragonminez", path); }
+    private static ResourceLocation dmz(String path) { return ResourceLocation.fromNamespaceAndPath("dragonminez", path); }
     private static ResourceLocation majinFace(String file) {
         return dmz("textures/entity/races/majin/faces/" + file);
     }

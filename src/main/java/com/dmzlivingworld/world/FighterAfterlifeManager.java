@@ -328,6 +328,14 @@ public final class FighterAfterlifeManager {
                 && dmzPlusHellEnabled();
     }
 
+    /** True when a dead-soul projection is standing in the afterlife assigned to it. */
+    public static boolean isProperAfterlifeDimension(AmbientFighterEntity fighter) {
+        if (fighter == null || !fighter.isDeadSoul()) return false;
+        ResourceKey<Level> dimension = fighter.level().dimension();
+        if (dimension.equals(OTHERWORLD)) return fighter.getAlignment() == FighterAlignment.GOOD;
+        return canUseNetherHell(fighter, dimension);
+    }
+
     private static Method dmzPlusHellMethod() {
         if (!dmzPlusHellLookupComplete) {
             synchronized (FighterAfterlifeManager.class) {

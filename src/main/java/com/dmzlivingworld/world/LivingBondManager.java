@@ -53,6 +53,7 @@ import com.mojang.logging.LogUtils;
  * self-preservation/faction loyalties while supporting genuine threats.
  */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@SuppressWarnings("unused") // Navigation fallbacks are kept for optional pathing branches.
 public final class LivingBondManager {
     private static final String ROOT = "DMZLivingWorldBonds";
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -460,6 +461,8 @@ public final class LivingBondManager {
 
         if (!companion.isAlive()) { removeCompanion(player, companion); return; }
         if (!companion.level().dimension().equals(player.level().dimension())) {
+            // Dead-soul projections are tied to their assigned afterlife and cannot travel.
+            if (companion.isDeadSoul()) return;
             if (!companionDimensionBlocked(level)) {
                 CompoundTag profile = companion.writeMemoryProfile();
                 companion.discard();
@@ -553,6 +556,7 @@ public final class LivingBondManager {
             AmbientFighterEntity companion = findLoadedCompanion(player, ids.get(index));
             if (companion == null || !companion.isAlive()) continue;
             if (!companion.level().dimension().equals(level.dimension())) {
+                if (companion.isDeadSoul()) continue;
                 if (companionDimensionBlocked(level)) continue;
                 CompoundTag profile = companion.writeMemoryProfile();
                 companion.discard();
@@ -798,7 +802,7 @@ public final class LivingBondManager {
         AmbientFighterEntity companion = findLoadedCompanion(player, id);
         if (recordId != null && FighterLegacyWorldData.get(targetLevel).isDeadRecord(recordId)) {
             if (companion != null) companion.discard();
-            clearCompanion(player);
+            clearCompanionInternal(player);
             return null;
         }
 
@@ -977,7 +981,7 @@ public final class LivingBondManager {
         }
 
         var type = ForgeRegistries.ENTITY_TYPES.getValue(
-                new ResourceLocation("dragonminez", "red_ribbon_soldier"));
+                ResourceLocation.fromNamespaceAndPath("dragonminez", "red_ribbon_soldier"));
         if (type == null) {
             player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
                     "dmzlivingworld.message.debug.red_ribbon_missing"), false);
@@ -1019,8 +1023,9 @@ public final class LivingBondManager {
 
     /** Player-facing Come Along request. Friendship helps, but fighters can still be busy or decline. */
     public static boolean requestCompanion(ServerPlayer player, AmbientFighterEntity npc) {
-        if (player == null || npc == null || !(player.level() instanceof ServerLevel level)) return false;
+        if (player == null || npc == null) return false;
         if (isCompanion(player, npc)) {
+            if (!canReleaseCompanionHere(player, npc)) return false;
             removeCompanion(player, npc);
             npc.speakKey("dialogue.bond.travel.let_go", 58);
             return true;
@@ -1288,7 +1293,7 @@ public final class LivingBondManager {
 
     /** Debug/QA hook: creates a proper persistent travelling companion immediately. */
     public static int forceSpawnCompanion(ServerPlayer player) {
-        if (!(player.level() instanceof ServerLevel level)) return 0;
+        if (player == null) return 0;
         UUID existing = companionId(player);
         if (existing != null) {
             AmbientFighterEntity loaded = findLoadedCompanion(player, existing);
@@ -1329,7 +1334,31 @@ public final class LivingBondManager {
                 + " • Meditation=" + (MeditationCompat.isAvailable() ? "enabled" : "disabled");
     }
 
-    public static void clearCompanion(ServerPlayer player) {
+    /** Manual group release. Internal cleanup must use clearCompanionInternal. */
+    public static boolean clearCompanion(ServerPlayer player) {
+        if (player == null) return false;
+        if (!LivingWorldDimensions.isSupported(player.serverLevel())) {
+            List<UUID> ids = companionIds(player);
+            List<AmbientFighterEntity> loaded = new ArrayList<>();
+            for (UUID id : ids) {
+                AmbientFighterEntity member = findLoadedCompanion(player, id);
+                if (member != null) loaded.add(member);
+            }
+            boolean allProperDeadSouls = !loaded.isEmpty() && loaded.size() == ids.size()
+                    && loaded.stream().allMatch(f -> f.level().dimension().equals(player.level().dimension())
+                    && FighterAfterlifeManager.isProperAfterlifeDimension(f));
+            if (!allProperDeadSouls) {
+                AmbientFighterEntity speaker = loaded.stream().filter(f -> !f.isDeadSoul()).findFirst()
+                        .orElse(loaded.isEmpty() ? null : loaded.get(0));
+                refuseUnsafeRelease(player, speaker);
+                return false;
+            }
+        }
+        clearCompanionInternal(player);
+        return true;
+    }
+
+    private static void clearCompanionInternal(ServerPlayer player) {
         TRAVEL_TRAILS.remove(player.getUUID());
         CompoundTag root = root(player);
         for (UUID id : companionIds(player)) {
@@ -1359,6 +1388,24 @@ public final class LivingBondManager {
             for (String key : travelKeys) current.getPersistentData().remove(key);
         }
         save(player, root);
+    }
+
+    private static boolean canReleaseCompanionHere(ServerPlayer player, AmbientFighterEntity fighter) {
+        if (LivingWorldDimensions.isSupported(player.serverLevel())) return true;
+        if (fighter != null && fighter.level().dimension().equals(player.level().dimension())
+                && FighterAfterlifeManager.isProperAfterlifeDimension(fighter)) return true;
+        refuseUnsafeRelease(player, fighter);
+        return false;
+    }
+
+    private static void refuseUnsafeRelease(ServerPlayer player, AmbientFighterEntity fighter) {
+        if (fighter != null && fighter.isAlive()) {
+            fighter.speakKey("dialogue.bond.travel.invalid_dimension."
+                    + fighter.getPersonality().name().toLowerCase(java.util.Locale.ROOT), 100);
+        }
+        player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                "dmzlivingworld.message.companion.invalid_release_dimension")
+                .withStyle(net.minecraft.ChatFormatting.RED), false);
     }
 
     private static AmbientFighterEntity entity(ServerLevel level, UUID id) {

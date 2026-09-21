@@ -45,7 +45,7 @@ import java.lang.reflect.Method;
  * aura shader, pulse aura and lightning. Our custom renderer previously skipped it.
  */
 public final class FighterRenderer extends GeoEntityRenderer<AmbientFighterEntity> {
-    private static final ResourceLocation FISHING_HOOK_TEXTURE = new ResourceLocation("minecraft", "textures/entity/fishing_hook.png");
+    private static final ResourceLocation FISHING_HOOK_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/fishing_hook.png");
     private static final RenderType FISHING_HOOK_RENDER = RenderType.entityCutoutNoCull(FISHING_HOOK_TEXTURE);
     private final DBSagasRenderer<AmbientFighterEntity> nativeSagaEffects;
     private final Method drawEffectsInline;

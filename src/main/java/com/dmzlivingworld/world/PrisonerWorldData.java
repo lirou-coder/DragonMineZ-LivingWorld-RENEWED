@@ -2,7 +2,6 @@ package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterArchetype;
-import com.dmzlivingworld.entity.FighterNames;
 import com.dmzlivingworld.entity.FighterPersonality;
 import com.dmzlivingworld.entity.FighterRace;
 import com.dmzlivingworld.entity.FighterRank;

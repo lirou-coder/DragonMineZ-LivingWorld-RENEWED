@@ -25,6 +25,7 @@ import java.util.UUID;
  * Two original fighters remain the authoritative persistent characters. A
  * temporary fighter of the same LW entity type exists only for the fusion span.
  */
+@SuppressWarnings("unused")
 public final class NpcFusionManager {
     private static final String DEBUG_ROOT = "DMZLWFusionNpcDebug";
     private static final String FIRST = "First";

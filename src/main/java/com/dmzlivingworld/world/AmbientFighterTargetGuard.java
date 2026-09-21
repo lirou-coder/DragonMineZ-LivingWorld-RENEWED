@@ -2,7 +2,6 @@ package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;

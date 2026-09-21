@@ -154,7 +154,6 @@ public final class FighterLegacyWorldData extends SavedData {
             String line = LWLang.speechKey("screen.dossier.content.fallen.entry", "%s%s | %s | Last known PL %s%s",
                     title.isBlank() ? "" : title + " ", r.getString("Name"), r.getString("Race"), r.getInt("BattlePower"),
                     r.getString("Killer").isBlank() ? "" : LWLang.speechKey("screen.dossier.content.fallen.cause", " | Fell to %s", r.getString("Killer")));
-            String killer = r.getString("Killer");
             UUID recordId = r.hasUUID("RecordId") ? r.getUUID("RecordId") : null;
             CompoundTag profile = r.contains("Profile", Tag.TAG_COMPOUND) ? r.getCompound("Profile").copy() : new CompoundTag();
             out.add(new FallenEntry(recordId, line, profile));
@@ -173,7 +172,6 @@ public final class FighterLegacyWorldData extends SavedData {
             String line = LWLang.speechKey("screen.dossier.content.fallen.entry", "%s%s | %s | Last known PL %s%s",
                     title.isBlank() ? "" : title + " ", r.getString("Name"), r.getString("Race"), r.getInt("BattlePower"),
                     r.getString("Killer").isBlank() ? "" : LWLang.speechKey("screen.dossier.content.fallen.cause", " | Fell to %s", r.getString("Killer")));
-            String killer = r.getString("Killer");
             CompoundTag profile = r.contains("Profile", Tag.TAG_COMPOUND) ? r.getCompound("Profile").copy() : new CompoundTag();
             return new FallenEntry(wanted, line, profile);
         }

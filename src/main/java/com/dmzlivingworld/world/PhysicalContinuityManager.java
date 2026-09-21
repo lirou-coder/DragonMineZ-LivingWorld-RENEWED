@@ -418,7 +418,7 @@ public final class PhysicalContinuityManager {
         }
 
         BlockPos rough = BlockPos.containing(candidate.x, fighter.getY(), candidate.z);
-        if (!level.hasChunkAt(rough)) {
+        if (!level.hasChunk(rough.getX() >> 4, rough.getZ() >> 4)) {
             // Never turn continuity recovery into chunk forcing. If the next leg crosses the
             // currently loaded edge, shorten it and let the next tick retry as chunks become live.
             candidate = fighter.position().add(dir.scale(Math.min(3.5D, leg)));

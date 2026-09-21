@@ -4,7 +4,6 @@ import com.dmzlivingworld.client.LWLang;
 
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterRank;
-import com.dmzlivingworld.entity.RacialFormProfile;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 

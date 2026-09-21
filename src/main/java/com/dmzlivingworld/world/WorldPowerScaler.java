@@ -21,6 +21,7 @@ import java.util.List;
  * bounded local pressure signal to new generation and future earned growth, never a direct
  * copy of that player's BP. Existing fighters are never forcibly rescaled by an era change.
  */
+@SuppressWarnings("unused") // Retain the complete relevance tuning profile.
 public final class WorldPowerScaler {
     private static final double LOCAL_PLAYER_RADIUS = 128.0D;
     private static final double LOCAL_PLAYER_RADIUS_SQR = LOCAL_PLAYER_RADIUS * LOCAL_PLAYER_RADIUS;
@@ -117,7 +118,9 @@ public final class WorldPowerScaler {
                 if (foundKillQuest) break;
             }
         }
-        return Double.isFinite(weakest) ? weakest : 450.0D;
+        // Era zero must remain playable even when a custom root saga deliberately
+        // starts with an extremely weak tutorial enemy.
+        return Double.isFinite(weakest) ? Math.max(175.0D, weakest) : 450.0D;
     }
 
     public static double lastKillReference(Saga saga) {

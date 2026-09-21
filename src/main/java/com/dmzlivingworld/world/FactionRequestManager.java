@@ -15,7 +15,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.network.chat.Component;
@@ -33,6 +32,7 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +41,7 @@ import java.util.UUID;
 /** Need-driven faction requests. R37 keeps the four physical supply jobs and reintroduces Patrol
  * as the first offensive/field request family, using only real persistent faction residents. */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@SuppressWarnings("unused") // Optional request families are activated conditionally.
 public final class FactionRequestManager {
     private static final String ROOT = "DMZLivingWorldFactionRequest";
     private static final String OFFERS = "Offers";
@@ -482,7 +483,7 @@ public final class FactionRequestManager {
         BlockPos rosterAnchor = req.getBoolean("Started") ? waypoint : rendezvous;
         // The faction commits the real patrol when the request is accepted, so the player can follow an exact named
         // leader immediately instead of reaching an empty waypoint and waiting for somebody to exist.
-        List<AmbientFighterEntity> loaded = FactionRequestMissionManager.ensureRoster(player, level, req, faction,
+        FactionRequestMissionManager.ensureRoster(player, level, req, faction,
                 "Patrol", recovery ? 3 : 4, rosterAnchor, FactionRequestMissionManager.SIDE_ALLY,
                 FactionRequestMissionManager.ROLE_PATROL,
                 f -> !f.isNonCombatant() && !f.isCaptive() && !f.isDefeated());
@@ -544,7 +545,7 @@ public final class FactionRequestManager {
                 && !req.getBoolean("PatrolContactActive") && leg >= req.getInt("PatrolAmbushLeg")) {
             WorldFaction threat = data.byId(req.getString("PatrolAmbushFaction"));
             if (threat != null) {
-                List<AmbientFighterEntity> ambush = FactionRequestMissionManager.ensureRoster(player, level, req, threat,
+                FactionRequestMissionManager.ensureRoster(player, level, req, threat,
                         "PatrolAmbush", recovery ? 2 : 4, waypoint, FactionRequestMissionManager.SIDE_ENEMY,
                         FactionRequestMissionManager.ROLE_COMBAT, f -> !f.isNonCombatant());
                 if (FactionRequestMissionManager.rosterSize(req, "PatrolAmbush") > 0) {
@@ -1765,7 +1766,6 @@ public final class FactionRequestManager {
         int completedNode = nodeIndex + 1;
         if (completedNode < route.size()) {
             req.putInt("SabotageNode", completedNode); req.putInt("SabotageWork", 0);
-            CompoundTag next = route.getCompound(completedNode);
             objectiveToastKey(player, "interdiction_next", completedNode, route.size());
             AmbientFighterEntity voice = security.stream().filter(AmbientFighterEntity::isAlive).findFirst().orElse(null);
             if (voice != null) voice.speak(FactionRequestDialogue.pressure("MERCENARY_SABOTAGE", now ^ completedNode * 6151L), 62);
@@ -2201,7 +2201,6 @@ public final class FactionRequestManager {
     private static boolean requestHasRealActors(String type, WorldFaction source, WorldFaction target, FactionWorldData data) {
         long sourceAny = activeResidentCount(data, source, false);
         long sourceCombat = activeResidentCount(data, source, true);
-        long targetAny = activeResidentCount(data, target, false);
         long targetCombat = activeResidentCount(data, target, true);
         return switch (type) {
             case "REPARATIONS", "PROVISIONS", "MATERIALS", "WAR_STOCKPILE" -> sourceAny >= 1;
@@ -2976,7 +2975,7 @@ public final class FactionRequestManager {
 
     private static void addSupplyLine(ListTag list, Item item, int need, String category) {
         if (item == null || need <= 0) return;
-        ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
+        ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
         CompoundTag line = new CompoundTag();
         line.putString("Id", id.toString());
         line.putString("Name", new ItemStack(item).getHoverName().getString());
@@ -2987,7 +2986,7 @@ public final class FactionRequestManager {
 
     private static Item supplyItem(CompoundTag line) {
         if (line == null || line.getString("Id").isBlank()) return Items.AIR;
-        try { return BuiltInRegistries.ITEM.get(new ResourceLocation(line.getString("Id"))); }
+        try { return ForgeRegistries.ITEMS.getValue(ResourceLocation.parse(line.getString("Id"))); }
         catch (Exception ignored) { return Items.AIR; }
     }
 

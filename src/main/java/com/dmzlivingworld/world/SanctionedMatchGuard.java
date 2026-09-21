@@ -344,7 +344,6 @@ public final class SanctionedMatchGuard {
         if (event.getEntity() instanceof ServerPlayer) {
             POST_SPAR_INVULNERABLE.remove(event.getEntity().getUUID());
         }
-        Entity attacker = event.getSource().getEntity();
         if (event.getEntity() instanceof AmbientFighterEntity fighter && fighter.isSanctionedMatchParticipant()) {
             event.setCanceled(true);
             float floor = Math.max(1.0F, fighter.getMaxHealth() * 0.30F);

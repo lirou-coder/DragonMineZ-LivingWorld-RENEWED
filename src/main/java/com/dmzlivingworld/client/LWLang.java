@@ -43,7 +43,6 @@ public final class LWLang {
         String[] words = name.trim().split("\\s+");
         Object[] translated = new Object[words.length];
         for (int i = 0; i < words.length; i++) translated[i] = speechKey("label.faction_word." + slug(words[i]), words[i]);
-        String fallback = String.join(" ", words);
         StringBuilder pattern = new StringBuilder();
         for (int i = 0; i < words.length; i++) pattern.append(i == 0 ? "%s" : " %s");
         return speechKey("label.faction_name.parts_" + words.length, pattern.toString(), translated);

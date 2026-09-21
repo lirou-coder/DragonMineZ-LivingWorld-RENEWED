@@ -17,7 +17,7 @@ public final class MeditationNetwork {
     private static final String PROTOCOL = "8";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(DBZMeditation.MODID, "main"),
+            ResourceLocation.fromNamespaceAndPath(DBZMeditation.MODID, "main"),
             () -> PROTOCOL,
             PROTOCOL::equals,
             PROTOCOL::equals);

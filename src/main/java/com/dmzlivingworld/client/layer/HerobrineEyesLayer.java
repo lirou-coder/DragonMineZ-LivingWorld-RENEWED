@@ -13,7 +13,7 @@ import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
 
 /** White-eye overlay over Minecraft's own Steve texture; the rest of Herobrine uses vanilla art. */
 public final class HerobrineEyesLayer extends GeoRenderLayer<AmbientFighterEntity> {
-    private static final ResourceLocation EYES = new ResourceLocation("dmzlivingworld", "textures/entity/herobrine_eyes.png");
+    private static final ResourceLocation EYES = ResourceLocation.fromNamespaceAndPath("dmzlivingworld", "textures/entity/herobrine_eyes.png");
 
     public HerobrineEyesLayer(GeoRenderer<AmbientFighterEntity> renderer) {
         super(renderer);

@@ -3,7 +3,6 @@ package com.dmzlivingworld.client.particle;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.*;
 import net.minecraft.core.particles.SimpleParticleType;
-import net.minecraft.util.Mth;
 
 /** Sharp inward-moving anime streak. Velocity is supplied by the server toward the focus point. */
 public final class KiTrainingDrawParticle extends TextureSheetParticle {
