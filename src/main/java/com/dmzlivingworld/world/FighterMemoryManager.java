@@ -146,6 +146,9 @@ public final class FighterMemoryManager {
             if (isRecordAlreadyLoaded(player, recordId)) continue;
 
             CompoundTag profile = record.getCompound("Profile").copy();
+            // Legacy saves may still contain a menace profile under an old ordinary-fighter
+            // memory record. Their dedicated singleton managers are the only spawn authority.
+            if (WorldMenaceManager.isWorldMenaceProfile(profile)) continue;
             // Affiliated recurring characters remain tied to their organization's home
             // realm. Independent fighters still need to physically be in the player's realm.
             if (profile.contains("FactionId")) {

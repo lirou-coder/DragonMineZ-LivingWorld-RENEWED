@@ -10,6 +10,7 @@ import com.dmzlivingworld.entity.FighterPersonality;
 import com.dmzlivingworld.entity.FighterRace;
 import com.dmzlivingworld.entity.FighterRank;
 import com.dmzlivingworld.entity.LWEntities;
+import com.dmzlivingworld.entity.WorldMenaceFighterEntity;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -899,9 +900,23 @@ public final class WorldMenaceManager {
     }
 
     private static AmbientFighterEntity findLoaded(MinecraftServer server, UUID entityId) {
-        if (entityId == null) return null;
+        if (server == null) return null;
+        // The saved UUID is authoritative when it still points at the dedicated hostile body.
+        // An old ambient_fighter body must never satisfy singleton recovery, otherwise the
+        // manager keeps the non-Monster clone alive and may later create another manifestation.
+        if (entityId != null) {
+            for (ServerLevel level : server.getAllLevels()) {
+                if (level.getEntity(entityId) instanceof WorldMenaceFighterEntity fighter && isHerobrine(fighter)) {
+                    return fighter;
+                }
+            }
+        }
+        // If SavedData has a stale UUID but the correct structural singleton is already loaded,
+        // adopt it instead of spawning yet another Herobrine. The next markActive() repairs UUID state.
         for (ServerLevel level : server.getAllLevels()) {
-            if (level.getEntity(entityId) instanceof AmbientFighterEntity fighter && isHerobrine(fighter)) return fighter;
+            for (var entity : level.getAllEntities()) {
+                if (entity instanceof WorldMenaceFighterEntity fighter && isHerobrine(fighter)) return fighter;
+            }
         }
         return null;
     }

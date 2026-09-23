@@ -233,6 +233,9 @@ public final class AmbientFighterSpawner {
                                                            int encounters, int relationship, boolean rescued,
                                                            BlockPos preferred, boolean closeForDebug) {
         if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) return null;
+        // World Menaces have a dedicated hostile entity type and singleton lifecycle. Never let
+        // an old remembered profile recreate them as the ordinary ambient_fighter entity.
+        if (WorldMenaceManager.isWorldMenaceProfile(profile)) return null;
         // Dead-record tombstones are authoritative across every materialization path, including
         // debug recurrence and companion recovery. A historical person must never be recreated.
         if (recordId != null && (FighterLegacyWorldData.get(level).isDeadRecord(recordId)
@@ -275,6 +278,7 @@ public final class AmbientFighterSpawner {
                                                                 BlockPos life) {
         if (player == null || life == null || !(player.level() instanceof ServerLevel level)
                 || !LivingWorldDimensions.isSupported(level)) return null;
+        if (WorldMenaceManager.isWorldMenaceProfile(profile)) return null;
         if (recordId != null && (FighterLegacyWorldData.get(level).isDeadRecord(recordId)
                 || FighterAfterlifeManager.isRecoveryQueued(level, recordId))) return null;
         if (recordId != null && isMemoryRecordLoaded(player, recordId)) return null;
@@ -301,6 +305,7 @@ public final class AmbientFighterSpawner {
     /** Recreates a non-remembered travelling companion from its persisted fighter profile. */
     public static AmbientFighterEntity spawnProfileNearPlayer(ServerPlayer player, CompoundTag profile) {
         if (player == null || profile == null || profile.isEmpty() || !(player.level() instanceof ServerLevel level)) return null;
+        if (WorldMenaceManager.isWorldMenaceProfile(profile)) return null;
         BlockPos pos = findSafeGroundAround(level, player.blockPosition(), player.getRandom(), 5, 10, 40);
         if (pos == null) return null;
         AmbientFighterEntity fighter = LWEntities.AMBIENT_FIGHTER.get().create(level);
@@ -317,6 +322,7 @@ public final class AmbientFighterSpawner {
     /** Dimension-transfer materialization; companions may follow into non-population dimensions. */
     public static AmbientFighterEntity spawnCompanionByPlayer(ServerPlayer player, CompoundTag profile) {
         if (player == null || profile == null || profile.isEmpty() || !(player.level() instanceof ServerLevel level)) return null;
+        if (WorldMenaceManager.isWorldMenaceProfile(profile)) return null;
         AmbientFighterEntity fighter = LWEntities.AMBIENT_FIGHTER.get().create(level);
         if (fighter == null) return null;
         Vec3 look = player.getLookAngle();

@@ -509,8 +509,20 @@ public final class RedRibbonExperimentManager {
     }
 
     private static AmbientFighterEntity findLoaded(MinecraftServer server, UUID id) {
-        if (server == null || id == null) return null;
-        for (ServerLevel l : server.getAllLevels()) if (l.getEntity(id) instanceof AmbientFighterEntity f && isExperiment(f)) return f;
+        if (server == null) return null;
+        if (id != null) {
+            for (ServerLevel level : server.getAllLevels()) {
+                if (level.getEntity(id) instanceof WorldMenaceFighterEntity fighter && isExperiment(fighter)) return fighter;
+            }
+        }
+        // SavedData can retain an older UUID across recovery/migration. Prefer an already-loaded
+        // dedicated menace body instead of creating a second X-7. Ordinary ambient_fighter
+        // copies are intentionally ignored and rejected by WorldMenaceEntityTypeGuard.
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getAllEntities()) {
+                if (entity instanceof WorldMenaceFighterEntity fighter && isExperiment(fighter)) return fighter;
+            }
+        }
         return null;
     }
     private static ServerPlayer closestPlayer(ServerLevel level, BlockPos pos) {
