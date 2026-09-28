@@ -21,6 +21,7 @@ import java.util.UUID;
 public final class FighterAppearanceEvolutionManager {
     private static final String NEXT_CHANGE = "LWNextAppearanceChange";
     private static final long DAY = 24000L;
+    private static final Set<UUID> CHECKED_FIGHTERS = new HashSet<>();
 
     private FighterAppearanceEvolutionManager() {}
 
@@ -30,7 +31,8 @@ public final class FighterAppearanceEvolutionManager {
         MinecraftServer server = event.getServer();
         long now = server.overworld().getGameTime();
         if (now % 1200L != 0L) return;
-        Set<UUID> checked = new HashSet<>();
+        Set<UUID> checked = CHECKED_FIGHTERS;
+        checked.clear();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) continue;
             for (AmbientFighterEntity fighter : level.getEntitiesOfClass(AmbientFighterEntity.class,

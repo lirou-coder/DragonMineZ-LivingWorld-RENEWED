@@ -53,9 +53,9 @@ public final class FighterInspectionManager {
         if (player == null) return false;
         try {
             // Use Dragon Mine Z's own Curios bridge. DMZ itself queries equipment through
-            // CuriosUtil.getFirstStack(...), including head_tech for Anti-Ki Cloak/scouter logic.
+            // CuriosUtil.getFirstStackForItem(...), including head_tech for native scouter logic.
             // This avoids reproducing Curios capability semantics inside Living World.
-            return isScouter(CuriosUtil.getFirstStack(player, "head_tech"));
+            return isScouter(CuriosUtil.getFirstStackForItem(player, "head_tech", "scouter"));
         } catch (RuntimeException ignored) {
             return false;
         }

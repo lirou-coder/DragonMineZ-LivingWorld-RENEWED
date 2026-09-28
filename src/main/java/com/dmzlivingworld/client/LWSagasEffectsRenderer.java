@@ -9,6 +9,7 @@ import com.dragonminez.client.render.shader.DMZShaders;
 import com.dragonminez.client.render.util.AuraMeshFactory;
 import com.dragonminez.client.render.util.IrisCompat;
 import com.dragonminez.client.render.util.PlayerEffectQueue;
+import com.dragonminez.client.render.util.ModRenderTypes;
 import com.dragonminez.client.util.ColorUtils;
 import com.dragonminez.common.init.entities.ShadowDummyEntity;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
@@ -305,7 +306,7 @@ public final class LWSagasEffectsRenderer extends GeoEntityRenderer<AmbientFight
         shader.safeGetUniform("divis").set(1.0f);
 
         ResourceLocation lightningTex = ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "textures/entity/races/null.png");
-        RenderType renderType = AuraRenderer.lightningType(lightningTex);
+        RenderType renderType = ModRenderTypes.getCustomLightning(lightningTex);
         AuraRenderer.customSetup(renderType, lightningTex, shader);
 
         shader.apply();

@@ -22,6 +22,4 @@ public final class FighterRevivalWish extends Wish {
         catch (IllegalArgumentException ignored) {}
         FighterAfterlifeManager.revive(player, id, mode);
     }
-
-    @Override public String toJson() { return ""; }
 }

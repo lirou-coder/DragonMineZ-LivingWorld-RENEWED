@@ -457,7 +457,8 @@ public final class WorldMenaceManager {
         int returns = Math.max(0, deaths);
         double powerScale = Math.min(24.0D, Math.pow(1.85D, Math.min(8, returns)));
         int minimumPower = (int)Math.min(12_000_000D, 250_000D * powerScale);
-        if (fighter.getPermanentBattlePower() < minimumPower) fighter.setBattlePowerAndRefresh(minimumPower);
+        if (fighter.getWorldMenacePowerReference() < minimumPower)
+            fighter.setWorldMenacePowerReferenceAndRefresh(minimumPower);
         // BP is the combat source of truth. Do not layer hidden HP/melee/Ki minimums on top of
         // the profile: the dossier must describe the same body that actually fights.
         fighter.refreshCombatStatsFromPower();

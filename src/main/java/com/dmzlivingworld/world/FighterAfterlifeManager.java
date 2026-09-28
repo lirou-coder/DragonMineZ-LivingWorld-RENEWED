@@ -122,8 +122,12 @@ public final class FighterAfterlifeManager {
     public static void serverTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         MinecraftServer server = event.getServer();
+        // Every afterlife deadline and natural-spawn cadence is expressed in whole seconds
+        // (and the spawn interval is always a multiple of 20). Scanning every loaded entity in
+        // every dimension each game tick therefore produced identical decisions 19 extra times.
+        if (server.getTickCount() % 20 != 0) return;
         Data data = Data.get(server.overworld());
-        if (server.getTickCount() % 20 == 0) restoreRecovering(server, data);
+        restoreRecovering(server, data);
         for (UUID forgotten : data.trimDead()) discardSoul(server, forgotten);
         boolean hellEnabled = dmzPlusHellEnabled();
         SoulSnapshot souls = scanSouls(server);

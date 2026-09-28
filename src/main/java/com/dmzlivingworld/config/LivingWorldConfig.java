@@ -268,12 +268,34 @@ public final class LivingWorldConfig {
 
     private static boolean isNonBlankId(Object value) { return value instanceof String s && !s.isBlank(); }
     public static List<String> npcRaceBlacklist() { return NPC_RACE_BLACKLIST.get().stream().map(String::valueOf).map(s -> s.toLowerCase(java.util.Locale.ROOT)).toList(); }
+    public static boolean npcRaceListContains(String... ids) {
+        if (ids == null) return false;
+        for (String id : ids) if (containsId(NPC_RACE_BLACKLIST.get(), id)) return true;
+        return false;
+    }
     public static boolean treatRaceBlacklistAsWhitelist() { return TREAT_RACE_BLACKLIST_AS_WHITELIST.get(); }
     public static List<String> canUseClothes() { return CAN_USE_CLOTHES.get().stream().map(String::valueOf).map(s -> s.toLowerCase(java.util.Locale.ROOT)).toList(); }
+    public static boolean raceCanUseClothes(String id) { return containsId(CAN_USE_CLOTHES.get(), id); }
     public static List<String> dimensionWhitelist() { return DIMENSION_WHITELIST.get().stream().map(String::valueOf).map(s -> s.toLowerCase(java.util.Locale.ROOT)).toList(); }
+    /** Allocation-free hot-path membership check; config lists can still change live. */
+    public static boolean dimensionListContains(String id) {
+        return containsId(DIMENSION_WHITELIST.get(), id);
+    }
     public static boolean treatDimensionWhitelistAsBlacklist() { return TREAT_DIMENSION_WHITELIST_AS_BLACKLIST.get(); }
     public static List<String> companionDimensionBlacklist() { return COMPANION_DIMENSION_BLACKLIST.get().stream()
             .map(String::valueOf).map(s -> s.toLowerCase(java.util.Locale.ROOT)).toList(); }
+    /** Allocation-free hot-path membership check; config lists can still change live. */
+    public static boolean companionDimensionBlacklistContains(String id) {
+        return containsId(COMPANION_DIMENSION_BLACKLIST.get(), id);
+    }
+
+    private static boolean containsId(List<? extends Object> configured, String sought) {
+        if (configured == null || configured.isEmpty() || sought == null) return false;
+        for (Object value : configured) {
+            if (value != null && sought.equalsIgnoreCase(String.valueOf(value).trim())) return true;
+        }
+        return false;
+    }
 
     /** Retained in the network snapshot for compatibility with older 1.9 release candidates. */
     public static int activityPreset() { return 2; }

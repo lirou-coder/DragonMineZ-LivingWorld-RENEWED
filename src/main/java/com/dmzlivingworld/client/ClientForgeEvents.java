@@ -32,6 +32,10 @@ public final class ClientForgeEvents {
     private static Object lastLevel;
     private static final Map<UUID, String> LAST_MIRRORED_SPEECH = new HashMap<>();
     private static final Map<Integer, Integer> LAST_SAIBAMAN_BP = new HashMap<>();
+    // Client tick is single-threaded. Reusing these sets avoids two short-lived hash tables
+    // (and their backing arrays) on every polling pass.
+    private static final Set<UUID> NEARBY_SPEECH_IDS = new HashSet<>();
+    private static final Set<Integer> NEARBY_SAIBAMAN_IDS = new HashSet<>();
 
     private ClientForgeEvents() {}
 
@@ -64,6 +68,8 @@ public final class ClientForgeEvents {
             FighterDispositionClientState.clear();
             LAST_MIRRORED_SPEECH.clear();
             LAST_SAIBAMAN_BP.clear();
+            NEARBY_SPEECH_IDS.clear();
+            NEARBY_SAIBAMAN_IDS.clear();
             FactionRequestTrackerOverlay.clear();
             lastLevel = null;
             return;
@@ -72,6 +78,8 @@ public final class ClientForgeEvents {
             FighterDispositionClientState.clear();
             LAST_MIRRORED_SPEECH.clear();
             LAST_SAIBAMAN_BP.clear();
+            NEARBY_SPEECH_IDS.clear();
+            NEARBY_SAIBAMAN_IDS.clear();
             FactionRequestTrackerOverlay.clear();
             lastLevel = minecraft.level;
         }
@@ -96,7 +104,8 @@ public final class ClientForgeEvents {
      */
     private static void refreshKiSenseWhenSaibamanPowerChanges(Minecraft minecraft) {
         if (minecraft.player.tickCount % 5 != 0) return;
-        Set<Integer> nearby = new HashSet<>();
+        Set<Integer> nearby = NEARBY_SAIBAMAN_IDS;
+        nearby.clear();
         boolean changed = false;
         for (SagaSaibamanEntity saibaman : minecraft.level.getEntitiesOfClass(SagaSaibamanEntity.class,
                 minecraft.player.getBoundingBox().inflate(192.0D), entity -> entity.isAlive())) {
@@ -116,8 +125,12 @@ public final class ClientForgeEvents {
             LAST_MIRRORED_SPEECH.clear();
             return;
         }
+        // Synced speech lasts many ticks; a two-tick poll is visually immediate while halving
+        // client entity-section queries in populated areas.
+        if ((minecraft.player.tickCount & 1) != 0) return;
         int radius = LivingWorldClientConfig.speechChatRadius();
-        Set<UUID> nearby = new HashSet<>();
+        Set<UUID> nearby = NEARBY_SPEECH_IDS;
+        nearby.clear();
         for (AmbientFighterEntity fighter : minecraft.level.getEntitiesOfClass(AmbientFighterEntity.class,
                 minecraft.player.getBoundingBox().inflate(radius), entity -> entity.isAlive())) {
             if (minecraft.player.distanceToSqr(fighter) > (double)radius * radius) continue;

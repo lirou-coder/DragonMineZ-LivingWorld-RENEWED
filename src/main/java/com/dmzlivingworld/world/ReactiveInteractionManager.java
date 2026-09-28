@@ -9,7 +9,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 
-import java.util.Comparator;
 import java.util.UUID;
 
 /**
@@ -89,9 +88,7 @@ public final class ReactiveInteractionManager {
             case WARY -> 6.2D;
             default -> 4.0D;
         };
-        ServerPlayer nearest = level.getEntitiesOfClass(ServerPlayer.class, fighter.getBoundingBox().inflate(radius), p ->
-                        p.isAlive() && !p.isSpectator() && !p.isCreative())
-                .stream().min(Comparator.comparingDouble(fighter::distanceToSqr)).orElse(null);
+        ServerPlayer nearest = nearestEligiblePlayer(level, fighter, radius);
         if (nearest == null) {
             softenPressure(data);
             return;
@@ -163,6 +160,22 @@ public final class ReactiveInteractionManager {
         data.remove(PRESSURE_PLAYER);
         data.remove(PRESSURE_TICKS);
         data.remove(PRESSURE_WARNED);
+    }
+
+    /** Uses ServerLevel's already-maintained player list instead of allocating an entity-query result every tick. */
+    private static ServerPlayer nearestEligiblePlayer(ServerLevel level, AmbientFighterEntity fighter, double radius) {
+        var bounds = fighter.getBoundingBox().inflate(radius);
+        ServerPlayer nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
+        for (ServerPlayer player : level.players()) {
+            if (!player.isAlive() || player.isSpectator() || player.isCreative() || !bounds.contains(player.position())) continue;
+            double distance = fighter.distanceToSqr(player);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearest = player;
+            }
+        }
+        return nearest;
     }
 
     /** Null means the current mood still permits a normal conversation. */

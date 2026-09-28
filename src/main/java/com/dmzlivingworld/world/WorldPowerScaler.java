@@ -86,11 +86,7 @@ public final class WorldPowerScaler {
                 for (; objectiveIndex != objectiveEnd; objectiveIndex += objectiveStep) {
                     if (!(quest.getObjectives().get(objectiveIndex) instanceof KillObjective kill)
                             || kill.getSpawnMode() != KillObjective.SpawnMode.QUEST) continue;
-                    double reference = ModList.get().isLoaded("dmzrevamp")
-                            ? killReference(kill)
-                            : ((Math.max(0.0D, kill.getHealth()) / 2.0D)
-                            + Math.max(0.0D, kill.getMeleeDamage())
-                            + Math.max(0.0D, kill.getKiDamage())) / 2.0D;
+                    double reference = killReference(kill);
                     if (Double.isFinite(reference) && reference > 0.0D) return reference;
                 }
             }
@@ -139,9 +135,8 @@ public final class WorldPowerScaler {
         double hp = Math.max(0.0D, kill.getHealth());
         double melee = Math.max(0.0D, kill.getMeleeDamage());
         double ki = Math.max(0.0D, kill.getKiDamage());
-        double reference = ModList.get().isLoaded("dmzrevamp")
-                ? (hp + melee + ki + revampDefense(kill)) / 4.0D
-                : (hp + melee + ki) / 4.0D;
+        double reference = hp / 2.0D + melee + ki;
+        if (ModList.get().isLoaded("dmzrevamp")) reference += revampDefense(kill);
         return Double.isFinite(reference) ? reference : -1.0D;
     }
 

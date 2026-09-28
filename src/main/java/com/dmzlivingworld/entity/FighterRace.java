@@ -5,7 +5,6 @@ import com.dmzlivingworld.world.SairensRaceCompat;
 import net.minecraft.util.RandomSource;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /** DragonMineZ player races used by procedural roaming fighters. */
 public enum FighterRace {
@@ -67,12 +66,7 @@ public enum FighterRace {
 
     public static boolean isAllowedForNaturalSpawn(FighterRace race) {
         if (race == null || (race.isSairensRace() && !SairensRaceCompat.isLoaded())) return false;
-        List<String> configured = LivingWorldConfig.npcRaceBlacklist().stream()
-                .map(value -> value == null ? "" : value.trim().toLowerCase(Locale.ROOT))
-                .filter(value -> !value.isBlank()).toList();
-        boolean listed = configured.contains(race.dmzId.toLowerCase(Locale.ROOT))
-                || configured.contains(race.name().toLowerCase(Locale.ROOT))
-                || configured.contains(race.displayName.toLowerCase(Locale.ROOT));
+        boolean listed = LivingWorldConfig.npcRaceListContains(race.dmzId, race.name(), race.displayName);
         return LivingWorldConfig.treatRaceBlacklistAsWhitelist() ? listed : !listed;
     }
 

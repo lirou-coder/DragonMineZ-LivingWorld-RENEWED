@@ -3,6 +3,7 @@ package com.dmzlivingworld.entity;
 import com.dmzlivingworld.compat.DmzRevampMobDefenseCompat;
 import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;
+import com.dragonminez.common.hair.HairStyleSlot;
 import com.dragonminez.common.config.ConfigManager;
 import com.dragonminez.common.init.entities.IBattlePower;
 import com.dragonminez.common.init.MainSounds;
@@ -1567,6 +1568,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     /** Authoritative Living World BP; the inherited DMZ field remains a saturated int mirror. */
     public long getPermanentBattlePowerLong() {
+        double menaceReference = legacyData.getDouble("LWWorldMenacePowerReference");
+        if (menaceReference > 0.0D && Double.isFinite(menaceReference)) {
+            double calculated = com.dmzlivingworld.world.BattlePowerFormula.worldMenaceBattlePower(menaceReference);
+            return calculated >= Long.MAX_VALUE ? Long.MAX_VALUE : Math.max(1L, Math.round(calculated));
+        }
         double effective = legacyData.getDouble(FighterPowerStatScaler.EFFECTIVE_STATS);
         if (effective > 0.0D && Double.isFinite(effective)) {
             double calculated = FighterPowerStatScaler.battlePowerForEffectiveBudget(this, effective);
@@ -1590,7 +1596,27 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
      * personal progression for faction re-anchoring, but it always updates the canonical base.
      */
     public void setBattlePowerAndRefresh(int battlePower) {
+        legacyData.remove("LWWorldMenacePowerReference");
         setPermanentBattlePowerAndRefresh(battlePower, false);
+    }
+
+    /** Sets a menace's fixed reference without allowing Custom BP to redistribute its stats. */
+    public void setWorldMenacePowerReferenceAndRefresh(double reference) {
+        double safe = Math.max(1.0D, Double.isFinite(reference) ? reference : 1.0D);
+        legacyData.putDouble("LWWorldMenacePowerReference", safe);
+        FighterPowerStatScaler.setEffectiveStatBudget(this, safe);
+        long displayed = getPermanentBattlePowerLong();
+        legacyData.putLong(PERMANENT_BATTLE_POWER, displayed);
+        setBattlePower((int)Math.min(Integer.MAX_VALUE - 1L, displayed));
+        if (!level().isClientSide && entityData.get(READY) && !blocksPowerProfileRefresh()) {
+            refreshCombatStatsFromPower();
+        } else if (!level().isClientSide) {
+            combatStatsPower = -1;
+        }
+    }
+
+    public double getWorldMenacePowerReference() {
+        return Math.max(0.0D, legacyData.getDouble("LWWorldMenacePowerReference"));
     }
 
     /**
@@ -2666,7 +2692,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                 entityData.set(NOSE_TYPE, random.nextInt(6));
                 entityData.set(MOUTH_TYPE, random.nextInt(9));
                 entityData.set(HAIR_ID, 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())));
-                entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains(race.dmzId()) ? random.nextInt(22) : 0);
+                entityData.set(OUTFIT, LivingWorldConfig.raceCanUseClothes(race.dmzId()) ? random.nextInt(22) : 0);
                 String skin = pick(random, SKIN_COLORS);
                 entityData.set(BODY_COLOR, skin);
                 // This layer is not another random skin channel. DMZ initializes it from the
@@ -2683,7 +2709,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                 entityData.set(HEAD_BONE, random.nextFloat() < 0.50F ? 0 : 1 + random.nextInt(2));
                 entityData.set(HAIR_ID, 0);
                 entityData.set(HAIR_COLOR, pick(random, NAMEK_LIGHT_GREEN));
-                entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains(race.dmzId()) ? random.nextInt(44) : 0);
+                entityData.set(OUTFIT, LivingWorldConfig.raceCanUseClothes(race.dmzId()) ? random.nextInt(44) : 0);
                 String green = pick(random, NAMEK_GREEN), red = pick(random, NAMEK_ACCENT), pink = pick(random, NAMEK_PINK);
                 entityData.set(BODY_COLOR, green);
                 entityData.set(BODY_COLOR2, red);
@@ -2695,7 +2721,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                 entityData.set(NOSE_TYPE, random.nextInt(2));
                 entityData.set(MOUTH_TYPE, random.nextInt(2));
                 entityData.set(HEAD_BONE, isFemale() ? 0 : random.nextInt(3));
-                entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains(race.dmzId()) ? random.nextInt(22) : 0);
+                entityData.set(OUTFIT, LivingWorldConfig.raceCanUseClothes(race.dmzId()) ? random.nextInt(22) : 0);
                 int majinColorRoll = random.nextInt(100);
                 boolean pinkVariant = majinColorRoll < 70;
                 String main = pinkVariant ? colorVariant(random, 0xFFA4FF, 30)
@@ -2729,7 +2755,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                     entityData.set(NOSE_TYPE, random.nextInt(6));
                     entityData.set(MOUTH_TYPE, random.nextInt(9));
                     entityData.set(HAIR_ID, 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())));
-                    entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains("human") ? random.nextInt(22) : 0);
+                    entityData.set(OUTFIT, LivingWorldConfig.raceCanUseClothes("human") ? random.nextInt(22) : 0);
                     String skin = pick(random, SKIN_COLORS);
                     entityData.set(BODY_COLOR, skin);
                     entityData.set(BODY_COLOR2, skin);
@@ -2750,7 +2776,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                 entityData.set(NOSE_TYPE, random.nextInt(6));
                 entityData.set(MOUTH_TYPE, random.nextInt(9));
                 entityData.set(HAIR_ID, 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())));
-                entityData.set(OUTFIT, LivingWorldConfig.canUseClothes().contains("human") ? random.nextInt(22) : 0);
+                entityData.set(OUTFIT, LivingWorldConfig.raceCanUseClothes("human") ? random.nextInt(22) : 0);
                 entityData.set(BODY_COLOR, "#FFD3C9");
                 entityData.set(BODY_COLOR2, randomColor(random));
                 entityData.set(BODY_COLOR3, randomColor(random));
@@ -2762,7 +2788,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                 entityData.set(NOSE_TYPE, random.nextInt(6));
                 entityData.set(MOUTH_TYPE, random.nextInt(9));
                 entityData.set(HAIR_ID, 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())));
-                entityData.set(OUTFIT, random.nextBoolean() && LivingWorldConfig.canUseClothes().contains("human")
+                entityData.set(OUTFIT, random.nextBoolean() && LivingWorldConfig.raceCanUseClothes("human")
                     ? random.nextInt(22) : -1);
                 String antoranianBody = randomColor(random);
                 entityData.set(BODY_COLOR, antoranianBody);
@@ -5080,9 +5106,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         // model visibility rule; every other form remains tailless.
         character.setHasSaiyanTail(isSaiyanSsj4Form());
         if (getRace().usesHair()) {
-            CustomHair hair = HairManager.getPresetHair(getHairId(), getRace().dmzId());
-            if (hair == null || hair.isEmpty()) hair = HairManager.getPresetHair(getHairId(), "human");
-            character.setHairBase(hair);
+            for (HairStyleSlot slot : HairStyleSlot.values()) {
+                CustomHair hair = HairManager.getPresetStyle(getHairId(), slot);
+                if (hair != null) character.setHairStyle(slot, hair);
+            }
         }
         return character;
     }

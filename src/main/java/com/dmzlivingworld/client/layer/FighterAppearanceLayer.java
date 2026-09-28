@@ -282,6 +282,12 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         }
         if (!"xenomax".equals(formId) && !"xenofp".equals(formId))
             layer(bioModel, pose, buffers, e, dmz(root + phase + "_" + bodyType + "_layer5.png"), rgb("#D9B28D"), pt, light, overlay);
+        boolean xenoModel = "bioandroid_xeno".equals(modelKey) || "bioandroid_xenofp".equals(modelKey);
+        if (xenoModel) {
+            layer(bioModel, pose, buffers, e, dmz(root + "xenoform_layer1.png"), WHITE, pt, light, overlay);
+            if (xenoModel)
+                layer(bioModel, pose, buffers, e, dmz(root + "xenoform_layer2.png"), WHITE, pt, light, overlay);
+        }
         layer(bioModel, pose, buffers, e, dmz(root + "faces/" + phase + "_eye_layer0.png"), WHITE, pt, light, overlay);
         layer(bioModel, pose, buffers, e, dmz(root + "faces/" + phase + "_eye_layer1.png"), rgb(e.getEye1Color()), pt, light, overlay);
     }
@@ -324,10 +330,7 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         var form = e.getActiveRacialFormConfig();
         if (form != null && !form.forcedHairCode().isBlank()) return true;
         if (e.getHairId() == 5) return false;
-        String raceId = e.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID || e.getRace().isSairensRace()
-            ? "human" : e.getRace().dmzId();
-        CustomHair hair = HairManager.getPresetHair(e.getHairId(), raceId);
-        if (hair == null || hair.isEmpty()) hair = HairManager.getPresetHair(e.getHairId(), "human");
+        CustomHair hair = HairManager.getPresetStyle(e.getHairId(), com.dragonminez.common.hair.HairStyleSlot.BASE);
         return hair != null && hair.getVisibleStrandCount() > 0;
     }
 

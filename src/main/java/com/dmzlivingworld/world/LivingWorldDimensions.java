@@ -22,8 +22,8 @@ public final class LivingWorldDimensions {
 
     public static boolean isSupported(ResourceKey<Level> dimension) {
         if (dimension == null) return false;
-        String id = dimension.location().toString().toLowerCase(java.util.Locale.ROOT);
-        boolean listed = LivingWorldConfig.dimensionWhitelist().contains(id);
+        String id = dimension.location().toString();
+        boolean listed = LivingWorldConfig.dimensionListContains(id);
         return LivingWorldConfig.treatDimensionWhitelistAsBlacklist() ? !listed : listed;
     }
 

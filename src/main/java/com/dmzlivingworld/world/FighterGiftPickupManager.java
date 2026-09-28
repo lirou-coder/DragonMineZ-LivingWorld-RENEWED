@@ -14,7 +14,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -23,6 +22,7 @@ import java.util.UUID;
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class FighterGiftPickupManager {
     public static final String GIVER = "LWGiftGiver";
+    private static final Set<UUID> PROCESSED_FIGHTERS = new HashSet<>();
     private FighterGiftPickupManager() {}
 
     @SubscribeEvent
@@ -38,16 +38,42 @@ public final class FighterGiftPickupManager {
         if (now % 40L != 0L) return;
         // Player radii regularly overlap in multiplayer. Process each actor once so one nearby
         // Senzu stack cannot be consumed multiple times in the same server tick.
-        Set<UUID> processed = new HashSet<>();
+        Set<UUID> processed = PROCESSED_FIGHTERS;
+        processed.clear();
         for (ServerPlayer observer : event.getServer().getPlayerList().getPlayers()) {
             if (!(observer.level() instanceof ServerLevel level)) continue;
             for (AmbientFighterEntity fighter : level.getEntitiesOfClass(AmbientFighterEntity.class,
                     observer.getBoundingBox().inflate(48.0D), f -> canAccept(f))) {
                 if (!processed.add(fighter.getUUID())) continue;
-                trySenzu(fighter, level);
-                tryFood(fighter, level);
+                tryGifts(fighter, level);
             }
         }
+    }
+
+    /** Finds both supported gift types in one entity-section query instead of two overlapping scans. */
+    private static void tryGifts(AmbientFighterEntity fighter, ServerLevel level) {
+        var senzuBounds = fighter.getBoundingBox().inflate(8.0D);
+        var foodBounds = fighter.getBoundingBox().inflate(7.0D);
+        ItemEntity nearestSenzu = null;
+        ItemEntity nearestFood = null;
+        double senzuDistance = Double.MAX_VALUE;
+        double foodDistance = Double.MAX_VALUE;
+        for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, senzuBounds,
+                e -> e.isAlive() && e.tickCount > 5 && e.getPersistentData().hasUUID(GIVER))) {
+            double distance = fighter.distanceToSqr(item);
+            if (isSenzu(item)) {
+                if (distance < senzuDistance) {
+                    senzuDistance = distance;
+                    nearestSenzu = item;
+                }
+            } else if (foodBounds.intersects(item.getBoundingBox()) && item.getItem().getItem().isEdible()
+                    && distance < foodDistance) {
+                foodDistance = distance;
+                nearestFood = item;
+            }
+        }
+        if (nearestSenzu != null) trySenzu(fighter, level, nearestSenzu);
+        if (nearestFood != null && nearestFood.isAlive()) tryFood(fighter, level, nearestFood);
     }
 
     private static boolean canAccept(AmbientFighterEntity fighter) {
@@ -57,11 +83,7 @@ public final class FighterGiftPickupManager {
                 && !fighter.isSocialPowerDisplay() && !fighter.isSanctionedMatchParticipant();
     }
 
-    private static void trySenzu(AmbientFighterEntity fighter, ServerLevel level) {
-        ItemEntity item = level.getEntitiesOfClass(ItemEntity.class, fighter.getBoundingBox().inflate(8.0D),
-                        e -> e.isAlive() && e.tickCount > 5 && e.getPersistentData().hasUUID(GIVER) && isSenzu(e))
-                .stream().min(Comparator.comparingDouble(fighter::distanceToSqr)).orElse(null);
-        if (item == null) return;
+    private static void trySenzu(AmbientFighterEntity fighter, ServerLevel level, ItemEntity item) {
         ServerPlayer giver = level.getServer().getPlayerList().getPlayer(item.getPersistentData().getUUID(GIVER));
         if (giver == null || giver.level() != fighter.level() || giver.distanceToSqr(fighter) > 18.0D * 18.0D) return;
 
@@ -101,12 +123,7 @@ public final class FighterGiftPickupManager {
         FighterMemoryManager.refreshLoadedProfile(fighter);
     }
 
-    private static void tryFood(AmbientFighterEntity fighter, ServerLevel level) {
-        ItemEntity item = level.getEntitiesOfClass(ItemEntity.class, fighter.getBoundingBox().inflate(7.0D),
-                        e -> e.isAlive() && e.tickCount > 5 && e.getPersistentData().hasUUID(GIVER)
-                                && !isSenzu(e) && e.getItem().getItem().isEdible())
-                .stream().min(Comparator.comparingDouble(fighter::distanceToSqr)).orElse(null);
-        if (item == null) return;
+    private static void tryFood(AmbientFighterEntity fighter, ServerLevel level, ItemEntity item) {
         ServerPlayer giver = level.getServer().getPlayerList().getPlayer(item.getPersistentData().getUUID(GIVER));
         if (giver == null || giver.level() != fighter.level() || giver.distanceToSqr(fighter) > 18.0D * 18.0D) return;
         long now = level.getServer().overworld().getGameTime();

@@ -22,6 +22,8 @@ import java.util.UUID;
  */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class AntagonistManager {
+    private static final Set<UUID> SEEN_FIGHTERS = new HashSet<>();
+
     private AntagonistManager() {}
 
     @SubscribeEvent
@@ -32,7 +34,10 @@ public final class AntagonistManager {
         if (now % 1200L == 0L) evaluateOrganizations(event.getServer().overworld(), now);
         if (now % 100L != 0L) return;
 
-        Set<UUID> seen = new HashSet<>();
+        // Server ticks are single-threaded; retain the backing table instead of allocating a large
+        // deduplication set every five seconds on populated servers.
+        Set<UUID> seen = SEEN_FIGHTERS;
+        seen.clear();
         for (net.minecraft.server.level.ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             if (!(player.level() instanceof ServerLevel level)) continue;
             for (AmbientFighterEntity fighter : level.getEntitiesOfClass(AmbientFighterEntity.class,

@@ -52,7 +52,11 @@ public final class FighterLivelinessManager {
         if (tickAttention(fighter, level, d, now)) return;
 
         if (now < d.getLong(POST_ACTIVITY_UNTIL) || now < d.getLong(DOWNTIME_UNTIL)) {
-            lookAtInterestingNearby(fighter, level, 12.0D);
+            // LookControl preserves its target rotation between updates. Staggering this cosmetic
+            // scan removes the only all-entity query this manager previously performed every tick.
+            if (Math.floorMod(fighter.tickCount + fighter.getId(), 10) == 0) {
+                lookAtInterestingNearby(fighter, level, 12.0D);
+            }
             return;
         }
         if (now < d.getLong(NEXT_REACTION)) return;

@@ -58,13 +58,18 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
     private static final ResourceLocation BIO = dmz("geo/entity/races/bioandroid.geo.json");
     private static final ResourceLocation BUFFED = dmz("geo/entity/races/hbuffed.geo.json");
     private static final ResourceLocation BUFFED_FEMALE = dmz("geo/entity/races/hbuffed_fem.geo.json");
+    private static final ResourceLocation BUFFED_G3 = dmz("geo/entity/races/hbuffedg3.geo.json");
+    private static final ResourceLocation BUFFED_FEMALE_G3 = dmz("geo/entity/races/hbuffed_femg3.geo.json");
     private static final ResourceLocation FROST_SECOND = dmz("geo/entity/races/frostdemon_second.geo.json");
     private static final ResourceLocation FROST_THIRD = dmz("geo/entity/races/frostdemon_third.geo.json");
     private static final ResourceLocation FROST_FP = dmz("geo/entity/races/frostdemon_fp.geo.json");
     private static final ResourceLocation FROST_FIFTH = dmz("geo/entity/races/frostdemon_fifth.geo.json");
+    private static final ResourceLocation FROST_METALCORE = dmz("geo/entity/races/frostdemon_metalcore.geo.json");
     private static final ResourceLocation BIO_SEMI = dmz("geo/entity/races/bioandroid_semi.geo.json");
     private static final ResourceLocation BIO_PERFECT = dmz("geo/entity/races/bioandroid_perfect.geo.json");
     private static final ResourceLocation BIO_ULTRA = dmz("geo/entity/races/bioandroid_ultra.geo.json");
+    private static final ResourceLocation BIO_XENO = dmz("geo/entity/races/bioandroid_xeno.geo.json");
+    private static final ResourceLocation BIO_XENO_FP = dmz("geo/entity/races/bioandroid_xenofp.geo.json");
     private static final ResourceLocation BLANK = dmz("textures/armor/blank.png");
     private static final ResourceLocation SAGA_ANIMATIONS = dmz("animations/entity/sagas/saga_base.animation.json");
     // WeaponRegistry attack profiles in DMZ 2.1.3 reference the race-combat animation library.
@@ -90,13 +95,19 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
         if (form != null) {
             String model = form.modelKey();
             if ("buffed".equals(model)) return entity.isFemale() ? BUFFED_FEMALE : BUFFED;
+            if ("ssj4gt".equals(model)) return entity.isFemale() ? BUFFED_FEMALE : BUFFED;
+            if ("buffedg3".equals(model) || "ssj4d".equals(model))
+                return entity.isFemale() ? BUFFED_FEMALE_G3 : BUFFED_G3;
             if ("frostdemon_second".equals(model)) return FROST_SECOND;
             if ("frostdemon_third".equals(model)) return FROST_THIRD;
             if ("frostdemon_fp".equals(model)) return FROST_FP;
             if ("frostdemon_fifth".equals(model)) return FROST_FIFTH;
+            if ("frostdemon_metalcore".equals(model)) return FROST_METALCORE;
             if ("bioandroid_semi".equals(model)) return BIO_SEMI;
             if ("bioandroid_perfect".equals(model)) return BIO_PERFECT;
             if ("bioandroid_ultra".equals(model)) return BIO_ULTRA;
+            if ("bioandroid_xeno".equals(model)) return BIO_XENO;
+            if ("bioandroid_xenofp".equals(model)) return BIO_XENO_FP;
             // DMZ resolves several player-only aliases (SSJ4/Namek/Majin) through its
             // player form renderer. Living World keeps native base geometry rather than
             // inventing a replacement model for those aliases.

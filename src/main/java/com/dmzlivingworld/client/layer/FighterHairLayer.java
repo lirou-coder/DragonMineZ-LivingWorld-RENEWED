@@ -2,14 +2,19 @@ package com.dmzlivingworld.client.layer;
 
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.world.WorldMenaceManager;
-import com.dragonminez.client.render.hair.HairRenderer;
+import com.dragonminez.Reference;
+import com.dragonminez.client.render.hair.HairEntityState;
+import com.dragonminez.client.render.hair.HairMeshBuilder;
 import com.dragonminez.common.hair.CustomHair;
+import com.dragonminez.common.hair.HairCodec;
 import com.dragonminez.common.hair.HairManager;
+import com.dragonminez.common.hair.HairStyleSlot;
 import com.dragonminez.common.stats.character.Character;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.renderer.GeoRenderer;
 import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
@@ -17,6 +22,11 @@ import software.bernie.geckolib.util.RenderUtils;
 
 /** Delegates humanoid hair geometry entirely to DragonMineZ's HairRenderer. */
 public final class FighterHairLayer extends GeoRenderLayer<AmbientFighterEntity> {
+    private static final ResourceLocation HAIR_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            Reference.MOD_ID, "textures/entity/races/hair.png");
+    private final HairMeshBuilder meshBuilder = new HairMeshBuilder();
+    private final HairEntityState hairState = new HairEntityState();
+
     public FighterHairLayer(GeoRenderer<AmbientFighterEntity> renderer) {
         super(renderer);
     }
@@ -30,59 +40,48 @@ public final class FighterHairLayer extends GeoRenderLayer<AmbientFighterEntity>
                 || (entity.getRace() == com.dmzlivingworld.entity.FighterRace.MAJIN && !entity.isFemale())) return;
 
         Character character = entity.getDMZCharacter();
-        String hairRace = entity.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID
-                || entity.getRace().isSairensRace() ? "human" : entity.getRace().dmzId();
         String hairType = entity.getActiveRacialForm() == null ? "base" : entity.getActiveRacialForm().hairType();
+        HairStyleSlot slot = hairSlot(hairType);
         String forcedHairCode = entity.getActiveRacialFormConfig() == null
                 ? "" : entity.getActiveRacialFormConfig().forcedHairCode();
-        CustomHair hair = decodeForcedHair(forcedHairCode, hairType);
-        if (hair == null || hair.isEmpty()) hair = switch (hairType) {
-            case "ssj" -> HairManager.getPresetHairSSJ(entity.getHairId(), hairRace);
-            case "ssj2" -> HairManager.getPresetHairSSJ2(entity.getHairId(), hairRace);
-            case "ssj3" -> HairManager.getPresetHairSSJ3(entity.getHairId(), hairRace);
-            default -> HairManager.getPresetHair(entity.getHairId(), hairRace);
-        };
-        if (hair == null || hair.isEmpty()) {
-            hair = switch (hairType) {
-                case "ssj" -> HairManager.getPresetHairSSJ(entity.getHairId(), "human");
-                case "ssj2" -> HairManager.getPresetHairSSJ2(entity.getHairId(), "human");
-                case "ssj3" -> HairManager.getPresetHairSSJ3(entity.getHairId(), "human");
-                default -> HairManager.getPresetHair(entity.getHairId(), "human");
-            };
-        }
+        CustomHair hair = decodeForcedHair(forcedHairCode, slot);
+        if (hair == null || hair.isEmpty()) hair = HairManager.getPresetStyle(entity.getHairId(), slot);
         if (hair == null || hair.isEmpty()) return;
-        float[] hairRgb = character.getRgbHairColor();
+        int hairRgb = toRgb(character.getRgbHairColor());
 
         poseStack.pushPose();
         RenderUtils.translateToPivotPoint(poseStack, bone);
-        HairRenderer.render(
-                poseStack, bufferSource, hair, hair, 1.0F, character,
-                null, null, hairRgb, hairRgb,
-                false, false, partialTick, packedLight, packedOverlay,
-                1.0F, 1.0F, 0.0F
-        );
+        hairState.updatePoses(hair, hair, 0.0F, slot, slot);
+        VertexConsumer hairBuffer = bufferSource.getBuffer(RenderType.entityCutoutNoCull(HAIR_TEXTURE));
+        meshBuilder.emit(hairBuffer, poseStack.last().pose(), poseStack.last().normal(), hairState, false,
+                hairRgb, hairRgb, false, false, packedLight, packedOverlay, 1.0F,
+                null, null, null);
         bufferSource.getBuffer(renderType);
         poseStack.popPose();
     }
 
-    private static CustomHair decodeForcedHair(String code, String hairType) {
+    private static HairStyleSlot hairSlot(String hairType) {
+        HairStyleSlot slot = HairStyleSlot.byHairType(hairType);
+        return slot == null ? HairStyleSlot.BASE : slot;
+    }
+
+    private static CustomHair decodeForcedHair(String code, HairStyleSlot slot) {
         if (code == null || code.isBlank()) return null;
         try {
-            if (HairManager.isFullSetCode(code)) {
-                CustomHair[] set = HairManager.fromFullSetCode(code);
-                if (set == null || set.length == 0) return null;
-                int variant = switch (hairType) {
-                    case "ssj" -> 1;
-                    case "ssj2" -> 2;
-                    case "ssj3" -> 3;
-                    default -> 0;
-                };
-                return set[Math.min(variant, set.length - 1)];
-            }
-            return HairManager.fromCode(code);
+            var set = HairCodec.fromFullSetCode(code);
+            if (set != null && set.get(slot) != null) return set.get(slot);
+            return HairCodec.fromCode(code);
         } catch (RuntimeException ignored) {
             // A malformed live form config must not break rendering; fall back to preset hair.
             return null;
         }
+    }
+
+    private static int toRgb(float[] rgb) {
+        if (rgb == null || rgb.length < 3) return 0xFFFFFF;
+        int r = Math.round(Math.max(0.0F, Math.min(1.0F, rgb[0])) * 255.0F);
+        int g = Math.round(Math.max(0.0F, Math.min(1.0F, rgb[1])) * 255.0F);
+        int b = Math.round(Math.max(0.0F, Math.min(1.0F, rgb[2])) * 255.0F);
+        return (r << 16) | (g << 8) | b;
     }
 }

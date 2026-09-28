@@ -586,8 +586,8 @@ public final class LivingBondManager {
     }
 
     private static boolean companionDimensionBlocked(ServerLevel level) {
-        return level != null && LivingWorldConfig.companionDimensionBlacklist().contains(
-                level.dimension().location().toString().toLowerCase(java.util.Locale.ROOT));
+        return level != null && LivingWorldConfig.companionDimensionBlacklistContains(
+                level.dimension().location().toString());
     }
 
     private static boolean validCompanionThreat(ServerPlayer player, AmbientFighterEntity companion, LivingEntity threat, double maxDistance) {
@@ -1116,6 +1116,7 @@ public final class LivingBondManager {
         if (player == null) return new ArrayList<>();
         CompoundTag root = root(player);
         List<UUID> result = new ArrayList<>();
+        boolean hadRoster = root.contains("CompanionIds", Tag.TAG_LIST);
         if (root.contains("CompanionIds", Tag.TAG_LIST)) {
             ListTag list = root.getList("CompanionIds", Tag.TAG_STRING);
             for (int i = 0; i < list.size() && result.size() < MAX_COMPANIONS; i++) {
@@ -1123,8 +1124,11 @@ public final class LivingBondManager {
                 catch (IllegalArgumentException ignored) { }
             }
         }
-        if (root.hasUUID("Companion") && !result.contains(root.getUUID("Companion"))) result.add(0, root.getUUID("Companion"));
-        if (!result.isEmpty()) writeCompanionIds(root, result);
+        boolean migratedLegacy = root.hasUUID("Companion") && !result.contains(root.getUUID("Companion"));
+        if (migratedLegacy) result.add(0, root.getUUID("Companion"));
+        // Reading a roster is extremely hot (AI, damage, buffs and navigation). Rewrite NBT only
+        // for the one-time legacy migration, not on every membership test.
+        if (!result.isEmpty() && (!hadRoster || migratedLegacy)) writeCompanionIds(root, result);
         return result;
     }
 
@@ -1136,7 +1140,20 @@ public final class LivingBondManager {
     }
 
     public static boolean isCompanion(ServerPlayer player, AmbientFighterEntity npc) {
-        return player != null && npc != null && companionIds(player).contains(npc.getUUID());
+        if (player == null || npc == null) return false;
+        return rosterContains(root(player), npc.getUUID());
+    }
+
+    private static boolean rosterContains(CompoundTag root, UUID sought) {
+        if (root == null || sought == null) return false;
+        if (root.hasUUID("Companion") && sought.equals(root.getUUID("Companion"))) return true;
+        if (!root.contains("CompanionIds", Tag.TAG_LIST)) return false;
+        ListTag list = root.getList("CompanionIds", Tag.TAG_STRING);
+        String id = sought.toString();
+        for (int i = 0; i < list.size() && i < MAX_COMPANIONS; i++) {
+            if (id.equalsIgnoreCase(list.getString(i))) return true;
+        }
+        return false;
     }
 
     public static void removeCompanion(ServerPlayer player, AmbientFighterEntity npc) {
@@ -1196,6 +1213,11 @@ public final class LivingBondManager {
 
     public static boolean isTravellingCompanion(AmbientFighterEntity fighter) {
         if (fighter == null || !(fighter.level() instanceof ServerLevel level)) return false;
+        CompoundTag data = fighter.getPersistentData();
+        if (data.hasUUID("LWCompanionOwner")) {
+            ServerPlayer owner = level.getServer().getPlayerList().getPlayer(data.getUUID("LWCompanionOwner"));
+            return owner != null && rosterContains(root(owner), fighter.getUUID());
+        }
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
             if (isCompanion(player, fighter)) return true;
         }

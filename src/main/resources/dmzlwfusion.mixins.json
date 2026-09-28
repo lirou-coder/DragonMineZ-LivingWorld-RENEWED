@@ -12,6 +12,7 @@
     "LivingWorldOwnedMonsterPersistenceMixin",
     "LivingWorldOwnedHostilePersistenceMixin"
     ,"RacialSkillLogicMixin"
+    ,"MajinAbsorptionMixin"
     ,"NamekianRevampRacialSkillMixin"
     ,"NamekianRevampTargetMixin"
     ,"MajinRevampFriendlyFistMixin"

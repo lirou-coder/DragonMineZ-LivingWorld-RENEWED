@@ -37,6 +37,8 @@ public final class KiSafetyManager {
     private static final String TAG_NATIVE_BLOCK_DESTRUCTION = "dmzlivingworld_native_block_destruction";
     private static int lastMode = -1;
     private static final ThreadLocal<AbstractKiProjectile> ACTIVE_LW_EXPLOSION = new ThreadLocal<>();
+    private static final Set<UUID> SEEN_PROJECTILES = new HashSet<>();
+    private static final Set<UUID> SEEN_FIGHTERS = new HashSet<>();
 
     private KiSafetyManager() {}
 
@@ -94,7 +96,8 @@ public final class KiSafetyManager {
     }
 
     private static void reconfigureLoadedProjectiles(TickEvent.ServerTickEvent event) {
-        Set<UUID> seen = new HashSet<>();
+        Set<UUID> seen = SEEN_PROJECTILES;
+        seen.clear();
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             if (!(player.level() instanceof ServerLevel level)) continue;
             AABB box = player.getBoundingBox().inflate(256.0D);
@@ -107,7 +110,8 @@ public final class KiSafetyManager {
     }
 
     private static void reconfigureLoadedFighters(TickEvent.ServerTickEvent event) {
-        Set<UUID> seen = new HashSet<>();
+        Set<UUID> seen = SEEN_FIGHTERS;
+        seen.clear();
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             if (!(player.level() instanceof ServerLevel level)) continue;
             for (AmbientFighterEntity fighter : level.getEntitiesOfClass(AmbientFighterEntity.class, player.getBoundingBox().inflate(512.0D))) {

@@ -36,6 +36,8 @@ public final class FighterPowerSpikeReactionManager {
     private static final Map<UUID, Boolean> LAST_NPC_TRANSFORM = new HashMap<>();
     private static final Map<UUID, Long> SOURCE_COOLDOWN = new HashMap<>();
     private static final Map<UUID, Long> LAST_NPC_SEEN = new HashMap<>();
+    private static final Set<UUID> ONLINE_PLAYER_SCRATCH = new HashSet<>();
+    private static final Set<UUID> SEEN_NPC_SCRATCH = new HashSet<>();
     private static final long NPC_STALE_TICKS = 1_200L;
 
     private FighterPowerSpikeReactionManager() {}
@@ -48,13 +50,15 @@ public final class FighterPowerSpikeReactionManager {
         // DMZ form/stat events cover discrete player spikes. Polling remains at a lower cadence
         // for charge edges, release (DMZ 2.1.3 exposes no server ReleaseChangeEvent), and NPCs.
         if (now % 10L != 0L) return;
-        Set<UUID> onlinePlayers = new HashSet<>();
+        Set<UUID> onlinePlayers = ONLINE_PLAYER_SCRATCH;
+        onlinePlayers.clear();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             onlinePlayers.add(player.getUUID());
             if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) continue;
             tickPlayer(level, player, now);
         }
-        Set<UUID> seen = new HashSet<>();
+        Set<UUID> seen = SEEN_NPC_SCRATCH;
+        seen.clear();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) continue;
             for (AmbientFighterEntity fighter : level.getEntitiesOfClass(AmbientFighterEntity.class,

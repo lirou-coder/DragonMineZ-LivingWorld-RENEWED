@@ -16,8 +16,4 @@ public final class ClearWantedWish extends Wish {
         WantedManager.clearPlayerWanted(player);
     }
 
-    @Override
-    public String toJson() {
-        return "";
-    }
 }

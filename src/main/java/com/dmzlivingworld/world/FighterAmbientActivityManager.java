@@ -77,6 +77,7 @@ public final class FighterAmbientActivityManager {
     public static final String POST_BATTLE_RECOVERY_PENDING = "LWPostBattleRecoveryPending";
     public static final String POST_BATTLE_RECOVERY_AT = "LWPostBattleRecoveryAt";
     private static final Map<UUID, Session> SESSIONS = new HashMap<>();
+    private static final Set<UUID> CHECKED_NEARBY_FIGHTERS = new HashSet<>();
 
     public enum Type {
         FISHING("Fishing"), REST("Resting"), SITTING("Sitting"), JOGGING("Jogging"), WALKING("Taking a walk"),
@@ -1300,7 +1301,8 @@ public final class FighterAmbientActivityManager {
     }
 
     private static void tryStartNearby(MinecraftServer server, long now) {
-        Set<UUID> checked = new HashSet<>();
+        Set<UUID> checked = CHECKED_NEARBY_FIGHTERS;
+        checked.clear();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (!(player.level() instanceof ServerLevel level) || !LivingWorldDimensions.isSupported(level)) continue;
             for (AmbientFighterEntity fighter : level.getEntitiesOfClass(AmbientFighterEntity.class,

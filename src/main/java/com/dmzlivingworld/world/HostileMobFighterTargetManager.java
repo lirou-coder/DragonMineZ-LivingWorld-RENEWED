@@ -15,8 +15,6 @@ import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-import java.util.Comparator;
-
 /** Lets structurally hostile mobs recognize neutral-typed Living World fighters as targets. */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class HostileMobFighterTargetManager {
@@ -88,13 +86,19 @@ public final class HostileMobFighterTargetManager {
                 Math.min(MAX_SCAN_RANGE, mob.getAttributeValue(Attributes.FOLLOW_RANGE))
         );
 
-        mob.level().getEntitiesOfClass(
-                        AmbientFighterEntity.class,
-                        mob.getBoundingBox().inflate(range),
-                        fighter -> mayTarget(mob, fighter))
-                .stream()
-                .min(Comparator.comparingDouble(mob::distanceToSqr))
-                .ifPresent(mob::setTarget);
+        AmbientFighterEntity nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
+        for (AmbientFighterEntity fighter : mob.level().getEntitiesOfClass(
+                AmbientFighterEntity.class,
+                mob.getBoundingBox().inflate(range),
+                fighter -> mayTarget(mob, fighter))) {
+            double distance = mob.distanceToSqr(fighter);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearest = fighter;
+            }
+        }
+        if (nearest != null) mob.setTarget(nearest);
     }
 
     private static boolean mayTarget(Mob mob, AmbientFighterEntity fighter) {

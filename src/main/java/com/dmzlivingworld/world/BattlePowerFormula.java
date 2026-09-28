@@ -31,6 +31,15 @@ public final class BattlePowerFormula {
         return p.reference * Math.pow(safe / p.divisor, p.exponent);
     }
 
+    /**
+     * World-menace presets are raw BP references in base DMZ. Overhaul deliberately curves that
+     * reference through its current Custom BP settings, without changing the menace's stat budget.
+     */
+    public static double worldMenaceBattlePower(double reference) {
+        double safe = Math.max(1.0D, reference);
+        return ModList.get().isLoaded("dmzrevamp") ? battlePower(safe) : safe;
+    }
+
     public static double effectiveFromBattlePower(double battlePower) {
         Parameters p = parameters();
         return p.divisor * Math.pow(Math.max(1.0D, battlePower) / p.reference, 1.0D / p.exponent);

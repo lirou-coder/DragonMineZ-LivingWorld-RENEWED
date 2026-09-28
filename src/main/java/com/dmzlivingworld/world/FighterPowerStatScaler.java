@@ -78,9 +78,11 @@ public final class FighterPowerStatScaler {
 
     /** BP of a freshly distributed budget, before lived/passive/form modifiers are applied. */
     public static double battlePowerForEffectiveBudget(AmbientFighterEntity fighter, double effective) {
-        double distributed = Math.max(1.0D, effective * (meleeShare(fighter) + defenseShare(fighter)
-                + kiShare(fighter) + healthShare(fighter)));
-        return battlePowerForStats(fighter, distributed);
+        // The rolled effective budget already is reference * the rank's selected percentage.
+        // Archetype shares decide only how that budget becomes combat stats; feeding their sum
+        // back into BP made identical era rolls display different power and let Overhaul's Ki
+        // Sense disagree with the Living World menu.
+        return battlePowerForStats(fighter, Math.max(1.0D, effective));
     }
 
     /**
