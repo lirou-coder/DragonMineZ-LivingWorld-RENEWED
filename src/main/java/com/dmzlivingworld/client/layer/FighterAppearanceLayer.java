@@ -5,7 +5,9 @@ import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.RedRibbonExperimentManager;
 import com.dmzlivingworld.world.SairensRaceCompat;
 import com.dragonminez.client.util.ColorUtils;
+import com.dragonminez.client.util.ArmorTextureResolver;
 import com.dragonminez.client.render.util.ModRenderTypes;
+import com.dragonminez.common.init.armor.DbzArmorItem;
 import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -13,6 +15,8 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
 import software.bernie.geckolib.renderer.GeoRenderer;
 import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
@@ -336,8 +340,28 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
 
     private void renderOutfit(BakedGeoModel model, PoseStack pose, MultiBufferSource buffers,
                               AmbientFighterEntity e, String outfit, float pt, int light, int overlay) {
+        ItemStack dmzArmor = equippedDmzArmor(e);
+        if (!dmzArmor.isEmpty() && dmzArmor.getItem() instanceof DbzArmorItem armor
+                && "dragonminez".equals(armor.getModId())) {
+            layer(model, pose, buffers, e,
+                    ArmorTextureResolver.resolve(armor.getModId(), armor.getItemId(), EquipmentSlot.CHEST, dmzArmor),
+                    WHITE, pt, light, overlay);
+            layer(model, pose, buffers, e,
+                    ArmorTextureResolver.resolve(armor.getModId(), armor.getItemId(), EquipmentSlot.LEGS, dmzArmor),
+                    WHITE, pt, light, overlay);
+            return;
+        }
         layer(model, pose, buffers, e, dmz("textures/armor/" + outfit + "_layer1.png"), WHITE, pt, light, overlay);
         layer(model, pose, buffers, e, dmz("textures/armor/" + outfit + "_layer2.png"), WHITE, pt, light, overlay);
+    }
+
+    private static ItemStack equippedDmzArmor(AmbientFighterEntity fighter) {
+        for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.CHEST, EquipmentSlot.LEGS,
+                EquipmentSlot.FEET, EquipmentSlot.HEAD}) {
+            ItemStack stack = fighter.getItemBySlot(slot);
+            if (stack.getItem() instanceof DbzArmorItem armor && "dragonminez".equals(armor.getModId())) return stack;
+        }
+        return ItemStack.EMPTY;
     }
 
     private void layer(BakedGeoModel model, PoseStack pose, MultiBufferSource buffers,

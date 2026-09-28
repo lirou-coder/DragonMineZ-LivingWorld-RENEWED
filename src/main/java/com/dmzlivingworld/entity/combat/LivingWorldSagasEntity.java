@@ -1,6 +1,9 @@
 package com.dmzlivingworld.entity.combat;
 
 import com.dmzlivingworld.entity.WorldMenaceFighterEntity;
+import com.dmzlivingworld.entity.AmbientFighterEntity;
+import com.dmzlivingworld.entity.FighterRace;
+import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dragonminez.client.util.ColorUtils;
 import com.dragonminez.common.combat.clash.BeamClashManager;
 import com.dragonminez.common.config.ConfigManager;
@@ -14,6 +17,8 @@ import com.dragonminez.common.init.MainSounds;
 import com.dmzlivingworld.entity.combat.goals.LWSagasUseSkillGoal;
 import com.dragonminez.common.init.entities.ki.*;
 import com.dmzlivingworld.entity.combat.ai.LWSagasCombatBrain;
+import com.dmzlivingworld.entity.combat.ai.v2.AiProfile;
+import com.dmzlivingworld.entity.combat.ai.v2.EnemyBrain;
 import com.dmzlivingworld.entity.combat.ai.LWCombatContext;
 import com.dmzlivingworld.entity.combat.helper.LWComboManager;
 import com.dmzlivingworld.entity.combat.helper.LWDBSagasAnimationHandler;
@@ -90,7 +95,8 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
         PROJECTILE_FAST,
         ZONING,
         DEFENSIVE,
-        AOE_BURST
+        AOE_BURST,
+        BLIND
     }
 
     /**
@@ -137,7 +143,18 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
         FINAL_FLASH(18, SkillRole.RANGED_TRAVEL, Tier.STRONG),
         MAJIN_CANDY(19, SkillRole.ZONING, Tier.STRONG),
         KI_AIR_VOLLEY(20, SkillRole.ZONING, Tier.WEAK),
-        DOUBLE_SUNDAY(21, SkillRole.RANGED_TRAVEL, Tier.STRONG);
+        DOUBLE_SUNDAY(21, SkillRole.RANGED_TRAVEL, Tier.STRONG),
+        WOLF_FANG(22, SkillRole.GUARD_BREAK, Tier.MEDIUM),
+        DRAGON_FIST(23, SkillRole.GUARD_BREAK, Tier.STRONG),
+        KAMEHAMEHA_X10(24, SkillRole.RANGED_TRAVEL, Tier.STRONG),
+        TAIYOKEN(25, SkillRole.BLIND, Tier.WEAK),
+        DODONPA(26, SkillRole.HITSCAN, Tier.MEDIUM),
+        BURNING_ATTACK(27, SkillRole.GUARD_BREAK, Tier.STRONG),
+        SUPERNOVA_COOLER(28, SkillRole.GUARD_BREAK, Tier.STRONG),
+        ASSAULT_RAIN(29, SkillRole.ZONING, Tier.MEDIUM),
+        BLASTER_METEOR(30, SkillRole.ZONING, Tier.STRONG),
+        DIMENSIONAL_PUNCH(31, SkillRole.GUARD_BREAK, Tier.STRONG),
+        DESTRUCTION_BALLS(32, SkillRole.ZONING, Tier.STRONG);
 
         private final int id;
         private final SkillRole role;
@@ -164,7 +181,8 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
         BASIC(0, Tier.MEDIUM), AIR(1, Tier.MEDIUM), KI_CHARGE_ATTACK(2, Tier.STRONG),
         METEOR_COMBINATION(3, Tier.STRONG), ANDROID_ABSORPTION(4, Tier.STRONG),
         GUM_PUNCH(5, Tier.MEDIUM), GUM_EXPAND(6, Tier.WEAK), SLEEP_RECOVERY(7, Tier.WEAK),
-        RAPID_KICKS(8, Tier.WEAK);
+        RAPID_KICKS(8, Tier.WEAK), SPIRIT_BREAKING_CANNON(9, Tier.STRONG),
+        SUPER_GOD_FIST(11, Tier.STRONG);
 
         private final int id;
         private final Tier tier;
@@ -264,6 +282,16 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
     protected double defaultAttackSpeed = 4.0D;
 
     private AiTier aiTier = AiTier.SIMPLE;
+    private final EnemyBrain combatBrain = new EnemyBrain(this);
+    public static final String RAID_ID_TAG = "dmz_raid_id";
+
+    private enum Maneuver { NONE, STRAFE, KITE, FLANK }
+    private Maneuver maneuver = Maneuver.NONE;
+    private int maneuverTicks;
+    private int maneuverDir = 1;
+    private Vec3 maneuverPoint;
+    private static final double SIDESTEP_SPEED = 1.1D;
+    private static final double DASH_AWAY_SPEED = 1.6D;
 
     public void setAiTierById(int id) {
         AiTier[] values = AiTier.values();
@@ -273,6 +301,14 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
 
     public int getAiTierId() {
         return this.aiTier.ordinal() + 1;
+    }
+
+    public AiProfile getAiProfile() {
+        return switch (this.aiTier) {
+            case SIMPLE -> com.dmzlivingworld.entity.combat.ai.v2.AiTier.NOVICE.profile();
+            case TACTICAL -> com.dmzlivingworld.entity.combat.ai.v2.AiTier.SMART.profile();
+            case ADVANCED -> com.dmzlivingworld.entity.combat.ai.v2.AiTier.EXPERT.profile();
+        };
     }
 
     private static final int DECISION_INTERVAL = 6;
@@ -474,7 +510,7 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
         this.comboEnabled = true;
         this.comboCooldownMax = cooldown;
         this.currentComboCooldown = 10;
-        this.allowedCombos = comboIds;
+        this.allowedCombos = withRacialCombos(java.util.Arrays.stream(comboIds).filter(this::canUseComboIdentity).toArray());
     }
 
     public void setAllowedCombos(int cooldown, ComboType... combos) {
@@ -482,11 +518,15 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
         this.comboCooldownMax = cooldown;
         this.currentComboCooldown = 10;
 
-        int[] ids = new int[combos.length];
-        for (int i = 0; i < combos.length; i++) {
-            ids[i] = combos[i].getId();
-        }
-        this.allowedCombos = ids;
+        this.allowedCombos = withRacialCombos(java.util.Arrays.stream(combos).mapToInt(ComboType::getId)
+                .filter(this::canUseComboIdentity).toArray());
+    }
+
+    private int[] withRacialCombos(int[] configured) {
+        if (!(this instanceof AmbientFighterEntity fighter) || fighter.getRace() != FighterRace.MAJIN
+                || java.util.Arrays.stream(configured).anyMatch(id -> id == ComboType.GUM_PUNCH.getId())) return configured;
+        return java.util.stream.IntStream.concat(java.util.Arrays.stream(configured),
+                java.util.stream.IntStream.of(ComboType.GUM_PUNCH.getId())).toArray();
     }
 
     public void setEvade(boolean active, int cooldown) {
@@ -508,11 +548,28 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
     }
 
     public void addKiSkill(KiSkillType type, int cooldown, float size, int colorMain, int colorBorder, int colorOutline) {
+        if (!canUseSkillIdentity(type)) return;
         this.skillPool.add(new KiSkill(type.getId(), cooldown, size, colorMain, colorBorder, colorOutline));
     }
 
+    private boolean canUseComboIdentity(int comboId) {
+        // Gum Punch is racial anatomy, not a generic martial art.
+        return comboId != ComboType.GUM_PUNCH.getId()
+                || (this instanceof AmbientFighterEntity fighter && fighter.getRace() == FighterRace.MAJIN);
+    }
+
+    private boolean canUseSkillIdentity(KiSkillType type) {
+        if (!(this instanceof AmbientFighterEntity fighter)) return true;
+        // DMZ 2.2 drives Rage Scream through the same NPC skill slot as its roar.
+        if (type == KiSkillType.OOZARU_ROAR) return fighter.getRace() == FighterRace.MAJIN;
+        // Dimensional Punch is added by the 2.2 port; reserve its native id now so malformed or
+        // older saved pools cannot grant it to ordinary fighters during migration.
+        if (type.getId() == 31) return WorldMenaceManager.isHerobrine(fighter);
+        return true;
+    }
+
     public void addKiSkill(KiSkillType type, int cooldown, float size, int colorMain, int colorBorder) {
-        this.skillPool.add(new KiSkill(type.getId(), cooldown, size, colorMain, colorBorder, ColorUtils.darkenColor(colorBorder, 0.6f)));
+        this.addKiSkill(type, cooldown, size, colorMain, colorBorder, ColorUtils.darkenColor(colorBorder, 0.6f));
     }
 
     public void addKiSkill(KiSkillType type, int cooldown, float size) {
@@ -833,20 +890,6 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
                     }
                 }
 
-                if (this.aiTier == AiTier.SIMPLE && this.canUseWildSense && this.currentWildSenseCooldown <= 0 && this.getTarget() != null && !this.isCasting() && !this.isComboing() && !clashing) {
-                    this.performTeleport(this.getTarget());
-                    this.currentWildSenseCooldown = this.wildSenseCooldownMax;
-                }
-
-                if (this.hurtTime > 0 && !this.isCasting() && !this.isComboing() && !this.isZanzoken()) {
-                    if (this.canUseZanzoken && this.currentZanzokenCooldown <= 0 && !this.isZanzoken()) {
-                        this.performZanzoken();
-                    }
-                    else if (this.canEvade && this.currentEvadeTimer <= 0 && !this.isEvading()) {
-                        this.performEvasion();
-                    }
-                }
-
                 if (this.isEvading()) {
                     evasionStateTicks++;
                     if (evasionStateTicks > 12) {
@@ -861,27 +904,10 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
                     if (this.isComboing()) {
                         this.comboTimer++;
                         handleComboLogic();
-                    } else if (this.aiTier == AiTier.SIMPLE && this.currentComboCooldown <= 0 && this.globalActionCooldown <= 0 && !this.isCasting() && this.getTarget() != null && !clashing && !this.isStunned()) {
-                        if (this.distanceTo(this.getTarget()) < 6.0D) {
-                            this.startComboAuto();
-                        }
                     }
                 }
-
-                if (this.aiTier != AiTier.SIMPLE) {
-                    LivingEntity decisionTarget = this.getTarget();
-                    if (decisionTarget == null || !decisionTarget.isAlive()) {
-                        if (!this.meleeAllowed) this.meleeAllowed = true;
-                        this.setLocomotionMode(LocomotionMode.WALK);
-                    } else {
-                        if (this.decisionCooldown > 0) this.decisionCooldown--;
-                        if (this.decisionCooldown <= 0 && !this.isCasting() && !this.isComboing()
-                                && !this.isZanzoken() && !this.isEvading() && !clashing && !this.isStunned()) {
-                            this.decisionCooldown = DECISION_INTERVAL;
-                            this.runBrainDecision();
-                        }
-                    }
-                }
+                this.tickManeuver();
+                this.combatBrain.tick();
             }
 
             if (this.isTransforming()) {
@@ -1021,6 +1047,8 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
 
     public void startSkill(KiSkill skill) {
         if (skill == null) return;
+        KiSkillType type = KiSkillType.fromId(skill.id);
+        if (type == null || !this.canUseSkillIdentity(type)) return;
         if (BeamClashManager.isClashing(this.getUUID())) return;
         this.currentPoolSkillSize = skill.size;
         this.currentPoolColorMain = skill.colorMain;
@@ -1518,6 +1546,163 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
         return super.doHurtTarget(pEntity);
     }
 
+    public boolean isCombatFrozen() { return false; }
+    public boolean isRaidDormant() { return false; }
+    public boolean isBossAsleep() { return false; }
+    public int getBossAbility() { return -1; }
+    public boolean isValidRaidTarget(LivingEntity candidate) { return candidate != null; }
+    public boolean brainCanTarget(LivingEntity candidate) {
+        return candidate != null && candidate.isAlive() && !this.isAlliedTo(candidate) && this.canAttack(candidate);
+    }
+    protected boolean brainMovementAllowed() { return true; }
+    public boolean isTournamentBound() { return this.getPersistentData().contains("dmz_tournament_match"); }
+    public boolean isBlindedByTaiyoken() {
+        return this.getPersistentData().getLong("dmz_taiyoken_blind_until") > this.level().getGameTime();
+    }
+    public double getMeleeReach() { return 4.5D + this.getBbWidth() * 0.5D; }
+    public boolean hasGiantBody() { return this.getScale() > 2.0F; }
+    public void setMeleeAllowed(boolean allowed) { this.meleeAllowed = allowed; }
+    public void restoreMovementSpeed() {
+        if (this.dashTicks <= 0 && this.getAttribute(Attributes.MOVEMENT_SPEED) != null) {
+            this.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(this.defaultMovementSpeed);
+        }
+    }
+    public void scaleZanzokenCooldown(float multiplier) {
+        if (multiplier > 0.0F) this.currentZanzokenCooldown = Math.max(1, Math.round(this.currentZanzokenCooldown * multiplier));
+    }
+    public void refundSkillCooldowns(float fraction) {
+        if (fraction <= 0.0F) return;
+        for (KiSkill skill : this.skillPool) {
+            if (skill.currentCooldown > 0) skill.currentCooldown = Math.max(0,
+                    skill.currentCooldown - Math.round(skill.cooldownMax * fraction));
+        }
+    }
+    public boolean startSkillReactive(KiSkill skill) {
+        if (skill == null || this.isCasting() || this.isComboing()) return false;
+        int savedGlobal = this.globalActionCooldown;
+        int savedPost = this.postCastCooldown;
+        this.globalActionCooldown = 0;
+        this.postCastCooldown = 0;
+        this.startSkill(skill);
+        if (!this.isCasting()) {
+            this.globalActionCooldown = savedGlobal;
+            this.postCastCooldown = savedPost;
+            return false;
+        }
+        return true;
+    }
+    public boolean isManeuvering() { return this.maneuver != Maneuver.NONE && this.maneuverTicks > 0; }
+    public void cancelManeuver() {
+        this.maneuver = Maneuver.NONE;
+        this.maneuverTicks = 0;
+        this.maneuverPoint = null;
+        this.meleeAllowed = true;
+    }
+    public void beginStrafe(int ticks, int dir) {
+        if (!brainMovementAllowed()) return;
+        this.maneuver = Maneuver.STRAFE; this.maneuverTicks = ticks; this.maneuverDir = dir >= 0 ? 1 : -1;
+        this.meleeAllowed = false; this.getNavigation().stop(); this.setLocomotionMode(LocomotionMode.WALK); restoreMovementSpeed();
+    }
+    public void beginKite(int ticks) {
+        if (!brainMovementAllowed()) return;
+        this.maneuver = Maneuver.KITE; this.maneuverTicks = ticks; this.meleeAllowed = false;
+        this.setLocomotionMode(LocomotionMode.RUN); restoreMovementSpeed();
+    }
+    public void beginFlank(Vec3 point, int ticks) {
+        if (!brainMovementAllowed() || point == null) return;
+        this.maneuver = Maneuver.FLANK; this.maneuverTicks = ticks; this.maneuverPoint = point; this.meleeAllowed = false;
+        this.setLocomotionMode(LocomotionMode.RUN); restoreMovementSpeed();
+    }
+    private void tickManeuver() {
+        if (this.maneuver == Maneuver.NONE) return;
+        LivingEntity target = this.getTarget();
+        if (--this.maneuverTicks <= 0 || target == null || !target.isAlive() || this.isCasting() || this.isComboing()
+                || this.isZanzoken() || this.isStunned() || !this.brainMovementAllowed()) {
+            cancelManeuver(); return;
+        }
+        if (this.isFlying()) return;
+        switch (this.maneuver) {
+            case STRAFE -> {
+                rotateBodyToTarget(target); double d = distanceTo(target); float forward = 0;
+                if (d > getMeleeReach() + 2.5D) forward = .45F; else if (d < 2D) forward = -.3F;
+                this.getMoveControl().strafe(forward, this.maneuverDir * .55F);
+            }
+            case KITE -> {
+                Vec3 away = this.position().subtract(target.position()); away = new Vec3(away.x, 0, away.z);
+                if (away.lengthSqr() < 1.0E-4D) away = this.getLookAngle().reverse();
+                Vec3 goal = this.position().add(away.normalize().scale(6));
+                if (this.tickCount % 5 == 0 || this.getNavigation().isDone()) this.getNavigation().moveTo(goal.x, goal.y, goal.z, 1.15D);
+                this.getLookControl().setLookAt(target, 30, 30);
+                if (distanceTo(target) > EnemyBrain.MID_RANGE) cancelManeuver();
+            }
+            case FLANK -> {
+                if (this.maneuverPoint == null) { cancelManeuver(); return; }
+                if (this.tickCount % 5 == 0 || this.getNavigation().isDone())
+                    this.getNavigation().moveTo(this.maneuverPoint.x, this.maneuverPoint.y, this.maneuverPoint.z, 1.2D);
+                this.getLookControl().setLookAt(target, 30, 30);
+                if (distanceToSqr(this.maneuverPoint) < 2.25D || distanceTo(target) <= getMeleeReach()) cancelManeuver();
+            }
+            default -> cancelManeuver();
+        }
+    }
+    private boolean moveManeuverInAir(LivingEntity target) {
+        if (!isManeuvering()) return false;
+        double speed = getFlySpeed();
+        Vec3 toward = new Vec3(target.getX() - getX(), 0, target.getZ() - getZ());
+        if (toward.lengthSqr() < 1.0E-4D) toward = getLookAngle();
+        toward = toward.normalize();
+        double vy = Mth.clamp((target.getY() + 1D - getY()) * .15D, -speed, speed);
+        Vec3 motion;
+        switch (this.maneuver) {
+            case STRAFE -> {
+                Vec3 side = new Vec3(-toward.z, 0, toward.x).scale(this.maneuverDir);
+                double d = distanceTo(target);
+                Vec3 radial = d > getMeleeReach() + 2.5D ? toward.scale(.5D) : d < 2D ? toward.scale(-.4D) : Vec3.ZERO;
+                motion = side.add(radial).normalize().scale(speed * .8D);
+            }
+            case KITE -> motion = toward.scale(-speed * .9D);
+            case FLANK -> {
+                if (this.maneuverPoint == null) return false;
+                Vec3 point = new Vec3(this.maneuverPoint.x - getX(), 0, this.maneuverPoint.z - getZ());
+                if (point.lengthSqr() < 2.25D) { cancelManeuver(); return false; }
+                motion = point.normalize().scale(speed);
+            }
+            default -> { return false; }
+        }
+        setDeltaMovement(motion.x, vy, motion.z); rotateBodyToTarget(target); return true;
+    }
+    public boolean isBackstepReady() { return this.canEvade && this.currentEvadeTimer <= 0 && !this.isEvading(); }
+    public void performBackstep() {
+        if (this.isEvading() || this.isZanzoken()) return;
+        this.getNavigation().stop(); this.setEvading(true); this.evasionStateTicks = 0; this.currentEvadeTimer = this.evadeCooldownMax;
+        Vec3 look = this.getLookAngle();
+        this.setDeltaMovement(-look.x * 1.5D, 0.3D, -look.z * 1.5D);
+        this.playSound(MainSounds.ZANZOKEN.get(), 1.0F, 1.2F);
+    }
+    public void performSidestep(Vec3 approachDir) {
+        if (this.isEvading() || this.isZanzoken()) return;
+        Vec3 dir = approachDir == null ? Vec3.ZERO : new Vec3(approachDir.x, 0.0D, approachDir.z);
+        if (dir.lengthSqr() < 1.0E-4D) dir = new Vec3(this.getLookAngle().x, 0.0D, this.getLookAngle().z);
+        if (dir.lengthSqr() < 1.0E-4D) dir = new Vec3(1, 0, 0);
+        dir = dir.normalize(); Vec3 left = new Vec3(-dir.z, 0, dir.x); Vec3 right = left.reverse();
+        boolean lf = this.level().noCollision(this, this.getBoundingBox().move(left.scale(2.0D)));
+        boolean rf = this.level().noCollision(this, this.getBoundingBox().move(right.scale(2.0D)));
+        Vec3 side = lf && rf ? (this.random.nextBoolean() ? left : right) : (lf ? left : (rf ? right : dir.reverse()));
+        this.getNavigation().stop(); this.setDeltaMovement(side.scale(SIDESTEP_SPEED).add(0, this.isFlying() ? .15D : (this.onGround() ? .25D : .05D), 0));
+        this.hurtMarked = true; this.setEvading(true); this.evasionStateTicks = 2;
+        this.playSound(MainSounds.ZANZOKEN.get(), .8F, 1.4F);
+    }
+    public void performDashAway(Vec3 approachDir) {
+        if (this.isEvading() || this.isZanzoken()) return;
+        Vec3 dir = approachDir == null ? Vec3.ZERO : new Vec3(approachDir.x, 0, approachDir.z);
+        if (dir.lengthSqr() < 1.0E-4D) dir = new Vec3(this.getLookAngle().x, 0, this.getLookAngle().z);
+        if (dir.lengthSqr() < 1.0E-4D) dir = new Vec3(1, 0, 0);
+        this.getNavigation().stop(); this.setDeltaMovement(dir.normalize().scale(DASH_AWAY_SPEED).add(0, this.onGround() ? .3D : .1D, 0));
+        this.hurtMarked = true; this.setEvading(true); this.evasionStateTicks = 0;
+        this.currentDashCooldown = Math.max(this.currentDashCooldown, DASH_COOLDOWN / 2);
+        this.playSound(MainSounds.ZANZOKEN.get(), 1.0F, 1.2F);
+    }
+
     protected void handleCommonCombatMovement(LivingEntity target, boolean isActionActive) {
         if (this.level().isClientSide) return;
 
@@ -1578,6 +1763,7 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
 
     public void moveTowardsTargetInAir(LivingEntity target) {
         if (this.isCasting() || this.isComboing() || this.isEvading() || this.isZanzoken() || this.isStunned()) return;
+        if (this.moveManeuverInAir(target)) return;
         double flyspeed = this.getFlySpeed();
 
         double distance = this.distanceTo(target);

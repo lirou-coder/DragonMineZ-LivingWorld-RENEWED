@@ -4,6 +4,8 @@ import com.dragonminez.common.init.MainEffects;
 import com.dragonminez.common.init.MainSounds;
 import com.dragonminez.common.init.entities.ki.KiWaveEntity;
 import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
+import com.dmzlivingworld.entity.AmbientFighterEntity;
+import com.dmzlivingworld.world.FighterCombatTechniquePolicy;
 import com.dragonminez.common.stats.StatsCapability;
 import com.dragonminez.common.stats.StatsProvider;
 import net.minecraft.core.particles.ParticleTypes;
@@ -29,6 +31,11 @@ public class LWComboManager {
     }
 
     public static void handleCombo(LivingWorldSagasEntity user, LivingEntity target, int comboId, int timer) {
+        if (user instanceof AmbientFighterEntity fighter && comboId == 5
+                && !FighterCombatTechniquePolicy.canUse(fighter, "gum_punch")) {
+            user.stopCombo();
+            return;
+        }
         if (target == null || !target.isAlive() || !user.isAlive() || user.isTransforming()) {
             user.stopCombo();
             return;
@@ -47,8 +54,51 @@ public class LWComboManager {
             case 6 -> handleGumExpand(user, target, timer);
             case 7 -> handleSleepRecovery(user, timer);
             case 8 -> handleRapidKicks(user, target, timer);
+            case 9 -> handleSpiritBreakingCannon(user, target, timer);
+            case 11 -> handleSuperGodFist(user, target, timer);
 
         }
+    }
+
+    private static void handleSuperGodFist(LivingWorldSagasEntity user, LivingEntity target, int timer) {
+        if (timer <= 8) {
+            Vec3 direction = target.position().subtract(user.position()).normalize();
+            user.setDeltaMovement(direction.x * 1.25D, 0.0D, direction.z * 1.25D);
+            target.setDeltaMovement(Vec3.ZERO);
+            target.invulnerableTime = 20;
+        }
+        if (timer == 9) {
+            float damage = comboHitDamage(user, LivingWorldSagasEntity.ComboType.SUPER_GOD_FIST, 1);
+            target.invulnerableTime = 0;
+            target.hurt(user.damageSources().mobAttack(user), damage);
+            user.spawnPunchParticles(target);
+            Vec3 push = user.getLookAngle().normalize().scale(4.0D);
+            target.setDeltaMovement(push.x, 0.6D, push.z);
+            target.hasImpulse = true;
+            user.playSound(MainSounds.CRITICO2.get(), 2.0F, .7F);
+        }
+        if (timer >= 18) user.stopCombo();
+    }
+
+    private static void handleSpiritBreakingCannon(LivingWorldSagasEntity user, LivingEntity target, int timer) {
+        float total = comboHitDamage(user, LivingWorldSagasEntity.ComboType.SPIRIT_BREAKING_CANNON, 1);
+        if (timer < 8) {
+            target.setDeltaMovement(Vec3.ZERO);
+            target.invulnerableTime = 20;
+        }
+        if (timer == 8 || timer == 14 || timer == 20) {
+            target.invulnerableTime = 0;
+            target.hurt(user.damageSources().mobAttack(user), total * .2F);
+            user.spawnPunchParticles(target);
+        }
+        if (timer == 28) {
+            target.invulnerableTime = 0;
+            target.hurt(user.damageSources().mobAttack(user), total * .4F);
+            user.spawnPunchParticles(target);
+            target.setDeltaMovement(0, -2.2D, 0);
+            target.hasImpulse = true;
+        }
+        if (timer >= 36) user.stopCombo();
     }
 
     /**

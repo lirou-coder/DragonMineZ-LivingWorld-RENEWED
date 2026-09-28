@@ -4,6 +4,8 @@ import com.dragonminez.common.init.MainEffects;
 import com.dragonminez.common.init.MainSounds;
 import com.dragonminez.common.init.entities.ki.*;
 import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
+import com.dmzlivingworld.entity.AmbientFighterEntity;
+import com.dmzlivingworld.world.FighterCombatTechniquePolicy;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -16,6 +18,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class LWSkillManager {
+    public static final int KAMEHAMEHA_CAST_TICKS = 37;
+    public static final int ASSAULT_RAIN_CAST_TICKS = 30;
+    public static final int ASSAULT_RAIN_FIRE_TICKS = 40;
+    public static final int BLASTER_METEOR_CAST_TICKS = 30;
+    public static final int BLASTER_METEOR_FIRE_TICKS = 50;
+    public static final int DRAGON_FIST_WINDUP = 5;
+    public static final int DRAGON_FIST_RUSH_TICKS = 20;
 
     @FunctionalInterface
     public interface KiAction {
@@ -166,14 +175,85 @@ public class LWSkillManager {
             KiWaveEntity doubleSunday = new KiWaveEntity(user.level(), user);
             doubleSunday.setupDoubleSunday(user, dmg, user.getKiBlastSpeed(), user.getCurrentPoolColorMain(), user.getCurrentPoolColorBorder(), user.getCurrentPoolColorOutline(), user.getCurrentPoolSkillSize(), 40);
         });
+        REGISTRY.put(22, (user, target, dmg) -> {
+            if (user.distanceTo(target) <= 4.0D) {
+                target.invulnerableTime = 0;
+                target.hurt(user.damageSources().mobAttack(user), dmg);
+                user.spawnPunchParticles(target);
+            }
+        });
+        REGISTRY.put(23, (user, target, dmg) -> {
+            SPDragonFistEntity attack = new SPDragonFistEntity(user.level(), user);
+            attack.setupDragonFist(user, dmg, 1.0F, DRAGON_FIST_RUSH_TICKS);
+        });
+        REGISTRY.put(24, (user, target, dmg) -> {
+            KiWaveEntity wave = new KiWaveEntity(user.level(), user);
+            wave.setupKiHame(user, dmg, user.getKiBlastSpeed(), user.getCurrentPoolSkillSize(),
+                    0xFFE3E3, 0xFF2A2A, 0xB00020, KAMEHAMEHA_CAST_TICKS);
+        });
+        REGISTRY.put(26, (user, target, dmg) -> {
+            KiLaserEntity laser = new KiLaserEntity(user.level(), user);
+            laser.setupKiDodonpa(user, dmg, user.getKiBlastSpeed() * 3.0F, 0);
+        });
+        REGISTRY.put(27, (user, target, dmg) -> {
+            KiBlastEntity blast = new KiBlastEntity(user.level(), user);
+            blast.setupKiBlast(user, dmg, user.getKiBlastSpeed(), user.getCurrentPoolColorMain(),
+                    user.getCurrentPoolColorBorder(), user.getCurrentPoolColorOutline(), user.getCurrentPoolSkillSize(), 30);
+        });
+        REGISTRY.put(28, (user, target, dmg) -> {
+            KiBlastEntity ball = new KiBlastEntity(user.level(), user);
+            ball.setupKiDeathBall(user, dmg, user.getKiBlastSpeed() * .7F,
+                    user.getCurrentPoolColorMain(), user.getCurrentPoolColorBorder(), 60);
+        });
+        REGISTRY.put(29, (user, target, dmg) -> {
+            KiBlastEntity rain = new KiBlastEntity(user.level(), user);
+            rain.setupAssaultRain(user, dmg, user.getKiBlastSpeed(), user.getCurrentPoolColorMain(),
+                    user.getCurrentPoolColorBorder(), user.getCurrentPoolColorOutline(),
+                    .8F * user.getCurrentPoolSkillSize(), ASSAULT_RAIN_CAST_TICKS, ASSAULT_RAIN_FIRE_TICKS);
+        });
+        REGISTRY.put(30, (user, target, dmg) -> {
+            KiBlastEntity meteor = new KiBlastEntity(user.level(), user);
+            meteor.setupBlasterMeteor(user, dmg, user.getKiBlastSpeed(), user.getCurrentPoolColorMain(),
+                    user.getCurrentPoolColorBorder(), user.getCurrentPoolColorOutline(),
+                    BLASTER_METEOR_CAST_TICKS, BLASTER_METEOR_FIRE_TICKS);
+        });
+        REGISTRY.put(25, (user, target, dmg) -> {
+            if (target.distanceTo(user) <= 16.0D && user.hasLineOfSight(target)) {
+                target.addEffect(new MobEffectInstance(MainEffects.STUN.get(), 30, 0, false, false, true));
+                target.getPersistentData().putLong("dmz_taiyoken_blind_until", user.level().getGameTime() + 60L);
+            }
+        });
+        REGISTRY.put(31, (user, target, dmg) -> {
+            if (user.distanceTo(target) > 4.0D) user.teleportTo(target.getX(), target.getY(), target.getZ());
+            target.invulnerableTime = 0;
+            target.hurt(user.damageSources().mobAttack(user), dmg);
+            user.spawnPunchParticles(target);
+        });
+        REGISTRY.put(32, (user, target, dmg) -> {
+            for (int i = 0; i < 3; i++) {
+                KiBlastEntity ball = new KiBlastEntity(user.level(), user);
+                ball.setupKiDeathBall(user, dmg / 3.0F, user.getKiBlastSpeed(),
+                        user.getCurrentPoolColorMain(), user.getCurrentPoolColorBorder(), 20);
+            }
+        });
     }
 
     public static void execute(int id, LivingWorldSagasEntity user, LivingEntity target) {
+        if (user instanceof AmbientFighterEntity fighter
+                && !FighterCombatTechniquePolicy.canUse(fighter, policyId(id))) return;
         KiAction action = REGISTRY.get(id);
         if (action != null) {
             float damage = getCalculatedDamage(id, user);
             action.execute(user, target, damage);
         }
+    }
+
+    private static String policyId(int id) {
+        return switch (id) {
+            case 7 -> "rage_scream";
+            case 31 -> "dimensional_punch";
+            default -> "skill_" + id;
+        };
     }
 
     private static final float VOLLEY_HIT_DIVISOR = 8.0F;
@@ -188,10 +268,10 @@ public class LWSkillManager {
         float mult = type != null ? type.getTier().getDamageMultiplier() : LivingWorldSagasEntity.Tier.MEDIUM.getDamageMultiplier();
 
         return switch (id) {
-            case 6 -> 0.0F;                             // Ki Barrier: defensive, no damage
-            case 7, 12, 19 -> meleeDmg * mult;          // Oozaru Roar / Blue Hurricane / Majin Candy: melee-scaled
+            case 6, 25 -> 0.0F;
+            case 7, 12, 19, 22, 23 -> meleeDmg * mult;
             case 13 -> kiDmg * mult / 3.0F;             // Triple Laser: 3 instances (ticks 10/20/30)
-            case 10, 20 -> kiDmg * mult / VOLLEY_HIT_DIVISOR; // Ki Volley / Air Volley: random spray, per-bullet
+            case 10, 20, 29, 30 -> kiDmg * mult / VOLLEY_HIT_DIVISOR;
             case 11 -> kiDmg * mult / SINGLE_IMPACT_HIT_DIVISOR; // Basic ki blast: single concentrated impact
             default -> kiDmg * mult;                    // every other ki skill: single ki-scaled hit
         };
@@ -202,6 +282,15 @@ public class LWSkillManager {
             case 4 -> 10;
             case 11 -> 12;
             case 12, 14, 17 -> 30;
+            case 23 -> DRAGON_FIST_WINDUP + DRAGON_FIST_RUSH_TICKS + 2;
+            case 24 -> 60;
+            case 25 -> 30;
+            case 26 -> 18;
+            case 27 -> 30;
+            case 28 -> 60;
+            case 29 -> ASSAULT_RAIN_CAST_TICKS + ASSAULT_RAIN_FIRE_TICKS + KiBlastEntity.ASSAULT_RAIN_DELAY;
+            case 30 -> BLASTER_METEOR_CAST_TICKS + BLASTER_METEOR_FIRE_TICKS;
+            case 31, 32 -> 40;
             case 13, 16, 18, 21 -> 40;
             case 19 -> 35;
             case 15 -> 60;

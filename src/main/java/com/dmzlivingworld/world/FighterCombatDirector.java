@@ -9,6 +9,7 @@ import com.dmzlivingworld.entity.FighterDialogue;
 import com.dmzlivingworld.client.LWLang;
 import com.dmzlivingworld.entity.FighterPersonality;
 import com.dmzlivingworld.entity.FighterRank;
+import com.dmzlivingworld.entity.FighterRace;
 import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
 import com.dragonminez.common.init.MainEffects;
 import com.dragonminez.common.init.entities.ki.AbstractKiProjectile;
@@ -152,6 +153,7 @@ public final class FighterCombatDirector {
 
         if (LivingWorldConfig.npcKiMode() != 2 && fighter.getRace() != com.dmzlivingworld.entity.FighterRace.ZAARAKIN) {
             configureKiIdentity(fighter, rank, style, variant);
+            configureDmz22Techniques(fighter, rank, style, variant);
             FighterTechniqueManager.applyLearnedTechniques(fighter);
         }
         configureSkillColors(fighter, variant);
@@ -164,6 +166,33 @@ public final class FighterCombatDirector {
 
         STATES.remove(fighter.getUUID());
         PENDING_SPEECH.remove(fighter.getUUID());
+    }
+
+    private static void configureDmz22Techniques(AmbientFighterEntity fighter, FighterRank rank,
+                                                   FighterArchetype style, int variant) {
+        if (WorldMenaceManager.isHerobrine(fighter)) {
+            fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.DIMENSIONAL_PUNCH, 180, 1.0F);
+            return;
+        }
+        if (fighter.getRace() == FighterRace.MAJIN && rank != FighterRank.ROOKIE) {
+            fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.OOZARU_ROAR, 280, 1.0F);
+        }
+        if (rank == FighterRank.ROOKIE) return;
+        switch (style) {
+            case BRAWLER -> fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.WOLF_FANG, 220, .8F);
+            case MARTIAL_ARTIST -> fighter.addKiSkill(variant % 2 == 0
+                    ? LivingWorldSagasEntity.KiSkillType.DRAGON_FIST
+                    : LivingWorldSagasEntity.KiSkillType.TAIYOKEN, 260, .9F);
+            case SPEEDSTER -> fighter.addKiSkill(variant % 2 == 0
+                    ? LivingWorldSagasEntity.KiSkillType.DODONPA
+                    : LivingWorldSagasEntity.KiSkillType.BURNING_ATTACK, 240, .8F);
+            case GUARDIAN -> {
+                if (rank == FighterRank.VETERAN) fighter.addKiSkill(LivingWorldSagasEntity.KiSkillType.DESTRUCTION_BALLS, 360, 1.0F);
+            }
+            case KI_SPECIALIST -> fighter.addKiSkill(rank == FighterRank.VETERAN
+                    ? LivingWorldSagasEntity.KiSkillType.BLASTER_METEOR
+                    : LivingWorldSagasEntity.KiSkillType.ASSAULT_RAIN, 320, 1.0F);
+        }
     }
 
     public static float baseKiDamage(AmbientFighterEntity fighter) {

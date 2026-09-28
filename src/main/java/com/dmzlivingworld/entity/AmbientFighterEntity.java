@@ -919,6 +919,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         // locomotion later in this method. Otherwise a peaceful activity can freeze a form.
         if (isKaiokenActive()) tickKaioken();
         if (isRacialFormActive()) tickRacialForm();
+        if (isAwakened() && !getPersistentData().getBoolean(TEMPORARY_AWAKENING)) tickAwakenedState();
         com.dmzlivingworld.world.ReactiveWorldManager.tick(this);
         FighterIntentManager.tick(this);
         long debugStopCharge = getPersistentData().getLong("LWDebugStopChargeAt");
@@ -2541,11 +2542,12 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (entity instanceof Player player && isSanctionedMatchParticipant() && isSanctionedOpponent(player)) return false;
         if (entity instanceof Player player && LivingBondManager.isCompanionAlly(player, this)) return true;
         if (entity instanceof AmbientFighterEntity other) {
+            if (com.dmzlivingworld.world.FighterNpcSocialManager.bond(this, other) >= 6)
+                return !isDuelOpponent(other);
             if (isFactionMember() && other.isFactionMember()) {
                 if (getFactionId().equals(other.getFactionId())) return !isDuelOpponent(other);
                 return FactionManager.areAllies(this, other) && !isDuelOpponent(other);
             }
-            if (other.getAlignment() == getAlignment()) return !isDuelOpponent(other);
         }
         return super.isAlliedTo(entity);
     }
@@ -3829,6 +3831,33 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         var attack = getAttribute(Attributes.ATTACK_DAMAGE);
         if (attack != null) attack.setBaseValue(FighterPowerStatScaler.baseAttack(this, FighterBattleGrowthManager.combatMultiplier(this)) * (getRank() == FighterRank.VETERAN ? 1.32D : 1.20D));
         setKiBlastDamage(FighterCombatDirector.baseKiDamage(this) * (getRank() == FighterRank.VETERAN ? 1.34F : 1.20F));
+    }
+
+    /** Generic Awakening follows the same calm-down lifecycle as configured racial forms. */
+    private void tickAwakenedState() {
+        if (isCaptive() || isDefeated()) {
+            stopAwakenedState();
+            return;
+        }
+        LivingEntity target = getTarget();
+        if (target != null && target.isAlive()) {
+            racialCalmTicks = 0;
+            return;
+        }
+        if (++racialCalmTicks >= 240) stopAwakenedState();
+    }
+
+    private void stopAwakenedState() {
+        if (!isAwakened()) return;
+        entityData.set(AWAKENED, false);
+        racialCalmTicks = 0;
+        auraFlareTicks = 0;
+        entityData.set(AURA_FLARED, false);
+        setLightning(false);
+        setKiCharge(false);
+        setBattlePower(projectedBattlePower());
+        if (entityData.get(READY)) refreshCombatStatsFromPower();
+        level().playSound(null, blockPosition(), MainSounds.TRANSFORM_OFF.get(), SoundSource.HOSTILE, 1.0F, 0.95F);
     }
 
     private void activateRacialForm() {

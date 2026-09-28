@@ -158,12 +158,7 @@ public final class WorldMenaceManager {
             disappear(fighter, attacker, now);
             return;
         }
-        WATCHES.remove(fighter.getUUID());
-        fighter.getPersistentData().putUUID(RETALIATE_PLAYER, attacker.getUUID());
-        fighter.getPersistentData().putLong(RETALIATE_UNTIL, now + 20L * 45L);
-        fighter.getPersistentData().putString(MENACE_STATE, "HUNTING");
-        fighter.setTarget(attacker);
-        markSpotted(attacker, fighter);
+        engage(fighter, attacker, now);
     }
 
     /** Handles ranged intimidation before any damage is applied. */
@@ -597,7 +592,6 @@ public final class WorldMenaceManager {
             // sighting turns into combat.  Merely entering the old 50-block warning radius
             // is not itself a challenge anymore.
             if (distance <= 20.0D && playerReady) {
-                teleportInFront(fighter, watched);
                 engage(fighter, watched, now);
                 return false;
             }
@@ -664,10 +658,20 @@ public final class WorldMenaceManager {
             return;
         }
         WATCHES.remove(fighter.getUUID());
+        // Watching owns and zeroes movement. Once the encounter is accepted, remove every
+        // presentation hold so ordinary combat navigation, flight and dashes regain full control.
+        fighter.getPersistentData().remove(DEBUG_HOLD_UNTIL);
+        fighter.getPersistentData().remove(INSPECTION_RELOCATE_AT);
+        fighter.getPersistentData().remove(INSPECTION_RELOCATE_PLAYER);
+        fighter.setNoGravity(false);
+        fighter.setFlying(false);
+        fighter.setFlyingFast(false);
+        fighter.getNavigation().stop();
         fighter.getPersistentData().putUUID(RETALIATE_PLAYER, player.getUUID());
         fighter.getPersistentData().putLong(RETALIATE_UNTIL, now + 20L * 45L);
         fighter.getPersistentData().putString(MENACE_STATE, "HUNTING");
         fighter.setTarget(player);
+        fighter.setAggressive(true);
         markSpotted(player, fighter);
     }
 
