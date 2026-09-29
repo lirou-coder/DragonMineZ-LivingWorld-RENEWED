@@ -14,6 +14,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.renderer.GeoRenderer;
@@ -53,9 +54,13 @@ public final class FighterHairLayer extends GeoRenderLayer<AmbientFighterEntity>
         RenderUtils.translateToPivotPoint(poseStack, bone);
         hairState.updatePoses(hair, hair, 0.0F, slot, slot);
         VertexConsumer hairBuffer = bufferSource.getBuffer(RenderType.entityCutoutNoCull(HAIR_TEXTURE));
+        var camera = Minecraft.getInstance().getCameraEntity();
+        // DMZ 2.2 now selects the expensive pixel-detail mesh only at close range. Keep the
+        // Fighter layer on the same 32-block threshold used by DMZHairLayer.
+        boolean pixelDetail = camera == null || entity.distanceToSqr(camera) <= 32.0D * 32.0D;
         meshBuilder.emit(hairBuffer, poseStack.last().pose(), poseStack.last().normal(), hairState, false,
                 hairRgb, hairRgb, false, false, packedLight, packedOverlay, 1.0F,
-                null, null, null);
+                pixelDetail, null, null, null);
         bufferSource.getBuffer(renderType);
         poseStack.popPose();
     }

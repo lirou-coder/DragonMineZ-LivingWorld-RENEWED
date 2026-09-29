@@ -93,6 +93,19 @@ public final class WorldMenaceManager {
                 || "Herobrine".equals(fighter.getFighterName()));
     }
 
+    /**
+     * True only after an encounter rule has explicitly released Herobrine into combat.
+     * A target picked by ordinary mob goals or by the DMZ brain while he is watching does not
+     * count: otherwise that target would accidentally turn the stationary sighting into a hunt.
+     */
+    public static boolean isHerobrineCombatEngaged(AmbientFighterEntity fighter) {
+        if (!isHerobrine(fighter) || fighter.level().isClientSide) return false;
+        CompoundTag data = fighter.getPersistentData();
+        long now = fighter.level().getGameTime();
+        boolean explicitRetaliation = data.getLong(RETALIATE_UNTIL) > now && data.hasUUID(RETALIATE_PLAYER);
+        return explicitRetaliation || ("HUNTING".equals(data.getString(MENACE_STATE)) && fighter.getTarget() != null);
+    }
+
     public static boolean enabled() { return LivingWorldConfig.worldMenacesEnabled(); }
 
     /** Shared social/People/IT gate for every unique recurring World Menace. */
@@ -485,6 +498,19 @@ public final class WorldMenaceManager {
         long now = level.getGameTime();
         ServerPlayer nearestPlayer = nearestPlayer(fighter);
         if (nearestPlayer != null) stareAt(fighter, nearestPlayer);
+
+        // Target goals and the DMZ 2.2 brain tick before this presentation manager. Discard any
+        // target they opportunistically selected while Herobrine is still only observing. Without
+        // this guard, the generic target was mistaken for an accepted confrontation below.
+        if (!isHerobrineCombatEngaged(fighter) && fighter.getTarget() != null) {
+            fighter.setTarget(null);
+            fighter.setLastHurtByMob(null);
+            fighter.setLastHurtMob(null);
+            fighter.setAggressive(false);
+            fighter.setAttacking(false);
+            fighter.getNavigation().stop();
+            fighter.setDeltaMovement(Vec3.ZERO);
+        }
 
         // Keep the singleton recovery coordinate fresh while the exact entity is loaded. Most
         // movement is ordinary navigation rather than teleportation; a one-second snapshot makes

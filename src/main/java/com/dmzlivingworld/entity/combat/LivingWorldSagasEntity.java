@@ -1546,7 +1546,11 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
         return super.doHurtTarget(pEntity);
     }
 
-    public boolean isCombatFrozen() { return false; }
+    public boolean isCombatFrozen() {
+        return this instanceof AmbientFighterEntity fighter
+                && WorldMenaceManager.isHerobrine(fighter)
+                && !WorldMenaceManager.isHerobrineCombatEngaged(fighter);
+    }
     public boolean isRaidDormant() { return false; }
     public boolean isBossAsleep() { return false; }
     public int getBossAbility() { return -1; }
