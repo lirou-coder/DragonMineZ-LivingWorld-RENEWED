@@ -151,6 +151,8 @@ public final class DBZMeditation {
     private static final String GRAVITY_MASTERY_BONUS = "dbzm_gravity_mastery_bonus";
     private static final String GRAVITY_STAT_REDUCTION = "dbzm_gravity_stat_reduction";
     private static final String GRAVITY_MACHINE = "dbzm_gravity_machine";
+    private static final String GRAVITY_MULTIPLIER = "dbzm_gravity_multiplier";
+    private static final String GRAVITY_TRAINING_MULTIPLIER = "dbzm_gravity_training_multiplier";
 
     private static final String LIFETIME_TICKS = "dbzm_lifetime_ticks";
     private static final String LONGEST_TICKS = "dbzm_longest_ticks";
@@ -339,6 +341,8 @@ public final class DBZMeditation {
         data.putDouble(GRAVITY_MASTERY_BONUS, safeGravity(() -> GravityLogic.getBonusGravity(player)));
         data.putDouble(GRAVITY_STAT_REDUCTION, safeGravity(() -> GravityLogic.getStatReduction(player)));
         data.putDouble(GRAVITY_MACHINE, safeGravity(() -> GravityLogic.getMachineGravity(player)));
+        data.putDouble(GRAVITY_MULTIPLIER, safeGravity(() -> GravityLogic.getGravityMultiplier(player)));
+        data.putDouble(GRAVITY_TRAINING_MULTIPLIER, safeGravity(() -> GravityLogic.getTrainingGravityMultiplier(player)));
         data.putInt(SESSIONS, data.getInt(SESSIONS) + 1);
 
         ServerLevel level = player.serverLevel();
@@ -1796,6 +1800,21 @@ public final class DBZMeditation {
         }
     }
 
+    /** Keeps DMZ gravity active only for Meditation's invisible visual carrier. */
+    public static double preserveMountedGravity(net.minecraft.world.entity.player.Player player,
+                                                String channel, double resolved) {
+        if (!(player instanceof ServerPlayer serverPlayer) || !isMeditating(serverPlayer)
+                || !isMeditationSeat(serverPlayer.getVehicle())) return resolved;
+        CompoundTag data = serverPlayer.getPersistentData();
+        double preserved = switch (channel) {
+            case "machine" -> data.getDouble(GRAVITY_MACHINE);
+            case "training" -> data.getDouble(GRAVITY_TRAINING_MULTIPLIER);
+            default -> data.getDouble(GRAVITY_MULTIPLIER);
+        };
+        if (!Double.isFinite(preserved)) preserved = 0.0D;
+        return Math.max(Math.max(0.0D, resolved), Math.max(0.0D, preserved));
+    }
+
     private static void awardFixedTp(
         ServerPlayer player,
         int gain,
@@ -1906,6 +1925,8 @@ public final class DBZMeditation {
         data.remove(GRAVITY_MASTERY_BONUS);
         data.remove(GRAVITY_STAT_REDUCTION);
         data.remove(GRAVITY_MACHINE);
+        data.remove(GRAVITY_MULTIPLIER);
+        data.remove(GRAVITY_TRAINING_MULTIPLIER);
     }
 
     private static int getMeditatingGroupCount(ServerPlayer player) {
