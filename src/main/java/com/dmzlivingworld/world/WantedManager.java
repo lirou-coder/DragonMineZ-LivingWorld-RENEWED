@@ -11,8 +11,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.npc.Npc;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -34,8 +39,52 @@ public final class WantedManager {
     private static final String PLAYER_NEUTRALS = "UnlawfulNeutralKills";
     private static final String PLAYER_LEVEL = "WantedLevel";
     private static final String PLAYER_CRIME = "Crime";
+    private static final String NON_FIGHTER_AGGRESSOR = "DMZLWNonFighterAggressor";
+    private static final String NON_FIGHTER_STARTED = "DMZLWNonFighterStarted";
+    private static final String NON_FIGHTER_AGGRESSOR_UNTIL = "DMZLWNonFighterAggressorUntil";
+    private static final long NON_FIGHTER_AGGRESSION_TICKS = 20L * 120L;
     private static final int PLAYER_WANTED_THRESHOLD = 6;
     private WantedManager() {}
+
+    /**
+     * Preserve first-hand self-defense provenance for civilian-like, non-LW entities. Their
+     * target can be cleared before death, so inspecting only the fighter's current target in
+     * {@link #onDeath(LivingDeathEvent)} would incorrectly turn retaliation into a crime.
+     */
+    @SubscribeEvent
+    public static void onFighterNonFighterDamage(LivingHurtEvent event) {
+        if (event.getEntity().level().isClientSide || event.isCanceled()) return;
+        Entity source = event.getSource().getEntity();
+        LivingEntity hurtEntity = event.getEntity();
+        if (event.getEntity() instanceof AmbientFighterEntity fighter
+                && source instanceof LivingEntity aggressor
+                && !(aggressor instanceof AmbientFighterEntity)
+                && !(aggressor instanceof ServerPlayer)) {
+            recordFirstNonFighterAggression(fighter, aggressor, true);
+            return;
+        }
+        if (source instanceof AmbientFighterEntity fighter
+                && !(hurtEntity instanceof AmbientFighterEntity)
+                && !(hurtEntity instanceof ServerPlayer)) {
+            recordFirstNonFighterAggression(fighter, hurtEntity, false);
+        }
+    }
+
+    private static void recordFirstNonFighterAggression(AmbientFighterEntity fighter,
+                                                         LivingEntity other,
+                                                         boolean otherStarted) {
+        CompoundTag data = fighter.getPersistentData();
+        long now = fighter.level().getGameTime();
+        boolean sameActiveEncounter = data.hasUUID(NON_FIGHTER_AGGRESSOR)
+                && other.getUUID().equals(data.getUUID(NON_FIGHTER_AGGRESSOR))
+                && data.getLong(NON_FIGHTER_AGGRESSOR_UNTIL) >= now;
+        if (!sameActiveEncounter) {
+            data.putUUID(NON_FIGHTER_AGGRESSOR, other.getUUID());
+            data.putBoolean(NON_FIGHTER_STARTED, otherStarted);
+        }
+        data.putLong(NON_FIGHTER_AGGRESSOR_UNTIL,
+                now + NON_FIGHTER_AGGRESSION_TICKS);
+    }
 
     @SubscribeEvent
     public static void onClone(PlayerEvent.Clone event) {
@@ -377,6 +426,23 @@ public final class WantedManager {
             return;
         }
 
+        // Hostile mobs are legitimate combat targets and can never create Wanted pressure.
+        // Among every other non-fighter type, only Minecraft's villager-like NPC contract is a
+        // protected civilian, and even that kill is lawful when that exact entity attacked first.
+        LivingEntity nonFighterVictim = event.getEntity();
+        if (!(nonFighterVictim instanceof AmbientFighterEntity)
+                && !(nonFighterVictim instanceof ServerPlayer)
+                && attacker instanceof AmbientFighterEntity killer) {
+            if (WorldMenaceManager.isWorldMenace(killer)
+                    || nonFighterVictim instanceof Enemy || nonFighterVictim instanceof Monster
+                    || !(nonFighterVictim instanceof Npc)
+                    || wasAttackedFirstBy(killer, nonFighterVictim)) return;
+            increment(killer.getLegacyData(), "UnlawfulCivilianKills");
+            killer.recordLegacyEvent("Killed non-combatant " + nonFighterVictim.getName().getString());
+            evaluate(killer);
+            return;
+        }
+
         // Killing the player is only treated as criminal behavior for an already hostile/bad
         // unsanctioned fighter; losing a fight the player started does not manufacture a crime.
         if (event.getEntity() instanceof ServerPlayer player && attacker instanceof AmbientFighterEntity killer) {
@@ -404,6 +470,15 @@ public final class WantedManager {
     private static void increment(CompoundTag tag, String key) {
         int value = Math.max(0, tag.getInt(key));
         if (value < Integer.MAX_VALUE) tag.putInt(key, value + 1);
+    }
+
+    private static boolean wasAttackedFirstBy(AmbientFighterEntity fighter, LivingEntity victim) {
+        if (fighter == null || victim == null) return false;
+        CompoundTag data = fighter.getPersistentData();
+        return data.hasUUID(NON_FIGHTER_AGGRESSOR)
+                && victim.getUUID().equals(data.getUUID(NON_FIGHTER_AGGRESSOR))
+                && data.getLong(NON_FIGHTER_AGGRESSOR_UNTIL) >= fighter.level().getGameTime()
+                && data.getBoolean(NON_FIGHTER_STARTED);
     }
 
     private static String crimeSummary(int civilian, int betrayal, int player, int neutral) {

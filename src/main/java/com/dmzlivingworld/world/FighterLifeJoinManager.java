@@ -440,7 +440,14 @@ public final class FighterLifeJoinManager {
                 .append(LWLang.speech(text).copy().withStyle(color)), false);
     }
     private static void messageKey(ServerPlayer player, String key, ChatFormatting color, Object... args) {
-        if (player != null) player.displayClientMessage(Component.translatable("dmzlivingworld.message.go_along." + key, args)
+        if (player == null) return;
+        Object[] localizedArgs = new Object[args == null ? 0 : args.length];
+        for (int i = 0; i < localizedArgs.length; i++) {
+            Object argument = args[i];
+            localizedArgs[i] = argument instanceof String text && LWLang.isSpeechKey(text)
+                    ? LWLang.speech(text) : argument;
+        }
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.go_along." + key, localizedArgs)
                 .withStyle(color), false);
     }
 

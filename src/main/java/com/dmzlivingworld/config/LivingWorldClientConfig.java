@@ -69,7 +69,7 @@ public final class LivingWorldClientConfig {
     public static int factionLabelDistance() { return FACTION_LABEL_DISTANCE.get(); }
     public static int dialogueDistance() { return DIALOGUE_DISTANCE.get(); }
     public static boolean speechToChat() { return SPEECH_TO_CHAT.get(); }
-    public static int speechChatRadius() { return Math.min(70, SPEECH_CHAT_RADIUS.get()); }
+    public static int speechChatRadius() { return SPEECH_CHAT_RADIUS.get(); }
     public static float hudScale() { return HUD_SCALE.get().floatValue(); }
     public static float factionQuestHudScale() { return FACTION_QUEST_HUD_SCALE.get().floatValue(); }
 
@@ -91,7 +91,7 @@ public final class LivingWorldClientConfig {
         FACTION_LABEL_DISTANCE.set(Math.max(6, Math.min(4096, v.factionLabelDistance())));
         DIALOGUE_DISTANCE.set(Math.max(8, Math.min(4096, v.dialogueDistance())));
         SPEECH_TO_CHAT.set(v.speechToChat());
-        SPEECH_CHAT_RADIUS.set(Math.max(8, Math.min(70, v.speechChatRadius())));
+        SPEECH_CHAT_RADIUS.set(Math.max(8, Math.min(4096, v.speechChatRadius())));
         HUD_SCALE.set(clamp(v.hudScale(), .5D, 3D));
         FACTION_QUEST_HUD_SCALE.set(clamp(v.factionQuestHudScale(), .5D, 3D));
         NAMEPLATE_SCALE.save();

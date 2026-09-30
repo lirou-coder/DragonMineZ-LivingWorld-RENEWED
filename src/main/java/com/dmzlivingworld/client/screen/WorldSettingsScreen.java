@@ -463,7 +463,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                     case 2 -> verticalOffset=clamp(verticalOffset+stepSign*0.05,-0.25,8.0); case 3 -> dispositionIcon=stepSign>0; case 4 -> factionLabel=stepSign>0;
                     case 5 -> dialogueVisible=stepSign>0; case 6 -> nameplateDistance=clamp(nameplateDistance+stepSign*16,8,4096);
                     case 7 -> factionLabelDistance=clamp(factionLabelDistance+stepSign*16,6,4096); case 8 -> dialogueDistance=clamp(dialogueDistance+stepSign*16,8,4096);
-                    case 9 -> setSpeechMode(speechModeIndex()+stepSign); case 10 -> speechChatRadius=clamp(speechChatRadius+stepSign*2,8,70);
+                    case 9 -> setSpeechMode(speechModeIndex()+stepSign); case 10 -> speechChatRadius=clamp(speechChatRadius+stepSign*2,8,4096);
                     case 11 -> hudScale=clamp(hudScale+stepSign*.05D,.5D,3D); case 12 -> factionQuestHudScale=clamp(factionQuestHudScale+stepSign*.05D,.5D,3D); default -> {} } }
             case 3 -> { switch (r) { case 0 -> medEnabled=stepSign>0; case 1 -> medTpRewards=stepSign>0; case 2 -> medTpScale=clamp(medTpScale+stepSign*10,0,5000);
                     case 3 -> medRewardInterval=clamp(medRewardInterval+stepSign,1,120); case 4 -> medCalmMultiplier=clamp(medCalmMultiplier+stepSign,1,100);
@@ -599,7 +599,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 0 -> switch (row) { case 0 -> 4096.0D; case 1 -> Math.max(0, nearbyFighterCap); case 3 -> 128.0D;
                 case 4 -> 8192.0D; case 5 -> 512.0D; case 10 -> 32768.0D; default -> 500.0D; };
             case 1 -> switch (row) { case 1 -> 50.0D; case 2 -> 100.0D; case 3,4 -> 86400.0D; default -> 500.0D; };
-            case 2 -> switch (row) { case 0,1 -> 400.0D; case 2 -> 8.0D; case 10 -> 70.0D; case 11,12 -> 300D; default -> 4096.0D; };
+            case 2 -> switch (row) { case 0,1 -> 400.0D; case 2 -> 8.0D; case 10 -> 4096.0D; case 11,12 -> 300D; default -> 4096.0D; };
             case 3 -> switch (row) { case 2 -> 5000.0D; case 3 -> 120.0D; case 4,5,6,7,8 -> 100.0D;
                 case 12 -> 100.0D; default -> 100.0D; };
             case 4 -> switch (row) { case 3 -> 240.0D; case 4 -> 250.0D; case 6 -> 200.0D; default -> 160.0D; };
@@ -639,7 +639,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 6 -> nameplateDistance=clamp((int)Math.round(raw/16.0D)*16,8,4096);
                 case 7 -> factionLabelDistance=clamp((int)Math.round(raw/16.0D)*16,6,4096);
                 case 8 -> dialogueDistance=clamp((int)Math.round(raw/16.0D)*16,8,4096);
-                case 10 -> speechChatRadius=clamp((int)Math.round(raw/2.0D)*2,8,70);
+                case 10 -> speechChatRadius=clamp((int)Math.round(raw/2.0D)*2,8,4096);
                 case 11 -> hudScale=clamp(Math.round(raw/5D)*5D/100D,.5D,3D);
                 case 12 -> factionQuestHudScale=clamp(Math.round(raw/5D)*5D/100D,.5D,3D);
                 default -> {}
@@ -1028,7 +1028,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 6 -> nameplateDistance = clamp(Integer.parseInt(raw), 8, 4096);
             case 7 -> factionLabelDistance = clamp(Integer.parseInt(raw), 6, 4096);
             case 8 -> dialogueDistance = clamp(Integer.parseInt(raw), 8, 4096);
-            case 10 -> speechChatRadius = clamp(Integer.parseInt(raw), 8, 70);
+            case 10 -> speechChatRadius = clamp(Integer.parseInt(raw), 8, 4096);
             case 11 -> hudScale = clamp(value / 100D, .5D, 3D);
             case 12 -> factionQuestHudScale = clamp(value / 100D, .5D, 3D);
             default -> throw new NumberFormatException("not numeric");
