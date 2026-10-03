@@ -415,6 +415,8 @@ public final class FighterInspectionManager {
                 String.format(java.util.Locale.ROOT, "%.1f", fighter.getKiBlastDamage()),
                 String.format(java.util.Locale.ROOT, "%.3f", fighter.getAttributeValue(Attributes.MOVEMENT_SPEED))));
         lines.add("* " + profileText("combat.defense_v2", "Defense: %s", String.format(java.util.Locale.ROOT, "%.1f", fighter.getDefenseStat())));
+        lines.add("* " + profileText("combat.ideal_weight", "Ideal Weight: %s",
+                Integer.toString(FighterWeightGravityManager.idealWeight(fighter))));
         lines.add("* " + profileText("combat.style", "Style: %s", FighterCombatDirector.signatureLabel(fighter)));
         if (RedRibbonExperimentManager.isExperiment(fighter)) {
             lines.add("!! " + profileText("combat.engineered", "Engineered Red Ribbon combatant"));

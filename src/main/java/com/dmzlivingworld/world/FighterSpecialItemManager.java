@@ -49,7 +49,7 @@ public final class FighterSpecialItemManager {
         if (!originalRollDone) {
             fighter.getLegacyData().putBoolean("SpecialItemsRolled", true);
             fighter.getLegacyData().putBoolean("AccessoryVisualRollV2", true);
-            if (fighter.getCosmeticAccessoryId() == ACCESSORY_NONE) rollAccessory(fighter);
+            clearLegacyCosmeticWeight(fighter);
             if (fighter.getRank().id() >= 2 && fighter.getRandom().nextFloat() < 0.012F) {
                 fighter.getLegacyData().putBoolean(FRUIT, true);
             }
@@ -61,7 +61,7 @@ public final class FighterSpecialItemManager {
         // changing identity, stats, or save structure.
         if (!visualRollDone) {
             fighter.getLegacyData().putBoolean("AccessoryVisualRollV2", true);
-            if (fighter.getCosmeticAccessoryId() == ACCESSORY_NONE) rollAccessory(fighter);
+            clearLegacyCosmeticWeight(fighter);
         }
     }
 
@@ -74,16 +74,13 @@ public final class FighterSpecialItemManager {
     }
 
     private static void rollAccessory(AmbientFighterEntity fighter) {
-        // R19: scouters are a readable Scientist specialization, not generic fashion.
-        // Preserve R18's ~10% ordinary training-weight frequency without rolling scouters.
-        float roll = fighter.getRandom().nextFloat();
-        if (roll < 0.10F) {
-            setAccessory(fighter, switch (fighter.getRandom().nextInt(3)) {
-                case 0 -> WEIGHT_TURTLE;
-                case 1 -> WEIGHT_WORKOUT;
-                default -> WEIGHT_PICCOLO;
-            }, "Training weights");
-        }
+        // Training weights are equipment now; natural fighters never receive cosmetic-only ones.
+        clearLegacyCosmeticWeight(fighter);
+    }
+
+    private static void clearLegacyCosmeticWeight(AmbientFighterEntity fighter) {
+        int id = fighter.getCosmeticAccessoryId();
+        if (id >= WEIGHT_TURTLE && id <= WEIGHT_PICCOLO) setAccessory(fighter, ACCESSORY_NONE, "");
     }
 
     private static void setAccessory(AmbientFighterEntity fighter, int id, String label) {

@@ -34,6 +34,7 @@ import com.dmzlivingworld.world.FighterPassiveSkillManager;
 import com.dmzlivingworld.world.FighterFullPowerManager;
 import com.dmzlivingworld.world.FighterMemoryManager;
 import com.dmzlivingworld.world.FighterArsenalManager;
+import com.dmzlivingworld.world.FighterWeightGravityManager;
 import com.dmzlivingworld.world.FighterLegacyManager;
 import com.dmzlivingworld.world.FighterGoalManager;
 import com.dmzlivingworld.world.FighterInspectionManager;
@@ -1008,7 +1009,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         FighterGoalManager.tick(this);
         FighterPromotionManager.tick(this);
         OrganicThreatManager.tick(this);
-        if (tickCount % 60 == Math.floorMod(getUUID().hashCode(), 60)) FighterArsenalManager.tryPickupNearby(this);
+        if (tickCount % 60 == Math.floorMod(getUUID().hashCode(), 60)) {
+            if (!FighterWeightGravityManager.inspectNearbyWeight(this)) FighterArsenalManager.tryPickupNearby(this);
+        }
+        if (tickCount % 10 == Math.floorMod(getUUID().hashCode(), 10)) FighterWeightGravityManager.tick(this);
 
         if (arsenalWeaponCooldown > 0) arsenalWeaponCooldown--;
         if (recoveryGraceTicks > 0) recoveryGraceTicks--;
@@ -1791,6 +1795,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     }
 
     public double getDefenseStat() {
+        return getUnpenalizedDefenseStat() * FighterWeightGravityManager.statMultiplier(this);
+    }
+
+    public double getUnpenalizedDefenseStat() {
         double defense = FighterPowerStatScaler.baseDefense(this);
         NpcFormConfigBridge.Form form = isRacialFormActive()
                 ? NpcFormConfigBridge.form(getRace(), getActiveRacialFormLevel()) : null;
@@ -4786,6 +4794,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         gain *= RedRibbonExperimentManager.trainingEfficiency(this);
         if (getRank() == FighterRank.ROOKIE) gain *= 1.18D;
         gain *= LivingWorldConfig.npcGrowthScale();
+        gain *= FighterWeightGravityManager.trainingMultiplier(this);
         if (level() instanceof net.minecraft.server.level.ServerLevel server)
             gain *= WorldPowerScaler.earnedGrowthMultiplier(server, this);
         // R9 pays a visible part of ordinary training during the session. Reconcile that exact

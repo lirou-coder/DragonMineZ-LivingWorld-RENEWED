@@ -567,6 +567,7 @@ public final class FighterArsenalManager {
         add(parts, fighter.getItemBySlot(EquipmentSlot.CHEST));
         add(parts, fighter.getItemBySlot(EquipmentSlot.LEGS));
         add(parts, fighter.getItemBySlot(EquipmentSlot.FEET));
+        add(parts, FighterWeightGravityManager.equippedWeight(fighter));
         return parts.isEmpty() ? "none" : String.join(", ", parts);
     }
 
@@ -578,6 +579,7 @@ public final class FighterArsenalManager {
         detail(out, "Chest", fighter.getItemBySlot(EquipmentSlot.CHEST));
         detail(out, "Legs", fighter.getItemBySlot(EquipmentSlot.LEGS));
         detail(out, "Feet", fighter.getItemBySlot(EquipmentSlot.FEET));
+        detail(out, "Weight", FighterWeightGravityManager.equippedWeight(fighter));
         return out.isEmpty() ? List.of("none") : out;
     }
 

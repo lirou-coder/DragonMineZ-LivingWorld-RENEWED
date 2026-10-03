@@ -447,6 +447,8 @@ public final class WantedManager {
         // unsanctioned fighter; losing a fight the player started does not manufacture a crime.
         if (event.getEntity() instanceof ServerPlayer player && attacker instanceof AmbientFighterEntity killer) {
             if (WorldMenaceManager.isWorldMenace(killer)) return;
+            long now = player.serverLevel().getServer().overworld().getGameTime();
+            if (PeacekeeperManager.isPlayerAggressorFor(killer, player, now)) return;
             if (killer.isSanctionedMatchParticipant() || killer.isDuelOpponent(player) || killer.getAlignment() != FighterAlignment.BAD) return;
             increment(killer.getLegacyData(), "UnlawfulPlayerKills");
             killer.recordLegacyEvent("Killed " + player.getGameProfile().getName() + " outside sanctioned combat");

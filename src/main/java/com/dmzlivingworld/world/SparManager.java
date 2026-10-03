@@ -15,6 +15,10 @@ import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import com.dragonminez.common.config.ConfigManager;
+import com.dragonminez.common.network.NetworkHandler;
+import com.dragonminez.common.network.S2C.StatsSyncS2C;
+import com.dragonminez.common.stats.StatsCapability;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,7 +48,7 @@ public final class SparManager {
     private static final Map<UUID, X7SparSession> X7_SPARS = new HashMap<>();
 
     private record X7SparSession(UUID fighterId, long startedAt) {}
-    private record Session(UUID playerId, UUID fighterId, long startedAt) {}
+    private record Session(UUID playerId, UUID fighterId, long startedAt, double playerBp, double fighterBp) {}
     private record PendingResume(UUID fighterId, long readyAt, long elapsed, String dimension, BlockPos lastPos, String fighterName) {}
     private SparManager() {}
 
@@ -100,7 +104,8 @@ public final class SparManager {
             messageKey(player, "player_hurt", ChatFormatting.GRAY);
             return false;
         }
-        SESSIONS.put(player.getUUID(), new Session(player.getUUID(), fighter.getUUID(), now));
+        SESSIONS.put(player.getUUID(), new Session(player.getUUID(), fighter.getUUID(), now,
+                Math.max(1.0D, PlayerWorldManager.playerBattlePower(player)), Math.max(1.0D, fighter.getBattlePower())));
         FighterBattleGrowthManager.clearProgressiveAdvance(fighter, FighterBattleGrowthManager.Source.SPAR);
         SENZU_WARNED.remove(player.getUUID());
         fighter.beginSanctionedMatch(player);
@@ -412,6 +417,7 @@ public final class SparManager {
                 int sparEffort = decisive ? 620 : 320;
                 fighter.applyTrainingGrowth(sparEffort, false);
                 FighterBattleGrowthManager.onSpar(fighter, sparEffort, decisive);
+                if (decisive) grantMatchedSparRewards(player, fighter, session);
                 FighterLifeNeedsManager.onSparCompleted(fighter, sparEffort);
                 String reactionLine = ReactiveInteractionManager.sparOutcome(fighter, player, playerWon, decisive);
                 int relationshipGain = decisive ? 2 : 1;
@@ -484,13 +490,39 @@ public final class SparManager {
             fighter.setTarget(null);
             fighter.beginSanctionedMatch(player);
             long startedAt = now - pending.elapsed;
-            SESSIONS.put(playerId, new Session(playerId, fighter.getUUID(), startedAt));
+            SESSIONS.put(playerId, new Session(playerId, fighter.getUUID(), startedAt,
+                    Math.max(1.0D, PlayerWorldManager.playerBattlePower(player)), Math.max(1.0D, fighter.getBattlePower())));
             PENDING_RESUMES.remove(playerId);
             clearReconnectState(player);
             SENZU_WARNED.remove(playerId);
             SanctionedMatchGuard.noteSparStart(player, fighter);
             messageKey(player, "resumed", ChatFormatting.GREEN, fighter.getFighterName());
         }
+    }
+
+    private static void grantMatchedSparRewards(ServerPlayer player, AmbientFighterEntity fighter, Session session) {
+        if (player == null || fighter == null || session == null) return;
+        double high = Math.max(session.playerBp, session.fighterBp);
+        double difference = Math.abs(session.playerBp - session.fighterBp) / Math.max(1.0D, high);
+        double factor = difference <= 0.10D ? 1.0D : Math.max(0.0D, 1.0D - (difference - 0.10D) / 0.90D);
+        if (factor <= 0.0D) return;
+
+        player.getCapability(StatsCapability.INSTANCE).ifPresent(data -> {
+            int maxStats = ConfigManager.getServerConfig().getGameplay().getMaxValue();
+            int onePointCost = data.calculateRecursiveCost(1, maxStats);
+            if (onePointCost > 0 && onePointCost < Integer.MAX_VALUE) {
+                float reward = (float)Math.min(Float.MAX_VALUE, onePointCost * 60.0D * factor);
+                data.getResources().addTrainingPoints(reward, false);
+                NetworkHandler.sendToTrackingEntityAndSelf(new StatsSyncS2C(player), player);
+                player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar.tp_reward", (int)reward), false);
+            }
+        });
+
+        // The reward is queued through the normal earned-growth path: installments settle while
+        // aftermath/rest runs and every installment rebuilds the archetype's complete stat spread.
+        double ceiling = Math.max(fighter.getPermanentBattlePower() * 1.10D,
+                fighter.getPermanentBattlePower() + 1.0D);
+        FighterBattleGrowthManager.queueAdjustedFraction(fighter, 0.10D * factor, ceiling);
     }
 
     private static void rememberReconnectState(ServerPlayer player, AmbientFighterEntity fighter, long elapsed) {

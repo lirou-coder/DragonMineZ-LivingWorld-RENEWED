@@ -93,6 +93,7 @@ public final class FighterBattleGrowthManager {
     public static void onJogging(AmbientFighterEntity fighter, int effortTicks) {
         if (fighter == null || effortTicks < 160) return;
         double effort = Math.min(1.25D, Math.max(0.20D, effortTicks / 1200.0D));
+        effort *= FighterWeightGravityManager.trainingMultiplier(fighter);
         // Jogging should be visible progression, but remain the lightest real BP activity.
         // Approximate progression order is Battle > Spar > Training > Meditation > Jogging.
         addGrowth(fighter, 0.00115D * effort);
@@ -103,7 +104,8 @@ public final class FighterBattleGrowthManager {
     public static void onSpar(AmbientFighterEntity fighter, int effortTicks, boolean decisive) {
         if (fighter == null || effortTicks < 100) return;
         double effort = Math.max(0.30D, Math.min(1.25D, effortTicks / 900.0D));
-        double fraction = (decisive ? 0.0045D : 0.0030D) * effort;
+        double fraction = (decisive ? 0.0045D : 0.0030D) * effort
+                * FighterWeightGravityManager.trainingMultiplier(fighter);
         addGrowth(fighter, fraction * 0.70D);
         growBattlePowerWithAdvance(fighter, fraction, Source.SPAR);
     }

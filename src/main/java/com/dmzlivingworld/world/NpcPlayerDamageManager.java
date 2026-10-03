@@ -2,11 +2,22 @@ package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
+import com.dmzlivingworld.entity.FighterAlignment;
+import com.dmzlivingworld.entity.FighterPersonality;
+import com.dragonminez.common.config.ConfigManager;
 import com.dragonminez.common.init.MainEffects;
+import com.dragonminez.common.init.entities.ki.AbstractKiProjectile;
+import com.dragonminez.common.network.NetworkHandler;
+import com.dragonminez.common.network.S2C.StatsSyncS2C;
+import com.dragonminez.common.stats.StatsCapability;
+import com.dragonminez.common.stats.StatsProvider;
+import com.dragonminez.common.stats.character.Cooldowns;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -31,6 +42,63 @@ public final class NpcPlayerDamageManager {
         data.putBoolean("LWLastNpcAttackGateStunned", attacker.hasEffect(MainEffects.STUN.get()));
         data.putBoolean("LWLastNpcAttackGatePostSpar", attacker.isPostSparOpponent(player));
         data.putInt("LWLastNpcAttackGateInvuln", Math.max(0, player.invulnerableTime));
+    }
+
+    /**
+     * DMZ has already resolved defense, blocking, Ki Protection and racial mitigation by the
+     * LivingDamage phase. A good fighter therefore judges lethality from this final amount and
+     * applies the same knocked-down state used by a player's Friendly Fist.
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = false)
+    public static void keepGoodFighterAttacksNonLethal(LivingDamageEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || player.level().isClientSide
+                || event.getAmount() <= 0.0F) return;
+        AmbientFighterEntity attacker = responsibleFighter(
+                event.getSource().getEntity(), event.getSource().getDirectEntity());
+        if (attacker == null || attacker.getAlignment() != FighterAlignment.GOOD
+                || player.getHealth() - event.getAmount() > 0.0F) return;
+
+        float nonLethalDamage = Math.max(0.0F, player.getHealth() - 1.0F);
+        if (nonLethalDamage <= 0.0F) event.setCanceled(true);
+        else event.setAmount(nonLethalDamage);
+
+        StatsProvider.get(StatsCapability.INSTANCE, player).ifPresent(stats -> {
+            int knockdownTicks = ConfigManager.getCombatConfig().getKnockdownDurationSeconds() * 20;
+            stats.getStatus().setKnockedDown(true);
+            stats.getCooldowns().setCooldown(Cooldowns.KNOCKDOWN_DURATION, knockdownTicks);
+            stats.getCooldowns().setCooldown(Cooldowns.KNOCKDOWN_INVULN, knockdownTicks);
+            stats.getCharacter().clearActiveForm();
+            stats.getCharacter().clearActiveStackForm();
+            NetworkHandler.sendToTrackingEntityAndSelf(new StatsSyncS2C(player), player);
+        });
+
+        attacker.setTarget(null);
+        attacker.setLastHurtByMob(null);
+        attacker.setLastHurtMob(null);
+        attacker.setAggressive(false);
+        attacker.interruptCombo();
+        attacker.stopCasting();
+        attacker.setAttacking(false);
+        FighterCombatDirector.reset(attacker);
+        attacker.getNavigation().stop();
+        attacker.speakKey(knockoutWarning(attacker.getPersonality()), 90);
+    }
+
+    private static AmbientFighterEntity responsibleFighter(Entity source, Entity direct) {
+        if (source instanceof AmbientFighterEntity fighter) return fighter;
+        if (direct instanceof AbstractKiProjectile projectile
+                && projectile.getOwner() instanceof AmbientFighterEntity fighter) return fighter;
+        return null;
+    }
+
+    private static String knockoutWarning(FighterPersonality personality) {
+        return switch (personality) {
+            case PROUD -> "dialogue.combat.player_knockout.proud";
+            case AGGRESSIVE -> "dialogue.combat.player_knockout.aggressive";
+            case CALM -> "dialogue.combat.player_knockout.calm";
+            case CAUTIOUS -> "dialogue.combat.player_knockout.cautious";
+            case HEROIC -> "dialogue.combat.player_knockout.heroic";
+        };
     }
 
     private static double finiteNonNegative(double value) {

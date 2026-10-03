@@ -176,6 +176,16 @@ public final class PeacekeeperManager {
         return data.getBoolean(RESPONSIBILITY_NPC_STARTED);
     }
 
+    /** True only while the same live encounter records the player as its immutable first aggressor. */
+    public static boolean isPlayerAggressorFor(AmbientFighterEntity fighter, ServerPlayer player, long now) {
+        if (fighter == null || player == null) return false;
+        CompoundTag data = fighter.getPersistentData();
+        return data.hasUUID(RESPONSIBILITY_PLAYER)
+                && player.getUUID().equals(data.getUUID(RESPONSIBILITY_PLAYER))
+                && data.getLong(RESPONSIBILITY_UNTIL) >= now
+                && !data.getBoolean(RESPONSIBILITY_NPC_STARTED);
+    }
+
     private static AmbientFighterEntity responsibleFighter(Entity sourceEntity, Entity directEntity) {
         if (sourceEntity instanceof AmbientFighterEntity fighter) return fighter;
         if (directEntity instanceof AbstractKiProjectile projectile && projectile.getOwner() instanceof AmbientFighterEntity fighter) return fighter;
