@@ -12,6 +12,7 @@ import com.dragonminez.common.quest.Quest;
 import com.dragonminez.common.quest.QuestRegistry;
 import com.dragonminez.common.quest.Saga;
 import com.dragonminez.common.quest.objectives.KillObjective;
+import com.dragonminez.common.stats.StatsCapability;
 import net.minecraftforge.fml.ModList;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -57,9 +58,32 @@ public final class WorldPowerScaler {
 
     public static double rollEffectiveStats(ServerLevel level, ServerPlayer player,
                                             FighterRank rank, RandomSource random) {
-        double reference = sagaKillReference(level, player) * LivingWorldConfig.npcStrengthScale()
+        double sagaReference = sagaKillReference(level, player);
+        double difficultyReference = sagaReference * playerDifficultyMultiplier(player);
+        // Era zero has an intentional floor of 175. Easy difficulty may lower a stronger
+        // tutorial anchor, but it can never reintroduce the tiny custom-saga values this floor fixes.
+        if (isInitialEra(player)) difficultyReference = Math.max(175.0D, difficultyReference);
+        double reference = difficultyReference * LivingWorldConfig.npcStrengthScale()
                 * LivingWorldConfig.npcPowerMultiplier();
         return Math.max(1.0D, reference * rollReferenceFactor(rank, random));
+    }
+
+    private static double playerDifficultyMultiplier(ServerPlayer player) {
+        if (player == null) return 1.0D;
+        return player.getCapability(StatsCapability.INSTANCE).map(stats -> {
+            var quests = stats.getPlayerQuestData();
+            if (quests == null || !quests.isDifficultyChosen()) return 1.0D;
+            var difficulty = quests.getDifficulty();
+            if (difficulty == null) return 1.0D;
+            double multiplier = (difficulty.hpMultiplier() + difficulty.damageMultiplier()) * 0.5D;
+            return Double.isFinite(multiplier) && multiplier > 0.0D ? multiplier : 1.0D;
+        }).orElse(1.0D);
+    }
+
+    private static boolean isInitialEra(ServerPlayer player) {
+        if (player == null) return false;
+        WorldEraProgression.PlayerEra era = WorldEraProgression.eraFor(player);
+        return era == null || era.number() == 0 || era.sagaId().isBlank();
     }
 
     /**

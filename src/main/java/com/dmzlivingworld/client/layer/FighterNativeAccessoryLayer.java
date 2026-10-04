@@ -134,11 +134,10 @@ public final class FighterNativeAccessoryLayer extends GeoRenderLayer<AmbientFig
         BakedGeoModel body = getGeoModel().getBakedModel(getGeoModel().getModelResource(fighter));
         if (parts == null || body == null) return;
         float[] color = com.dragonminez.client.util.ColorUtils.hexToRgb(fighter.getBodyColor());
-        // DMZPlayer's race-parts layer always adds ears3 to Majins. Male Majins
-        // additionally use the selected majin1/majin2/majin3 cranial head bone.
+        // DMZ 2.2 lets either Majin gender combine ears3, a Majin cranial part and hair.
         renderNamekianPart(parts, body, "ears3", poseStack, fighter, buffers, partialTick, packedLight, color);
-        if (!fighter.isFemale()) {
-            renderNamekianPart(parts, body, "majin" + (Math.floorMod(fighter.getHeadBone(), 3) + 1),
+        if (fighter.getHeadBone() >= 0) {
+            renderNamekianPart(parts, body, "majin" + (fighter.getHeadBone() + 1),
                     poseStack, fighter, buffers, partialTick, packedLight, color);
         }
     }

@@ -37,8 +37,7 @@ public final class FighterHairLayer extends GeoRenderLayer<AmbientFighterEntity>
                               RenderType renderType, MultiBufferSource bufferSource,
                               VertexConsumer buffer, float partialTick, int packedLight, int packedOverlay) {
         if (WorldMenaceManager.isHerobrine(entity)) return;
-        if (!"head".equals(bone.getName()) || !entity.getRace().usesHair()
-                || (entity.getRace() == com.dmzlivingworld.entity.FighterRace.MAJIN && !entity.isFemale())) return;
+        if (!"head".equals(bone.getName()) || !entity.getRace().usesHair()) return;
 
         Character character = entity.getDMZCharacter();
         String hairType = entity.getActiveRacialForm() == null ? "base" : entity.getActiveRacialForm().hairType();

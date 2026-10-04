@@ -750,6 +750,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (level().isClientSide && clientWeaponAnimationWindow > 0) clientWeaponAnimationWindow--;
         if (!level().isClientSide && isAlive() && postSparPeaceTicks > 0) enforcePostSparPeace();
         if (!level().isClientSide && isAlive()) enforcePlayerAlignmentCombatRules();
+        if (!level().isClientSide && getTarget() instanceof AmbientFighterEntity other
+                && !WorldMenaceManager.allowsHerobrineFighterCombat(this, other)) {
+            setTarget(null);
+            setAggressive(false);
+        }
         if (!level().isClientSide && isAlive()) WorldMenaceManager.enforceNearestPlayerStare(this);
     }
 
@@ -2096,6 +2101,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         Entity attackerEntity = source.getEntity();
+        if (!level().isClientSide && attackerEntity instanceof AmbientFighterEntity attacker
+                && !WorldMenaceManager.allowsHerobrineFighterCombat(attacker, this)) return false;
         if (!level().isClientSide && SanctionedMatchGuard.isPostSparInvulnerable(this)) return false;
         if (!level().isClientSide && attackerEntity instanceof ServerPlayer player
                 && PlayerCreationSafety.isCreating(player)) return false;
@@ -2371,6 +2378,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             super.setTarget(null);
             return;
         }
+        if (!level().isClientSide && target instanceof AmbientFighterEntity other
+                && !WorldMenaceManager.allowsHerobrineFighterCombat(this, other)) {
+            super.setTarget(null);
+            return;
+        }
         if (!level().isClientSide && target instanceof ServerPlayer player
                 && PlayerSpawnCombatSafety.blocksTarget(this, player)) {
             super.setTarget(null);
@@ -2399,6 +2411,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     @Override
     public boolean doHurtTarget(Entity target) {
+        if (!level().isClientSide && target instanceof AmbientFighterEntity other
+                && !WorldMenaceManager.allowsHerobrineFighterCombat(this, other)) return false;
         if (!level().isClientSide && isRetreatThreat(target)) return false;
         if (!level().isClientSide && target instanceof ServerPlayer player
                 && PlayerCreationSafety.isCreating(player)) return false;
@@ -2478,6 +2492,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     @Override
     public boolean canAttack(LivingEntity target) {
+        if (target instanceof AmbientFighterEntity other
+                && !WorldMenaceManager.allowsHerobrineFighterCombat(this, other)) return false;
         if (isRetreatThreat(target)) return false;
         if (target instanceof ServerPlayer player && PlayerCreationSafety.isCreating(player)) return false;
         if (target instanceof ServerPlayer player && PlayerSpawnCombatSafety.blocksTarget(this, player)) return false;
@@ -2550,6 +2566,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (entity instanceof Player player && isSanctionedMatchParticipant() && isSanctionedOpponent(player)) return false;
         if (entity instanceof Player player && LivingBondManager.isCompanionAlly(player, this)) return true;
         if (entity instanceof AmbientFighterEntity other) {
+            if (WorldMenaceManager.isHerobrine(this) || WorldMenaceManager.isHerobrine(other))
+                return !WorldMenaceManager.allowsHerobrineFighterCombat(this, other);
             if (com.dmzlivingworld.world.FighterNpcSocialManager.bond(this, other) >= 6)
                 return !isDuelOpponent(other);
             if (isFactionMember() && other.isFactionMember()) {
@@ -2713,9 +2731,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             case NAMEKIAN -> {
                 int bodyType = random.nextInt(3);
                 entityData.set(BODY_TYPE, bodyType);
-                entityData.set(EYES_TYPE, random.nextInt(5));
-                entityData.set(NOSE_TYPE, random.nextInt(2));
-                entityData.set(MOUTH_TYPE, random.nextInt(2));
+                entityData.set(EYES_TYPE, randomFaceType(random, 5, 13));
+                entityData.set(NOSE_TYPE, randomFaceType(random, 2, 6));
+                entityData.set(MOUTH_TYPE, randomFaceType(random, 2, 9));
                 entityData.set(HEAD_BONE, random.nextFloat() < 0.50F ? 0 : 1 + random.nextInt(2));
                 entityData.set(HAIR_ID, 0);
                 entityData.set(HAIR_COLOR, pick(random, NAMEK_LIGHT_GREEN));
@@ -2727,10 +2745,15 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             }
             case MAJIN -> {
                 entityData.set(BODY_TYPE, random.nextInt(3));
-                entityData.set(EYES_TYPE, random.nextInt(3));
-                entityData.set(NOSE_TYPE, random.nextInt(2));
-                entityData.set(MOUTH_TYPE, random.nextInt(2));
-                entityData.set(HEAD_BONE, isFemale() ? 0 : random.nextInt(3));
+                entityData.set(EYES_TYPE, randomFaceType(random, 3, 13));
+                entityData.set(NOSE_TYPE, randomFaceType(random, 2, 6));
+                entityData.set(MOUTH_TYPE, randomFaceType(random, 2, 9));
+                // DMZ 2.2 exposes both Majin cranial parts and preset hair to both genders.
+                // Each fighter may use either category or both; -1 explicitly means no head bone.
+                boolean useHeadBone = random.nextBoolean();
+                boolean useHair = random.nextBoolean();
+                if (!useHeadBone && !useHair) useHair = true;
+                entityData.set(HEAD_BONE, useHeadBone ? random.nextInt(3) : -1);
                 entityData.set(OUTFIT, LivingWorldConfig.raceCanUseClothes(race.dmzId()) ? random.nextInt(22) : 0);
                 int majinColorRoll = random.nextInt(100);
                 boolean pinkVariant = majinColorRoll < 70;
@@ -2739,7 +2762,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                         : randomColor(random);
                 String secondary = pinkVariant ? main
                         : shadeColor(main, random.nextBoolean() ? 0.72D : 1.28D);
-                entityData.set(HAIR_ID, isFemale() ? 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())) : 0);
+                entityData.set(HAIR_ID, useHair ? 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())) : 0);
                 entityData.set(HAIR_COLOR, main);
                 entityData.set(BODY_COLOR, main);
                 entityData.set(BODY_COLOR2, secondary);
@@ -2750,9 +2773,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             }
             case FROST_DEMON -> {
                 entityData.set(BODY_TYPE, Math.floorMod(getUUID().hashCode(), 3));
-                entityData.set(EYES_TYPE, random.nextInt(6));
-                entityData.set(NOSE_TYPE, random.nextInt(2));
-                entityData.set(MOUTH_TYPE, random.nextInt(2));
+                entityData.set(EYES_TYPE, randomFaceType(random, 7, 13));
+                entityData.set(NOSE_TYPE, randomFaceType(random, 2, 6));
+                entityData.set(MOUTH_TYPE, randomFaceType(random, 2, 9));
                 entityData.set(HAIR_ID, 0);
                 entityData.set(OUTFIT, 0);
                 entityData.set(HEAD_BONE, random.nextInt(5));
@@ -2772,19 +2795,20 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                     entityData.set(BODY_COLOR3, skin);
                     break;
                 }
-                entityData.set(BODY_TYPE, random.nextInt(3));
-                entityData.set(EYES_TYPE, 0);
-                entityData.set(NOSE_TYPE, 0);
-                entityData.set(MOUTH_TYPE, 0);
+                // Dragon Mine Z 2.2 exposes six native Bio-Android body presets.
+                entityData.set(BODY_TYPE, random.nextInt(6));
+                entityData.set(EYES_TYPE, randomFaceType(random, 4, 13));
+                entityData.set(NOSE_TYPE, randomFaceType(random, 0, 6));
+                entityData.set(MOUTH_TYPE, randomFaceType(random, 0, 9));
                 entityData.set(HAIR_ID, 0);
                 entityData.set(OUTFIT, 0);
                 applyBioAndroidColors(random);
             }
             case ZAARAKIN -> {
                 entityData.set(BODY_TYPE, 1 + random.nextInt(2));
-                entityData.set(EYES_TYPE, random.nextInt(13));
-                entityData.set(NOSE_TYPE, random.nextInt(6));
-                entityData.set(MOUTH_TYPE, random.nextInt(9));
+                entityData.set(EYES_TYPE, randomFaceType(random, 13, 13));
+                entityData.set(NOSE_TYPE, randomFaceType(random, 6, 6));
+                entityData.set(MOUTH_TYPE, randomFaceType(random, 9, 9));
                 entityData.set(HAIR_ID, 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())));
                 entityData.set(OUTFIT, LivingWorldConfig.raceCanUseClothes("human") ? random.nextInt(22) : 0);
                 entityData.set(BODY_COLOR, "#FFD3C9");
@@ -2794,9 +2818,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             }
             case ANTORANIAN -> {
                 entityData.set(BODY_TYPE, 1 + random.nextInt(2));
-                entityData.set(EYES_TYPE, random.nextInt(8));
-                entityData.set(NOSE_TYPE, random.nextInt(6));
-                entityData.set(MOUTH_TYPE, random.nextInt(9));
+                entityData.set(EYES_TYPE, randomFaceType(random, 8, 13));
+                entityData.set(NOSE_TYPE, randomFaceType(random, 6, 6));
+                entityData.set(MOUTH_TYPE, randomFaceType(random, 9, 9));
                 entityData.set(HAIR_ID, 1 + random.nextInt(Math.max(1, HairManager.getPresetCount())));
                 entityData.set(OUTFIT, random.nextBoolean() && LivingWorldConfig.raceCanUseClothes("human")
                     ? random.nextInt(22) : -1);
@@ -2807,6 +2831,12 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                 entityData.set(HAIR_COLOR, randomColor(random));
             }
         }
+    }
+
+    /** Mirrors DMZ 2.2's combined racial-face then Human-face index space. */
+    private static int randomFaceType(RandomSource random, int racialCount, int humanCount) {
+        int humanStart = Math.max(1, racialCount);
+        return random.nextInt(Math.max(1, humanStart + humanCount));
     }
 
     private void applyBioAndroidColors(RandomSource random) {
@@ -3171,7 +3201,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     public int getNoseType() { return entityData.get(NOSE_TYPE); }
     public int getMouthType() { return entityData.get(MOUTH_TYPE); }
     public int getHairId() { return entityData.get(HAIR_ID); }
-    public int getHeadBone() { return Math.floorMod(entityData.get(HEAD_BONE), getRace() == FighterRace.FROST_DEMON ? 5 : 3); }
+    public int getHeadBone() {
+        int value = entityData.get(HEAD_BONE);
+        if (getRace() == FighterRace.MAJIN && value < 0) return -1;
+        return Math.floorMod(value, getRace() == FighterRace.FROST_DEMON ? 5 : 3);
+    }
     public int getOutfit() { return entityData.get(OUTFIT); }
     /** Persistent Living World cosmetic evolution; bounded to native DMZ preset hairs. */
     public void setHairIdForLivingWorld(int hairId) {
@@ -3559,6 +3593,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         tag.putInt("EyesType", getEyesType());
         tag.putInt("NoseType", getNoseType());
         tag.putInt("MouthType", getMouthType());
+        tag.putInt("HeadBone", getHeadBone());
         tag.putInt("HairId", getHairId());
         tag.putInt("Outfit", getOutfit());
         tag.putString("BodyColor", transformedAppearance && !racialBaseBodyColor.isBlank() ? racialBaseBodyColor : getBodyColor());
@@ -3607,6 +3642,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (profile.contains("EyesType")) entityData.set(EYES_TYPE, profile.getInt("EyesType"));
         if (profile.contains("NoseType")) entityData.set(NOSE_TYPE, profile.getInt("NoseType"));
         if (profile.contains("MouthType")) entityData.set(MOUTH_TYPE, profile.getInt("MouthType"));
+        if (profile.contains("HeadBone")) entityData.set(HEAD_BONE, profile.getInt("HeadBone"));
         if (profile.contains("HairId")) entityData.set(HAIR_ID, profile.getInt("HairId"));
         if (profile.contains("Outfit")) entityData.set(OUTFIT, profile.getInt("Outfit"));
         if (profile.contains("BodyColor")) entityData.set(BODY_COLOR, profile.getString("BodyColor"));
@@ -3691,6 +3727,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (profile.contains("EyesType")) entityData.set(EYES_TYPE, profile.getInt("EyesType"));
         if (profile.contains("NoseType")) entityData.set(NOSE_TYPE, profile.getInt("NoseType"));
         if (profile.contains("MouthType")) entityData.set(MOUTH_TYPE, profile.getInt("MouthType"));
+        if (profile.contains("HeadBone")) entityData.set(HEAD_BONE, profile.getInt("HeadBone"));
         if (profile.contains("HairId")) entityData.set(HAIR_ID, profile.getInt("HairId"));
         if (profile.contains("Outfit")) entityData.set(OUTFIT, profile.getInt("Outfit"));
         if (profile.contains("BodyColor")) entityData.set(BODY_COLOR, profile.getString("BodyColor"));
@@ -5458,20 +5495,12 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             entityData.set(HAIR_COLOR, NAMEK_LIGHT_GREEN[Math.floorMod(appearanceSeed / 29, NAMEK_LIGHT_GREEN.length)]);
         }
         if (tag.contains("LWHairColor")) entityData.set(HAIR_COLOR, tag.getString("LWHairColor"));
-        // Migrate female Majins created by older builds, where the race-level hair gate
-        // forced an otherwise valid generated HairId to remain invisible (or zero).
-        if (getRace() == FighterRace.MAJIN && isFemale()) {
-            int presets = Math.max(1, HairManager.getPresetCount());
-            if (getHairId() <= 0) entityData.set(HAIR_ID, 1 + Math.floorMod(getUUID().hashCode(), presets));
-            entityData.set(HAIR_COLOR, getBodyColor());
-        }
         if (getRace() == FighterRace.MAJIN) {
             int appearanceSeed = getUUID().hashCode();
             entityData.set(BODY_TYPE, Math.floorMod(getBodyType(), 3));
-            entityData.set(EYES_TYPE, Math.floorMod(getEyesType(), 3));
-            entityData.set(NOSE_TYPE, Math.floorMod(getNoseType(), 2));
-            entityData.set(MOUTH_TYPE, Math.floorMod(getMouthType(), 2));
-            if (!isFemale()) entityData.set(HEAD_BONE, Math.floorMod(appearanceSeed, 3));
+            entityData.set(EYES_TYPE, Math.floorMod(getEyesType(), 16));
+            entityData.set(NOSE_TYPE, Math.floorMod(getNoseType(), 8));
+            entityData.set(MOUTH_TYPE, Math.floorMod(getMouthType(), 11));
             if (isMajinPinkVariant(getBodyColor()))
                 entityData.set(BODY_COLOR2, getBodyColor());
             else if (getBodyColor2().equalsIgnoreCase(getBodyColor()))
@@ -5479,7 +5508,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             String redEye = MAJIN_EYE_RED[Math.floorMod(appearanceSeed / 11, MAJIN_EYE_RED.length)];
             entityData.set(EYE1_COLOR, redEye);
             entityData.set(EYE2_COLOR, redEye);
-            if (isFemale()) entityData.set(HAIR_COLOR, getBodyColor());
+            entityData.set(HAIR_COLOR, getBodyColor());
         }
         // Migrate Frost Demons saved by older builds without replacing already-authored colours
         // on every load. Missing channels receive broader native-channel variants.
@@ -5487,9 +5516,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             RandomSource frostAppearance = RandomSource.create(getUUID().getMostSignificantBits()
                     ^ Long.rotateLeft(getUUID().getLeastSignificantBits(), 23));
             entityData.set(BODY_TYPE, Math.floorMod(getUUID().hashCode(), 3));
-            entityData.set(EYES_TYPE, Math.floorMod(getEyesType(), 6));
-            entityData.set(NOSE_TYPE, Math.floorMod(getNoseType(), 2));
-            entityData.set(MOUTH_TYPE, Math.floorMod(getMouthType(), 2));
+            entityData.set(EYES_TYPE, Math.floorMod(getEyesType(), 20));
+            entityData.set(NOSE_TYPE, Math.floorMod(getNoseType(), 8));
+            entityData.set(MOUTH_TYPE, Math.floorMod(getMouthType(), 11));
             entityData.set(HEAD_BONE, Math.floorMod(getHeadBone(), 5));
             applyFrostDemonColors(frostAppearance,
                     !tag.contains("LWBodyColor"), !tag.contains("LWBodyColor2"), !tag.contains("LWBodyColor3"),

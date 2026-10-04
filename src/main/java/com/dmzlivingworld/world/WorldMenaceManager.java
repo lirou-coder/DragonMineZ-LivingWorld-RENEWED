@@ -106,6 +106,39 @@ public final class WorldMenaceManager {
         return explicitRetaliation || ("HUNTING".equals(data.getString(MENACE_STATE)) && fighter.getTarget() != null);
     }
 
+    /**
+     * Herobrine and ordinary Living World fighters ignore each other. The sole exception is a
+     * travelling companion whose owner is actively fighting this manifestation; that companion
+     * may assist, and Herobrine may retaliate against it for the duration of that confrontation.
+     */
+    public static boolean allowsHerobrineFighterCombat(AmbientFighterEntity first,
+                                                        AmbientFighterEntity second) {
+        if (first == null || second == null) return false;
+        if (first == second) return true;
+        AmbientFighterEntity herobrine = isHerobrine(first) ? first : isHerobrine(second) ? second : null;
+        if (herobrine == null) return true;
+        AmbientFighterEntity companion = herobrine == first ? second : first;
+        if (isWorldMenace(companion) || !(herobrine.level() instanceof ServerLevel level)
+                || !companion.getPersistentData().hasUUID("LWCompanionOwner")) return false;
+        UUID ownerId = companion.getPersistentData().getUUID("LWCompanionOwner");
+        ServerPlayer owner = level.getServer().getPlayerList().getPlayer(ownerId);
+        if (owner == null || owner.serverLevel() != level || !owner.isAlive()
+                || !LivingBondManager.isCompanion(owner, companion)) return false;
+
+        CompoundTag menaceData = herobrine.getPersistentData();
+        boolean explicitOwnerFight = menaceData.getLong(RETALIATE_UNTIL) > level.getGameTime()
+                && menaceData.hasUUID(RETALIATE_PLAYER)
+                && ownerId.equals(menaceData.getUUID(RETALIATE_PLAYER));
+        boolean ownerRecentlyHitHerobrine = owner.getLastHurtMob() == herobrine
+                && owner.tickCount - owner.getLastHurtMobTimestamp() <= 200;
+        boolean ownerRecentlyHitByHerobrine = owner.getLastHurtByMob() == herobrine
+                && owner.tickCount - owner.getLastHurtByMobTimestamp() <= 200;
+        return explicitOwnerFight
+                || herobrine.getTarget() == owner
+                || ownerRecentlyHitHerobrine
+                || ownerRecentlyHitByHerobrine;
+    }
+
     public static boolean enabled() { return LivingWorldConfig.worldMenacesEnabled(); }
 
     /** Shared social/People/IT gate for every unique recurring World Menace. */

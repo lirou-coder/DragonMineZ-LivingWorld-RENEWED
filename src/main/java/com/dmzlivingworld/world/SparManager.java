@@ -502,8 +502,13 @@ public final class SparManager {
 
     private static void grantMatchedSparRewards(ServerPlayer player, AmbientFighterEntity fighter, Session session) {
         if (player == null || fighter == null || session == null) return;
-        double high = Math.max(session.playerBp, session.fighterBp);
-        double difference = Math.abs(session.playerBp - session.fighterBp) / Math.max(1.0D, high);
+        // Compare the powers that actually finished the fight. Capturing them only at the start
+        // allowed a player to enter suppressed, raise Release/forms mid-spar and retain the easier
+        // matching reward calculated from the deliberately low opening BP.
+        double finalPlayerBp = Math.max(1.0D, PlayerWorldManager.playerBattlePower(player));
+        double finalFighterBp = Math.max(1.0D, fighter.getBattlePower());
+        double high = Math.max(finalPlayerBp, finalFighterBp);
+        double difference = Math.abs(finalPlayerBp - finalFighterBp) / Math.max(1.0D, high);
         double factor = difference <= 0.10D ? 1.0D : Math.max(0.0D, 1.0D - (difference - 0.10D) / 0.90D);
         if (factor <= 0.0D) return;
 
@@ -511,7 +516,13 @@ public final class SparManager {
             int maxStats = ConfigManager.getServerConfig().getGameplay().getMaxValue();
             int onePointCost = data.calculateRecursiveCost(1, maxStats);
             if (onePointCost > 0 && onePointCost < Integer.MAX_VALUE) {
-                float reward = (float)Math.min(Float.MAX_VALUE, onePointCost * 60.0D * factor);
+                int currentRelease = Math.max(0, data.getResources().getPowerRelease());
+                // Spar effort is measured against the standard 100% output, not the character's
+                // personal cap. Suppression below 100 reduces TP and extended Release above 100
+                // (Potential Unlock/Zenkai/Overhaul) increases it proportionally.
+                double releaseRatio = currentRelease / 100.0D;
+                float reward = (float)Math.min(Float.MAX_VALUE,
+                        onePointCost * 60.0D * factor * releaseRatio);
                 data.getResources().addTrainingPoints(reward, false);
                 NetworkHandler.sendToTrackingEntityAndSelf(new StatsSyncS2C(player), player);
                 player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar.tp_reward", (int)reward), false);

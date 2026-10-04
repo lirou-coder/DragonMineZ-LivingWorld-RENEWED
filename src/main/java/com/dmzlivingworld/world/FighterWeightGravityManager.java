@@ -59,8 +59,24 @@ public final class FighterWeightGravityManager {
     public static int idealWeight(AmbientFighterEntity fighter) {
         if (fighter == null) return 10;
         GeneralServerConfig.GravityConfig cfg = ConfigManager.getServerConfig().getGravity();
-        double capacity = Math.max(0.0D, fighter.getUnpenalizedDefenseStat()) / Math.max(0.0001D, cfg.getTpIdealBaseDivisor());
+        double capacity = gravityWeightReference(fighter) / Math.max(0.0001D, cfg.getTpIdealBaseDivisor());
         return Math.max(10, (int)Math.round(capacity));
+    }
+
+    /**
+     * NPC equivalent of the player's resistance stat. Temporary gravity/weight modifiers are
+     * deliberately excluded so the penalty can never lower its own resistance and feed back.
+     */
+    public static double gravityWeightReference(AmbientFighterEntity fighter) {
+        if (fighter == null) return 0.0D;
+        AttributeInstance health = fighter.getAttribute(Attributes.MAX_HEALTH);
+        AttributeInstance melee = fighter.getAttribute(Attributes.ATTACK_DAMAGE);
+        double maxHealth = health == null ? fighter.getMaxHealth() : health.getBaseValue();
+        double meleeDamage = melee == null ? 0.0D : melee.getBaseValue();
+        KiPenaltyState kiPenalty = KI_PENALTIES.get(fighter);
+        double kiDamage = kiPenalty == null ? fighter.getKiBlastDamage() : kiPenalty.base();
+        double defense = fighter.getUnpenalizedDefenseStat();
+        return Math.max(0.0D, maxHealth + meleeDamage + kiDamage + defense) / 6.0D;
     }
 
     public static int rawWeight(AmbientFighterEntity fighter) {
@@ -167,7 +183,7 @@ public final class FighterWeightGravityManager {
         GeneralServerConfig.GravityConfig cfg = ConfigManager.getServerConfig().getGravity();
         double max = Math.max(1.0D, ConfigManager.getServerConfig().getGameplay().getMaxValue());
         double divisor = Math.max(1.0D, max * cfg.getResistanceStatDivisorRatio());
-        return (Math.max(0.0D, fighter.getUnpenalizedDefenseStat()) / divisor) * cfg.getResistanceScale();
+        return (gravityWeightReference(fighter) / divisor) * cfg.getResistanceScale();
     }
 
     private static double netGravity(AmbientFighterEntity fighter) {

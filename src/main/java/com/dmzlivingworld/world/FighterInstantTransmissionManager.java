@@ -1,5 +1,6 @@
 package com.dmzlivingworld.world;
 
+import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dragonminez.common.init.MainSounds;
 import com.dragonminez.common.network.NetworkHandler;
@@ -16,20 +17,32 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /** Lets a player use Dragon Mine Z's learned Instant Transmission to reach a familiar remembered fighter. */
+@Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class FighterInstantTransmissionManager {
     private static final int MENU_SKILL_LEVEL = 5;
     private static final int CROSS_DIMENSION_SKILL_LEVEL = 10;
     private static final int KI_FAMILIAR_RELATIONSHIP = 5;
     // Server-thread guard: one remembered identity may only be materialized once at a time.
     private static final Set<String> MATERIALIZING = new HashSet<>();
+    private static final Map<String, PendingTravel> PENDING_TRAVELS = new HashMap<>();
+    private static final Map<String, PendingReconciliation> PENDING_RECONCILIATIONS = new HashMap<>();
+    private static final int CHUNK_ENTITY_LOAD_GRACE_TICKS = 4;
+    private record PendingTravel(UUID playerId, UUID recordId, int attempts, long retryAt) {}
+    private record PendingReconciliation(UUID playerId, UUID recordId, int ticksLeft) {}
 
     private FighterInstantTransmissionManager() {}
 
@@ -131,10 +144,11 @@ public final class FighterInstantTransmissionManager {
         // A remembered fighter can be abstract/off-screen when the player deliberately locks on.
         // Materialize that SAME recorded identity at its simulated life location for the IT action.
         if (!targetLoaded) {
-            target = tryMaterializeNearbySignal(player, recordId, signalRecord, skillLevel);
+            target = tryMaterializeNearbySignal(player, recordId, signalRecord);
             targetLoaded = target != null && target.isAlive() && !target.isCaptive();
             if (!targetLoaded) {
-                message(player, "cannot_sense_now");
+                if (!PENDING_TRAVELS.containsKey(pendingKey(player.getUUID(), recordId)))
+                    message(player, "cannot_sense_now");
                 return;
             }
             sameDimension = target.level().dimension().equals(player.level().dimension());
@@ -172,7 +186,7 @@ public final class FighterInstantTransmissionManager {
     }
 
     private static AmbientFighterEntity tryMaterializeNearbySignal(ServerPlayer player, UUID recordId,
-                                                                   CompoundTag record, int skillLevel) {
+                                                                   CompoundTag record) {
         if (record == null || record.isEmpty() || !record.contains("Profile")
                 || !record.contains("LifeX") || !record.contains("LifeZ")) return null;
         String dimension = record.getString("LifeDimension");
@@ -202,12 +216,82 @@ public final class FighterInstantTransmissionManager {
         restored = findLoadedIdentity(player, recordId, record);
         if (restored != null) return restored;
 
+        // Chunk IO and entity registration do not finish atomically. Creating a remembered copy in
+        // this same tick races the genuine persistent entity that the chunk is still restoring.
+        // Wait a few real server ticks and resolve the stable identity again before materializing.
+        String pendingKey = pendingKey(player.getUUID(), recordId);
+        PENDING_TRAVELS.putIfAbsent(pendingKey, new PendingTravel(player.getUUID(), recordId, 0,
+                player.getServer().overworld().getGameTime() + 1L));
+        return null;
+    }
+
+    @SubscribeEvent
+    public static void onServerTick(TickEvent.ServerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+        long now = event.getServer().overworld().getGameTime();
+        Iterator<Map.Entry<String, PendingTravel>> iterator = PENDING_TRAVELS.entrySet().iterator();
+        List<PendingTravel> ready = new ArrayList<>();
+        while (iterator.hasNext()) {
+            Map.Entry<String, PendingTravel> entry = iterator.next();
+            if (entry.getValue().retryAt() <= now) {
+                ready.add(entry.getValue());
+                iterator.remove();
+            }
+        }
+        for (PendingTravel pending : ready) {
+            ServerPlayer player = event.getServer().getPlayerList().getPlayer(pending.playerId());
+            if (player == null) continue;
+            CompoundTag record = FighterMemoryManager.internalSignalRecord(player, pending.recordId());
+            if (record.isEmpty()) continue;
+            AmbientFighterEntity restored = findLoadedIdentity(player, pending.recordId(), record);
+            if (restored != null) {
+                travel(player, pending.recordId());
+                continue;
+            }
+            if (pending.attempts() + 1 < CHUNK_ENTITY_LOAD_GRACE_TICKS) {
+                PENDING_TRAVELS.put(pendingKey(pending.playerId(), pending.recordId()),
+                        new PendingTravel(pending.playerId(), pending.recordId(), pending.attempts() + 1, now + 1L));
+                continue;
+            }
+            AmbientFighterEntity materialized = materializeSignalNow(player, pending.recordId(), record);
+            if (materialized == null) message(player, "cannot_sense_now");
+            else travel(player, pending.recordId());
+        }
+
+        // Keep repairing the identity for two seconds after explicit materialization. This is not
+        // another teleport: it solely catches an unusually late chunk entity and removes whichever
+        // instance is no longer the canonical remembered person.
+        Iterator<Map.Entry<String, PendingReconciliation>> reconciliations =
+                PENDING_RECONCILIATIONS.entrySet().iterator();
+        while (reconciliations.hasNext()) {
+            Map.Entry<String, PendingReconciliation> entry = reconciliations.next();
+            PendingReconciliation pending = entry.getValue();
+            ServerPlayer player = event.getServer().getPlayerList().getPlayer(pending.playerId());
+            if (player != null) {
+                CompoundTag record = FighterMemoryManager.internalSignalRecord(player, pending.recordId());
+                if (!record.isEmpty()) findLoadedIdentity(player, pending.recordId(), record);
+            }
+            if (player == null || pending.ticksLeft() <= 1) reconciliations.remove();
+            else entry.setValue(new PendingReconciliation(pending.playerId(), pending.recordId(),
+                    pending.ticksLeft() - 1));
+        }
+    }
+
+    private static AmbientFighterEntity materializeSignalNow(ServerPlayer player, UUID recordId, CompoundTag record) {
+        if (record == null || record.isEmpty() || !record.contains("Profile")
+                || !record.contains("LifeX") || !record.contains("LifeZ")) return null;
+        String dimension = record.getString("LifeDimension");
+        if (!dimension.isBlank() && !dimension.equals(player.level().dimension().location().toString())) return null;
+        BlockPos life = new BlockPos(record.getInt("LifeX"),
+                record.contains("LifeY") ? record.getInt("LifeY") : player.blockPosition().getY(),
+                record.getInt("LifeZ"));
+
         String guard = player.getUUID() + ":" + recordId;
         if (!MATERIALIZING.add(guard)) return findLoadedIdentity(player, recordId, record);
         try {
             // One final identity lookup happens under the materialization guard. This catches a
             // fighter restored by the same server tick before a second IT request can make a copy.
-            restored = findLoadedIdentity(player, recordId, record);
+            AmbientFighterEntity restored = findLoadedIdentity(player, recordId, record);
             if (restored != null) return restored;
             AmbientFighterEntity spawned = AmbientFighterSpawner.spawnRememberedSignalAt(player, record.getCompound("Profile"), recordId,
                     Math.max(1, record.getInt("Encounters")), record.getInt("Relationship"),
@@ -220,12 +304,16 @@ public final class FighterInstantTransmissionManager {
             // here keeps that actor and discards the temporary copy; if no old actor exists, the
             // spawned entity is rebound and becomes the sole canonical instance.
             AmbientFighterEntity canonical = findLoadedIdentity(player, recordId, record);
-            CompoundTag identitySnapshot = record.copy();
-            player.getServer().execute(() -> findLoadedIdentity(player, recordId, identitySnapshot));
+            PENDING_RECONCILIATIONS.put(pendingKey(player.getUUID(), recordId),
+                    new PendingReconciliation(player.getUUID(), recordId, 40));
             return canonical == null ? spawned : canonical;
         } finally {
             MATERIALIZING.remove(guard);
         }
+    }
+
+    private static String pendingKey(UUID playerId, UUID recordId) {
+        return playerId + ":" + recordId;
     }
 
     /**
