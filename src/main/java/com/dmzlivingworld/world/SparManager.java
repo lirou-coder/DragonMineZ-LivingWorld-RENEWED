@@ -507,9 +507,7 @@ public final class SparManager {
         // matching reward calculated from the deliberately low opening BP.
         double finalPlayerBp = Math.max(1.0D, PlayerWorldManager.playerBattlePower(player));
         double finalFighterBp = Math.max(1.0D, fighter.getBattlePower());
-        double high = Math.max(finalPlayerBp, finalFighterBp);
-        double difference = Math.abs(finalPlayerBp - finalFighterBp) / Math.max(1.0D, high);
-        double factor = difference <= 0.10D ? 1.0D : Math.max(0.0D, 1.0D - (difference - 0.10D) / 0.90D);
+        double factor = matchedPowerFactor(finalPlayerBp, finalFighterBp);
         if (factor <= 0.0D) return;
 
         player.getCapability(StatsCapability.INSTANCE).ifPresent(data -> {
@@ -534,6 +532,50 @@ public final class SparManager {
         double ceiling = Math.max(fighter.getPermanentBattlePower() * 1.10D,
                 fighter.getPermanentBattlePower() + 1.0D);
         FighterBattleGrowthManager.queueAdjustedFraction(fighter, 0.10D * factor, ceiling);
+    }
+
+    /** Shared end-of-fight BP matching curve used by spars and unsanctioned battles. */
+    public static double matchedPowerFactor(double firstBp, double secondBp) {
+        double first = Math.max(1.0D, firstBp);
+        double second = Math.max(1.0D, secondBp);
+        double difference = Math.abs(first - second) / Math.max(first, second);
+        return difference <= 0.10D ? 1.0D : Math.max(0.0D, 1.0D - (difference - 0.10D) / 0.90D);
+    }
+
+    /**
+     * Resolves an ordinary player/fighter battle using the final powers. A normal battle passes
+     * {@code rewardScale=0.5}; death may independently suppress the dead participant's reward.
+     */
+    public static void grantMatchedBattleRewards(ServerPlayer player, AmbientFighterEntity fighter,
+                                                 double rewardScale, boolean rewardPlayer,
+                                                 boolean rewardFighter) {
+        if (player == null || fighter == null || rewardScale <= 0.0D) return;
+        double factor = matchedPowerFactor(PlayerWorldManager.playerBattlePower(player), fighter.getBattlePower());
+        if (factor <= 0.0D) return;
+
+        if (rewardPlayer) player.getCapability(StatsCapability.INSTANCE).ifPresent(data -> {
+            int maxStats = ConfigManager.getServerConfig().getGameplay().getMaxValue();
+            int onePointCost = data.calculateRecursiveCost(1, maxStats);
+            if (onePointCost <= 0 || onePointCost == Integer.MAX_VALUE) return;
+            double releaseRatio = Math.max(0, data.getResources().getPowerRelease()) / 100.0D;
+            float reward = (float)Math.min(Float.MAX_VALUE,
+                    onePointCost * 60.0D * factor * rewardScale * releaseRatio);
+            if (reward <= 0.0F) return;
+            data.getResources().addTrainingPoints(reward, false);
+            NetworkHandler.sendToTrackingEntityAndSelf(new StatsSyncS2C(player), player);
+        });
+
+        if (rewardFighter) grantMatchedFighterGrowth(fighter, factor, rewardScale);
+    }
+
+    /** Grants the NPC side of the spar curve; used for both participants in NPC-vs-NPC battles. */
+    public static void grantMatchedFighterGrowth(AmbientFighterEntity fighter, double factor,
+                                                  double rewardScale) {
+        if (fighter == null || factor <= 0.0D || rewardScale <= 0.0D) return;
+        double permanent = fighter.getPermanentBattlePower();
+        double ceiling = Math.max(permanent * (1.0D + 0.10D * rewardScale), permanent + 1.0D);
+        FighterBattleGrowthManager.queueAdjustedFraction(fighter,
+                0.10D * factor * rewardScale, ceiling);
     }
 
     private static void rememberReconnectState(ServerPlayer player, AmbientFighterEntity fighter, long elapsed) {

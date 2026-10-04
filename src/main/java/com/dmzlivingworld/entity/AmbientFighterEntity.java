@@ -55,6 +55,7 @@ import com.dmzlivingworld.world.NpcDefenseCalculator;
 import com.dmzlivingworld.world.NpcDefensePenetrationManager;
 import com.dmzlivingworld.world.NpcFormConfigBridge;
 import com.dmzlivingworld.world.SairensBioAndroidCompat;
+import com.dmzlivingworld.world.CombatEncounterGrowthManager;
 import com.dmzlivingworld.world.SairensRaceCompat;
 import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.ReactiveWorldEventManager;
@@ -2035,6 +2036,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         stopCasting();
         setAttacking(false);
         setFlying(false);
+        setSprinting(true);
+        setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.RUN);
         getNavigation().stop();
     }
 
@@ -2048,6 +2051,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         setTarget(null);
         if (retreatTicks-- <= 0) {
             retreatThreatId = null;
+            setSprinting(false);
+            setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
             return;
         }
 
@@ -2055,8 +2060,13 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (threat == null || !threat.isAlive()) {
             retreatTicks = 0;
             retreatThreatId = null;
+            setSprinting(false);
+            setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.IDLE);
             return;
         }
+
+        setSprinting(true);
+        setLocomotionMode(LivingWorldSagasEntity.LocomotionMode.RUN);
 
         if (tickCount % 12 == 0) {
             double dx = getX() - threat.getX();
@@ -2177,6 +2187,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             }
         }
         if (attackerEntity instanceof AmbientFighterEntity attacker) {
+            if (!level().isClientSide) CombatEncounterGrowthManager.onNpcCombatContact(attacker, this);
             if (!level().isClientSide && RedRibbonExperimentManager.isExperiment(attacker) && isFactionMember()) {
                 RedRibbonExperimentManager.onFactionMemberAttacked(attacker, this);
             }
@@ -2276,6 +2287,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         suppressCombatIntent();
 
         if (victor != null) {
+            CombatEncounterGrowthManager.onNpcConcession(victor, this);
             FighterLegacyManager.recordConcession(victor, this);
             FighterBattleGrowthManager.onConcession(victor, this);
             FighterDefeatRewardManager.onDefeated(this, victor);
@@ -2309,6 +2321,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         // Reward the moral act at the actual one-shot mercy transition. MercyManager's
         // faction bookkeeping intentionally ignores ordinary fighters, but alignment must not.
         PlayerAlignmentManager.rewardGoodAct(player);
+        CombatEncounterGrowthManager.onFighterSpared(player, this);
         MercyManager.onMercyDowned(player, this);
     }
 
