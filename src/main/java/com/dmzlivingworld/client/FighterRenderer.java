@@ -11,6 +11,7 @@ import com.dmzlivingworld.client.layer.LWSagaArmorLayer;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dragonminez.client.render.util.IrisCompat;
+import com.dragonminez.client.render.hair.HairRenderCapture;
 import com.dragonminez.client.render.util.PlayerEffectQueue;
 import com.dragonminez.client.systems.kisense.KiSenseScan;
 import com.dragonminez.client.systems.kisense.KiSenseState;
@@ -79,6 +80,7 @@ public final class FighterRenderer extends GeoEntityRenderer<AmbientFighterEntit
         // always force this FighterModel to evaluate the current NPC instead of accepting a baked
         // pose that was last evaluated for another actor (most visibly the local player's arms).
         ((GeoModelAccessor) (Object) getGeoModel()).dmz$setLastRenderedInstance(-1L);
+        HairRenderCapture.beginEntity(entity, poseStack);
 
         float scale = entity.getDisplayScale();
         poseStack.pushPose();

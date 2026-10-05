@@ -10,6 +10,9 @@ import com.dragonminez.common.init.MainSounds;
 import com.dragonminez.common.init.MainParticles;
 import com.dragonminez.common.init.MainDamageTypes;
 import com.dragonminez.common.init.entities.sagas.DBSagasEntity;
+import com.dragonminez.common.init.entities.ki.KiBlastEntity;
+import com.dragonminez.common.init.entities.ki.KiDiskEntity;
+import com.dragonminez.common.init.item.weapons.WeaponItem;
 import com.dragonminez.common.init.entities.sagas.helper.DBSagasAnimations;
 import com.dmzlivingworld.entity.combat.LivingWorldSagasEntity;
 import com.dmzlivingworld.entity.combat.helper.LWDBSagasAnimationHandler;
@@ -96,6 +99,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -113,6 +117,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.registries.ForgeRegistries;
 import software.bernie.geckolib.core.animation.AnimatableManager;
@@ -133,6 +138,8 @@ import java.util.UUID;
  * chasing, melee, dashing, aerial pursuit and Ki execution stay native to DMZ.
  */
 public class AmbientFighterEntity extends LivingWorldSagasEntity {
+    private static final String SAIYAN_TAIL_REGROW_AT = "LWSaiyanTailRegrowAt";
+    private static final int SAIYAN_TAIL_REGROW_TICKS = 40 * 60 * 20;
     private static final int DATA_VERSION = 23;
     private static final int MAX_DIALOGUE_HISTORY = 50;
     private static final int MAX_DIALOGUE_LENGTH = 240;
@@ -217,6 +224,12 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> ACTIVE_RACIAL_FORM_LEVEL =
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<String> ACTIVE_RACIAL_FORM_ID =
+            SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Boolean> HAS_SAIYAN_TAIL =
+            SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> SAIYAN_TAIL_BEARER =
+            SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> AMBIENT_POSE =
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> WEAPON_TRAINING_STRIKE =
@@ -368,6 +381,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     private int kaiokenBaseAuraColor = 0xFFFFFF;
     private int racialTrainingProgress;
     private boolean racialTransformPending;
+    private String racialTransformFormId = "";
     private int racialCalmTicks;
     private int racialBasePower;
     private double racialBaseAttack;
@@ -378,6 +392,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     private String racialBaseBodyColor2 = "";
     private String racialBaseBodyColor3 = "";
     private float racialBaseScale = 1.0F;
+    private int racialBaseDbzStyle;
     private String racialBaseHairColor = "";
     private String racialBaseEye1Color = "";
     private String racialBaseEye2Color = "";
@@ -415,6 +430,53 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     public static AttributeSupplier.Builder createAttributes() {
         return LivingWorldSagasEntity.createAttributes();
+    }
+
+    private boolean isGreatApeForm() {
+        NpcFormConfigBridge.Form form = getActiveRacialFormConfig();
+        return form != null && "oozaru".equalsIgnoreCase(form.modelKey());
+    }
+
+    /**
+     * Great Apes use the same physical core as DMZ's saga Oozaru. The visual model extends well
+     * beyond that core, so its render-culling volume is handled separately below instead of making
+     * the entire visible ape an enormous solid collision box.
+     */
+    @Override
+    public EntityDimensions getDimensions(Pose pose) {
+        return isGreatApeForm() ? EntityDimensions.scalable(3.0F, 4.5F) : super.getDimensions(pose);
+    }
+
+    @Override
+    protected float getStandingEyeHeight(Pose pose, EntityDimensions dimensions) {
+        return isGreatApeForm() ? 4.05F : super.getStandingEyeHeight(pose, dimensions);
+    }
+
+    @Override
+    public AABB getBoundingBoxForCulling() {
+        AABB physical = super.getBoundingBoxForCulling();
+        float scale = Math.max(0.1F, getDisplayScale());
+        double visualRadius = Math.max(physical.getXsize() * 0.5D, 0.65D * scale);
+        double visualHeight = Math.max(physical.getYsize(), 2.15D * scale);
+
+        // DMZ's Oozaru is multipart (legs/torso/head) and reaches roughly eleven blocks high.
+        // Living World keeps its single entity hitbox, but must expose the same complete visual
+        // envelope to frustum culling or the upper half disappears when the original body leaves view.
+        if (isGreatApeForm()) {
+            visualRadius = Math.max(visualRadius, 3.5D);
+            visualHeight = Math.max(visualHeight, 11.0D);
+        }
+
+        AABB visual = new AABB(getX() - visualRadius, getY(), getZ() - visualRadius,
+                getX() + visualRadius, getY() + visualHeight, getZ() + visualRadius);
+        return physical.minmax(visual);
+    }
+
+    @Override
+    public boolean shouldRenderAtSqrDistance(double distance) {
+        if (isGreatApeForm()) return distance < 512.0D * 512.0D;
+        float scale = Math.max(1.0F, getDisplayScale());
+        return super.shouldRenderAtSqrDistance(distance / (scale * scale));
     }
 
     /**
@@ -573,6 +635,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         entityData.define(FLIGHT_UNLOCKED, false);
         entityData.define(RACIAL_SKILL_LEVEL, 0);
         entityData.define(ACTIVE_RACIAL_FORM_LEVEL, 0);
+        entityData.define(ACTIVE_RACIAL_FORM_ID, "");
+        entityData.define(HAS_SAIYAN_TAIL, false);
+        entityData.define(SAIYAN_TAIL_BEARER, false);
         entityData.define(AMBIENT_POSE, 0);
         entityData.define(WEAPON_TRAINING_STRIKE, 0);
         entityData.define(WEAPON_COMBAT_STRIKE, 0);
@@ -621,6 +686,12 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     public void initializeAs(FighterAlignment alignment, FighterRank rank, FighterPersonality personality,
                              FighterRace race, FighterArchetype archetype, ServerPlayer progressionPlayer) {
         RandomSource random = getRandom();
+        // Keep the progression context that authored this naturally spawned person. Arsenal
+        // initialization runs on the following server tick, when the spawning player may no
+        // longer be the nearest player (or even remain online).
+        int arsenalSpawnEra = progressionPlayer == null ? 0
+                : Math.max(0, WorldEraProgression.eraFor(progressionPlayer).number());
+        getPersistentData().putInt("LWSpawnEra", arsenalSpawnEra);
         if (race == FighterRace.ZAARAKIN && archetype == FighterArchetype.KI_SPECIALIST) {
             archetype = FighterArchetype.BRAWLER;
         }
@@ -633,8 +704,15 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         entityData.set(SPEECH, "");
         entityData.set(DEFEATED, false);
         entityData.set(AWAKENED, false);
+        entityData.set(HAS_SAIYAN_TAIL, false);
+        entityData.set(SAIYAN_TAIL_BEARER, false);
+        getPersistentData().remove(SAIYAN_TAIL_REGROW_AT);
         randomizeNativeAppearance(random);
         entityData.set(FIGHTER_NAME, FighterNames.rollUnique(this, random, race, isFemale()));
+        // A fresh identity needs its canonical container before reference/effective are written.
+        // Replacing this tag after the calculation erased LWEffectiveStats and made command-spawned
+        // fighters reconstruct their entire profile from DMZ's still-default BP of 1.
+        legacyData = new CompoundTag();
         if (level() instanceof ServerLevel server) {
             double effective = WorldPowerScaler.rollEffectiveStats(server, progressionPlayer, rank, random);
             FighterPowerStatScaler.setEffectiveStatBudget(this, effective);
@@ -682,6 +760,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         entityData.set(RACIAL_SKILL_LEVEL, spawnEra >= LivingWorldConfig.racialSkillMinimumEra()
                 ? rollInitialRacialSkill(random, rank, race) : 0);
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, 0);
+        entityData.set(ACTIVE_RACIAL_FORM_ID, "");
         entityData.set(AMBIENT_POSE, 0);
         entityData.set(WEAPON_TRAINING_STRIKE, 0);
         entityData.set(WEAPON_COMBAT_STRIKE, 0);
@@ -728,7 +807,6 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         partyId = null;
         partyCaptain = false;
         lastFactionRepHitTick = Long.MIN_VALUE;
-        legacyData = new CompoundTag();
         // Establish a canonical permanent BP only after the fresh legacy container exists.
         // The current DMZ field above is still needed during construction, but it is not an
         // authoritative source once temporary power layers are possible.
@@ -757,6 +835,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             setAggressive(false);
         }
         if (!level().isClientSide && isAlive()) WorldMenaceManager.enforceNearestPlayerStare(this);
+        if (!level().isClientSide && isAlive() && tickCount % 20 == 0) tickSaiyanTailRegrowth();
     }
 
     private void enforceLivingWorldSleepingRotation() {
@@ -872,7 +951,18 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (!entityData.get(READY)) {
             FighterAlignment alignment = FighterAlignment.roll(getRandom());
             FighterRank rank = FighterRank.roll(getRandom());
-            initializeAs(alignment, rank, FighterPersonality.roll(getRandom(), alignment), FighterRace.roll(getRandom()), FighterArchetype.roll(getRandom(), rank));
+            // Every normal LW materialization initializes before entering the level. Reaching this
+            // branch therefore identifies a raw vanilla `/summon`. Use the player at the summon
+            // location as its personal saga/reference context instead of the obsolete global era.
+            ServerPlayer summoningPlayer = null;
+            if (level() instanceof ServerLevel server) {
+                summoningPlayer = server.players().stream()
+                        .filter(candidate -> !candidate.isSpectator())
+                        .min(java.util.Comparator.comparingDouble(this::distanceToSqr))
+                        .orElse(null);
+            }
+            initializeAs(alignment, rank, FighterPersonality.roll(getRandom(), alignment),
+                    FighterRace.roll(getRandom()), FighterArchetype.roll(getRandom(), rank), summoningPlayer);
         } else if (!combatConfigured) {
             configureCombatProfile(false);
         }
@@ -1708,8 +1798,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         }
 
         int racialLevel = getActiveRacialFormLevel();
+        String racialId = getActiveRacialFormId();
         int kaiokenLevel = getKaiokenLevel();
-        NpcFormConfigBridge.Form form = racial ? NpcFormConfigBridge.form(getRace(), racialLevel) : null;
+        NpcFormConfigBridge.Form form = racial ? getActiveRacialFormConfig() : null;
         double kaiokenPowerMultiplier = kaioken ? kaiokenMultiplier(kaiokenLevel) : 1.0D;
 
         // Temporarily expose only canonical BP plus any live fruit. The normal refresh owns
@@ -1717,6 +1808,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         // Forms are mutually exclusive in normal play; clearing both also hardens old/corrupt
         // saves without baking either temporary multiplier into the base.
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, 0);
+        entityData.set(ACTIVE_RACIAL_FORM_ID, "");
         entityData.set(KAIOKEN_LEVEL, 0);
         setBattlePower(projectedBattlePower());
         refreshCombatStatsFromPower();
@@ -1730,6 +1822,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             racialBaseAttackSpeed = getDefaultAttackSpeed();
             racialBaseKiDamage = getKiBlastDamage();
             entityData.set(ACTIVE_RACIAL_FORM_LEVEL, racialLevel);
+            entityData.set(ACTIVE_RACIAL_FORM_ID, racialId);
             if (attack != null) attack.setBaseValue(racialBaseAttack * form.melee());
             if (speed != null) speed.setBaseValue(racialBaseSpeed * form.speed());
             setDefaultAttackSpeed(racialBaseAttackSpeed * form.attackSpeed());
@@ -1756,8 +1849,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (FighterSpecialItemManager.hasActiveMightFruit(this)) {
             projected *= FighterSpecialItemManager.mightFruitMultiplier(this);
         }
-        NpcFormConfigBridge.Form form = isRacialFormActive()
-                ? NpcFormConfigBridge.form(getRace(), getActiveRacialFormLevel()) : null;
+        NpcFormConfigBridge.Form form = getActiveRacialFormConfig();
         if (form != null) projected = FighterPowerStatScaler.transformedBattlePower(this,
                 form.melee(), form.defense(), form.vitality(), form.ki());
         if (isKaiokenActive()) {
@@ -1806,8 +1898,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     public double getUnpenalizedDefenseStat() {
         double defense = FighterPowerStatScaler.baseDefense(this);
-        NpcFormConfigBridge.Form form = isRacialFormActive()
-                ? NpcFormConfigBridge.form(getRace(), getActiveRacialFormLevel()) : null;
+        NpcFormConfigBridge.Form form = getActiveRacialFormConfig();
         if (form != null) defense *= form.defense();
         NpcFormConfigBridge.Form kaioken = isKaiokenActive()
                 ? NpcFormConfigBridge.kaioken(getKaiokenLevel()) : null;
@@ -2163,6 +2254,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                 && LivingBondManager.protectCompanionFromFriendlyFire(player, this)) {
             return false;
         }
+
+        // Only an accepted, mitigated combat hit may sever the tail. Spars and protected
+        // companion hits have already returned above, so a friendly exercise cannot cause
+        // a permanent racial-state change.
+        if (amount > 0.0F) tryCutSaiyanTail(source);
 
         // X-7's half-health squad call is evaluated from the incoming hit rather than waiting for
         // another AI tick. A large strike that crosses 50% can therefore never skip the trigger.
@@ -2740,6 +2836,12 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                 // race's configured player default and forms then override that same channel.
                 entityData.set(BODY_COLOR2, defaultPlayerBodyColor2(race));
                 entityData.set(BODY_COLOR3, skin);
+                if (race == FighterRace.SAIYAN) {
+                    boolean tail = random.nextFloat() < 0.05F;
+                    entityData.set(HAS_SAIYAN_TAIL, tail);
+                    entityData.set(SAIYAN_TAIL_BEARER, tail);
+                    if (tail && random.nextBoolean()) entityData.set(BODY_COLOR2, getHairColor());
+                }
             }
             case NAMEKIAN -> {
                 int bodyType = random.nextInt(3);
@@ -3592,6 +3694,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         tag.putBoolean("FlightUnlocked", hasFlightUnlocked());
         tag.putInt("RacialSkillLevel", getRacialSkillLevel());
         tag.putInt("RacialTrainingProgress", racialTrainingProgress);
+        tag.putBoolean("HasSaiyanTail", hasNaturalSaiyanTail());
+        tag.putBoolean("SaiyanTailBearer", isSaiyanTailBearer());
+        if (getPersistentData().contains(SAIYAN_TAIL_REGROW_AT))
+            tag.putLong("SaiyanTailRegrowAt", getPersistentData().getLong(SAIYAN_TAIL_REGROW_AT));
         tag.putBoolean("Awakened", isAwakened());
         // Wishes rebuild an NPC from this compact profile, so the personal bond is identity data too.
         if (memoryOwnerId != null) tag.putUUID("MemoryOwner", memoryOwnerId);
@@ -3664,8 +3770,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (profile.contains("HairColor")) entityData.set(HAIR_COLOR, profile.getString("HairColor"));
         if (profile.contains("Eye1Color")) entityData.set(EYE1_COLOR, profile.getString("Eye1Color"));
         if (profile.contains("Eye2Color")) entityData.set(EYE2_COLOR, profile.getString("Eye2Color"));
+        entityData.set(HAS_SAIYAN_TAIL, profile.contains("HasSaiyanTail") && profile.getBoolean("HasSaiyanTail"));
+        entityData.set(SAIYAN_TAIL_BEARER, profile.contains("SaiyanTailBearer") && profile.getBoolean("SaiyanTailBearer"));
 
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, 0);
+        entityData.set(ACTIVE_RACIAL_FORM_ID, "");
         entityData.set(KAIOKEN_LEVEL, 0);
         entityData.set(MEDITATING, false);
         entityData.set(DEFEATED, false);
@@ -3749,6 +3858,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (profile.contains("HairColor")) entityData.set(HAIR_COLOR, profile.getString("HairColor"));
         if (profile.contains("Eye1Color")) entityData.set(EYE1_COLOR, profile.getString("Eye1Color"));
         if (profile.contains("Eye2Color")) entityData.set(EYE2_COLOR, profile.getString("Eye2Color"));
+        entityData.set(HAS_SAIYAN_TAIL, profile.contains("HasSaiyanTail") && profile.getBoolean("HasSaiyanTail"));
+        entityData.set(SAIYAN_TAIL_BEARER, profile.contains("SaiyanTailBearer") && profile.getBoolean("SaiyanTailBearer"));
+        if (profile.contains("SaiyanTailRegrowAt"))
+            getPersistentData().putLong(SAIYAN_TAIL_REGROW_AT, profile.getLong("SaiyanTailRegrowAt"));
         if (profile.contains("FactionId")) entityData.set(FACTION_ID, profile.getString("FactionId"));
         if (profile.contains("FactionName")) entityData.set(FACTION_NAME, profile.getString("FactionName"));
         if (profile.contains("FactionTitle")) entityData.set(FACTION_TITLE, profile.getString("FactionTitle"));
@@ -3811,7 +3924,6 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     public boolean beginAwakening() {
         if (level().isClientSide || isAwakening() || isRacialFormActive() || isKaiokenActive()
                 || getRank() == FighterRank.ROOKIE) return false;
-        if (isAwakened() && getRacialSkillLevel() <= 0) return false;
         int skillLevel = getRacialSkillLevel();
         if (skillLevel <= 0 && getPersistentData().getBoolean("LWTemporaryAwakening")
             && getRace() == FighterRace.BIO_ANDROID) skillLevel = 1;
@@ -3827,11 +3939,17 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             base.putBoolean("Lightning", isLightning());
             getPersistentData().put(TEMPORARY_AWAKENING_BASE, base);
         }
-        racialTransformPending = skillLevel > 0;
+        NpcFormConfigBridge.Form selectedForm = selectCombatRacialForm(skillLevel);
+        if (isAwakened() && selectedForm == null) return false;
+        racialTransformPending = selectedForm != null;
+        racialTransformFormId = selectedForm == null ? "" : selectedForm.id();
         awakeningTicks = getRank() == FighterRank.VETERAN ? 76 : 64;
         setTransforming(true);
         setKiCharge(true);
-        RacialFormProfile next = racialTransformPending ? NpcFormConfigBridge.profile(getRace(), skillLevel) : null;
+        RacialFormProfile next = selectedForm == null ? null : new RacialFormProfile(getRace(), selectedForm.skillLevel(),
+                selectedForm.id(), selectedForm.name(), selectedForm.melee(), selectedForm.speed(),
+                selectedForm.attackSpeed(), selectedForm.scale(), selectedForm.auraColor(), selectedForm.lightning(),
+                selectedForm.hairType(), selectedForm.hairColor(), selectedForm.eyeColor(), selectedForm.modelKey());
         setLightning(next != null ? next.lightning() : (getRank() == FighterRank.VETERAN || getRandom().nextBoolean()));
         if (next != null && next.auraColor() != 0xFFFFFF) {
             setAuraType("kakarot");
@@ -3842,6 +3960,39 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         setAttacking(false);
         getNavigation().stop();
         return true;
+    }
+
+    /** Selects the normal racial tree unless this born-tailed Saiyan currently meets Oozaru rules. */
+    private NpcFormConfigBridge.Form selectCombatRacialForm(int skillLevel) {
+        if (getRace() == FighterRace.SAIYAN && isSaiyanTailBearer()) {
+            int level = Math.max(0, skillLevel);
+            // A born-tailed Saiyan at maximum racial skill always uses GT SSJ4 when available.
+            // Unlike Oozaru/Golden Oozaru, this remains available after the physical tail is cut.
+            if (level >= NpcFormConfigBridge.maxSkillLevel(FighterRace.SAIYAN)) {
+                NpcFormConfigBridge.Form gt = NpcFormConfigBridge.ssj4GtForSkill(level);
+                if (gt != null) return gt;
+            }
+            if (hasNaturalSaiyanTail() && hasOozaruMoonCondition()) {
+                NpcFormConfigBridge.Form oozaru = NpcFormConfigBridge.oozaruForSkill(level, false);
+                if (oozaru != null) return oozaru;
+            }
+        }
+        return skillLevel > 0 ? NpcFormConfigBridge.form(getRace(), skillLevel) : null;
+    }
+
+    /** Includes level-zero superforms such as Oozaru when their environmental rules are met. */
+    public boolean canUseRacialFormNow() {
+        return selectCombatRacialForm(getRacialSkillLevel()) != null;
+    }
+
+    private boolean hasOozaruMoonCondition() {
+        Level world = level();
+        long day = Math.floorDiv(world.getDayTime(), 24000L);
+        boolean fullMoon = world.isNight() && day % 8L == 0L && world.canSeeSky(blockPosition());
+        if (fullMoon) return true;
+        return !world.getEntitiesOfClass(KiBlastEntity.class, getBoundingBox().inflate(200.0D),
+                moon -> moon.isAlive() && moon.isParked()
+                        && moon.getKiRenderType() == KiBlastEntity.RENDER_FAKE_MOON).isEmpty();
     }
 
     private void tickAwakening() {
@@ -3922,7 +4073,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         int skillLevel = getRacialSkillLevel();
         if (skillLevel <= 0 && getPersistentData().getBoolean(TEMPORARY_AWAKENING)
             && getRace() == FighterRace.BIO_ANDROID) skillLevel = 1;
-        NpcFormConfigBridge.Form configured = NpcFormConfigBridge.form(getRace(), skillLevel);
+        NpcFormConfigBridge.Form configured = NpcFormConfigBridge.formById(getRace(), racialTransformFormId);
+        if (configured == null) configured = NpcFormConfigBridge.form(getRace(), skillLevel);
         if (configured == null || isRacialFormActive()) return;
         racialBasePower = getPermanentBattlePower();
         var attack = getAttribute(Attributes.ATTACK_DAMAGE);
@@ -3935,6 +4087,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         racialBaseBodyColor2 = getBodyColor2();
         racialBaseBodyColor3 = getBodyColor3();
         racialBaseScale = getDisplayScale();
+        racialBaseDbzStyle = getDBZStyle();
         racialBaseHairColor = getHairColor();
         racialBaseEye1Color = getEye1Color();
         racialBaseEye2Color = getEye2Color();
@@ -3944,6 +4097,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         racialBaseLightning = isLightning();
 
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, configured.skillLevel());
+        entityData.set(ACTIVE_RACIAL_FORM_ID, configured.id());
+        if (isGreatApeForm()) setDBZStyle(4);
+        refreshDimensions();
+        racialTransformFormId = "";
         if (attack != null) attack.setBaseValue(racialBaseAttack * configured.melee());
         if (speed != null) speed.setBaseValue(racialBaseSpeed * configured.speed());
         setDefaultAttackSpeed(racialBaseAttackSpeed * configured.attackSpeed());
@@ -3960,6 +4117,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         entityData.set(DISPLAY_SCALE, racialBaseScale * configured.scale());
         setScaleVal(getDisplayScale());
         if (!configured.hairColor().isBlank()) entityData.set(HAIR_COLOR, configured.hairColor());
+        // Great Ape fur follows the currently active secondary body colour. This deliberately
+        // overrides a generic form hair colour for both Oozaru and Golden Oozaru.
+        if (isGreatApeForm()) entityData.set(HAIR_COLOR, getBodyColor2());
         if (!configured.eyeColor().isBlank()) entityData.set(EYE1_COLOR, configured.eyeColor());
         if (!configured.eye2Color().isBlank()) entityData.set(EYE2_COLOR, configured.eye2Color());
         setAuraType("kakarot");
@@ -3985,7 +4145,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     public void stopRacialForm() {
         if (!isRacialFormActive()) return;
+        boolean wasGreatApe = isGreatApeForm();
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, 0);
+        entityData.set(ACTIVE_RACIAL_FORM_ID, "");
+        if (wasGreatApe) setDBZStyle(racialBaseDbzStyle);
+        refreshDimensions();
         refreshTemporaryPowerProjection();
         var attack = getAttribute(Attributes.ATTACK_DAMAGE);
         var speed = getAttribute(Attributes.MOVEMENT_SPEED);
@@ -4057,8 +4221,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     }
 
     public boolean debugTransformRacial() {
-        if (getRacialSkillLevel() <= 0 || isRacialFormActive() || isKaiokenActive() || isMeditating()) return false;
+        if (isRacialFormActive() || isKaiokenActive() || isMeditating()) return false;
+        NpcFormConfigBridge.Form selected = selectCombatRacialForm(getRacialSkillLevel());
+        if (selected == null) return false;
         racialTransformPending = true;
+        racialTransformFormId = selected.id();
         awakeningTicks = 1;
         setTransforming(true);
         tickAwakening();
@@ -4360,12 +4527,48 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     public boolean hasFlightUnlocked() { return entityData.get(FLIGHT_UNLOCKED); }
     public int getRacialSkillLevel() { return entityData.get(RACIAL_SKILL_LEVEL); }
     public int getActiveRacialFormLevel() { return entityData.get(ACTIVE_RACIAL_FORM_LEVEL); }
-    public boolean isRacialFormActive() { return getActiveRacialFormLevel() > 0; }
+    public String getActiveRacialFormId() { return entityData.get(ACTIVE_RACIAL_FORM_ID); }
+    public boolean isRacialFormActive() { return getActiveRacialFormLevel() > 0 || !getActiveRacialFormId().isBlank(); }
     public RacialFormProfile getActiveRacialForm() {
-        return isRacialFormActive() ? NpcFormConfigBridge.profile(getRace(), getActiveRacialFormLevel()) : null;
+        NpcFormConfigBridge.Form form = getActiveRacialFormConfig();
+        return form == null ? null : new RacialFormProfile(getRace(), form.skillLevel(), form.id(), form.name(),
+                form.melee(), form.speed(), form.attackSpeed(), form.scale(), form.auraColor(), form.lightning(),
+                form.hairType(), form.hairColor(), form.eyeColor(), form.modelKey());
     }
     public NpcFormConfigBridge.Form getActiveRacialFormConfig() {
-        return isRacialFormActive() ? NpcFormConfigBridge.form(getRace(), getActiveRacialFormLevel()) : null;
+        if (!isRacialFormActive()) return null;
+        NpcFormConfigBridge.Form exact = NpcFormConfigBridge.formById(getRace(), getActiveRacialFormId());
+        return exact != null ? exact : NpcFormConfigBridge.form(getRace(), getActiveRacialFormLevel());
+    }
+    public boolean hasNaturalSaiyanTail() { return getRace() == FighterRace.SAIYAN && entityData.get(HAS_SAIYAN_TAIL); }
+    public boolean isSaiyanTailBearer() { return getRace() == FighterRace.SAIYAN && entityData.get(SAIYAN_TAIL_BEARER); }
+    public boolean shouldRenderSaiyanTail() {
+        NpcFormConfigBridge.Form form = getActiveRacialFormConfig();
+        return getRace() == FighterRace.SAIYAN && (hasNaturalSaiyanTail()
+                || form != null && "ssj4gt".equalsIgnoreCase(form.modelKey()));
+    }
+
+    private void tickSaiyanTailRegrowth() {
+        if (!isSaiyanTailBearer() || hasNaturalSaiyanTail()) return;
+        long regrowAt = getPersistentData().getLong(SAIYAN_TAIL_REGROW_AT);
+        if (regrowAt <= 0L || level().getGameTime() < regrowAt) return;
+        entityData.set(HAS_SAIYAN_TAIL, true);
+        getPersistentData().remove(SAIYAN_TAIL_REGROW_AT);
+    }
+
+    private void tryCutSaiyanTail(DamageSource source) {
+        if (level().isClientSide || !hasNaturalSaiyanTail()) return;
+        boolean cuttingKi = source.getDirectEntity() instanceof KiDiskEntity;
+        Entity attacker = source.getEntity();
+        boolean cuttingWeapon = attacker instanceof LivingEntity living
+                && living.getMainHandItem().getItem() instanceof WeaponItem;
+        if (!cuttingKi && !cuttingWeapon) return;
+        entityData.set(HAS_SAIYAN_TAIL, false);
+        getPersistentData().putLong(SAIYAN_TAIL_REGROW_AT, level().getGameTime() + SAIYAN_TAIL_REGROW_TICKS);
+        NpcFormConfigBridge.Form active = getActiveRacialFormConfig();
+        if (active != null && "oozaru".equalsIgnoreCase(active.group())
+                && !"ssj4gt".equalsIgnoreCase(active.modelKey())) stopRacialForm();
+        level().playSound(null, blockPosition(), MainSounds.KATANA_SLASH.get(), SoundSource.HOSTILE, 1.0F, 1.0F);
     }
     public boolean isSaiyanSsj4Form() {
         if (getRace() != FighterRace.SAIYAN) return false;
@@ -4389,6 +4592,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         state.putBoolean("Lightning", isLightning());
         state.putBoolean("Awakened", isAwakened());
         state.putInt("ActiveRacialForm", getActiveRacialFormLevel());
+        state.putString("ActiveRacialFormId", getActiveRacialFormId());
         state.putBoolean("KiCharge", isCharge());
         state.putBoolean("Flying", isFlying());
         state.putBoolean("NoGravity", isNoGravity());
@@ -4406,6 +4610,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         setLightning(state.getBoolean("Lightning"));
         entityData.set(AWAKENED, state.getBoolean("Awakened"));
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, Math.max(0, state.getInt("ActiveRacialForm")));
+        entityData.set(ACTIVE_RACIAL_FORM_ID, state.getString("ActiveRacialFormId"));
         setKiCharge(state.getBoolean("KiCharge"));
         if (state.getBoolean("AuraFlared")) {
             auraFlareTicks = Math.max(1, state.getInt("AuraFlareTicks"));
@@ -5181,7 +5386,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         character.setNoseType(getNoseType());
         character.setMouthType(getMouthType());
         character.setHairId(getHairId());
-        character.setRenderHairBase(getRace().usesHair());
+        character.setRenderHairBase(getRace().usesHairBase());
         character.setBodyColor(getBodyColor());
         character.setBodyColor2(getBodyColor2());
         character.setBodyColor3(getBodyColor3());
@@ -5189,10 +5394,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         character.setEye1Color(getEye1Color());
         character.setEye2Color(getEye2Color());
         character.setAuraColor("#FFFFFF");
-        // SSJ4 Daima and GT explicitly carry a Saiyan tail even when the fighter's base
-        // appearance does not. Keep the native DMZ character state consistent with the
-        // model visibility rule; every other form remains tailless.
-        character.setHasSaiyanTail(isSaiyanSsj4Form());
+        character.setHasSaiyanTail(shouldRenderSaiyanTail());
         if (getRace().usesHair()) {
             for (HairStyleSlot slot : HairStyleSlot.values()) {
                 CustomHair hair = HairManager.getPresetStyle(getHairId(), slot);
@@ -5269,6 +5471,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         tag.putInt("LWRacialSkillLevel", getRacialSkillLevel());
         tag.putInt("LWRacialTrainingProgress", racialTrainingProgress);
         tag.putInt("LWActiveRacialForm", getActiveRacialFormLevel());
+        tag.putString("LWActiveRacialFormId", getActiveRacialFormId());
+        tag.putString("LWRacialTransformFormId", racialTransformFormId == null ? "" : racialTransformFormId);
+        tag.putBoolean("LWHasSaiyanTail", hasNaturalSaiyanTail());
+        tag.putBoolean("LWSaiyanTailBearer", isSaiyanTailBearer());
         tag.putInt("LWCosmeticAccessory", getCosmeticAccessoryId());
         tag.putInt("LWRacialBasePower", racialBasePower);
         tag.putDouble("LWRacialBaseAttack", racialBaseAttack);
@@ -5276,6 +5482,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         tag.putDouble("LWRacialBaseAttackSpeed", racialBaseAttackSpeed);
         tag.putFloat("LWRacialBaseKiDamage", racialBaseKiDamage);
         tag.putFloat("LWRacialBaseScale", racialBaseScale);
+        tag.putInt("LWRacialBaseDbzStyle", racialBaseDbzStyle);
         tag.putString("LWRacialBaseBody", racialBaseBodyColor == null ? "" : racialBaseBodyColor);
         tag.putString("LWRacialBaseBody2", racialBaseBodyColor2 == null ? "" : racialBaseBodyColor2);
         tag.putString("LWRacialBaseBody3", racialBaseBodyColor3 == null ? "" : racialBaseBodyColor3);
@@ -5399,6 +5606,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         entityData.set(RACIAL_SKILL_LEVEL, tag.contains("LWRacialSkillLevel") ? tag.getInt("LWRacialSkillLevel") : 0);
         racialTrainingProgress = tag.contains("LWRacialTrainingProgress") ? tag.getInt("LWRacialTrainingProgress") : 0;
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, tag.contains("LWActiveRacialForm") ? tag.getInt("LWActiveRacialForm") : 0);
+        entityData.set(ACTIVE_RACIAL_FORM_ID, tag.contains("LWActiveRacialFormId") ? tag.getString("LWActiveRacialFormId") : "");
+        racialTransformFormId = tag.contains("LWRacialTransformFormId") ? tag.getString("LWRacialTransformFormId") : "";
+        entityData.set(HAS_SAIYAN_TAIL, tag.contains("LWHasSaiyanTail") && tag.getBoolean("LWHasSaiyanTail"));
+        entityData.set(SAIYAN_TAIL_BEARER, tag.contains("LWSaiyanTailBearer") && tag.getBoolean("LWSaiyanTailBearer"));
         entityData.set(COSMETIC_ACCESSORY, tag.contains("LWCosmeticAccessory") ? tag.getInt("LWCosmeticAccessory") : legacyData.getInt("CosmeticAccessoryId"));
         entityData.set(AMBIENT_POSE, 0);
         entityData.set(WEAPON_TRAINING_STRIKE, 0);
@@ -5409,6 +5620,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         racialBaseAttackSpeed = tag.contains("LWRacialBaseAttackSpeed") ? tag.getDouble("LWRacialBaseAttackSpeed") : getDefaultAttackSpeed();
         racialBaseKiDamage = tag.contains("LWRacialBaseKiDamage") ? tag.getFloat("LWRacialBaseKiDamage") : 0.0F;
         racialBaseScale = tag.contains("LWRacialBaseScale") ? tag.getFloat("LWRacialBaseScale") : getDisplayScale();
+        racialBaseDbzStyle = tag.contains("LWRacialBaseDbzStyle") ? tag.getInt("LWRacialBaseDbzStyle") : 0;
         racialBaseBodyColor = tag.contains("LWRacialBaseBody") ? tag.getString("LWRacialBaseBody") : getBodyColor();
         racialBaseBodyColor2 = tag.contains("LWRacialBaseBody2") ? tag.getString("LWRacialBaseBody2") : getBodyColor2();
         racialBaseBodyColor3 = tag.contains("LWRacialBaseBody3") ? tag.getString("LWRacialBaseBody3") : getBodyColor3();
@@ -5450,9 +5662,13 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         }
         // Active race forms are combat state, not a permanent stat multiplier. Restore
         // the exact pre-form profile on load while keeping the learned skill level.
-        boolean restoreRacialAppearance = getActiveRacialFormLevel() > 0;
+        boolean restoreRacialAppearance = isRacialFormActive();
         if (restoreRacialAppearance) {
+            boolean wasGreatApe = isGreatApeForm();
             entityData.set(ACTIVE_RACIAL_FORM_LEVEL, 0);
+            entityData.set(ACTIVE_RACIAL_FORM_ID, "");
+            if (wasGreatApe) setDBZStyle(racialBaseDbzStyle);
+            refreshDimensions();
             setTransforming(false);
             if (racialBasePower > 0) setBattlePower(racialBasePower);
             var attack = getAttribute(Attributes.ATTACK_DAMAGE);
@@ -5485,12 +5701,16 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             entityData.set(HEAD_BONE, Math.floorMod(getUUID().hashCode(), 2) == 0 ? 0 : 1 + Math.floorMod(getUUID().hashCode() / 2, 2));
         if (tag.contains("LWHairId")) entityData.set(HAIR_ID, tag.getInt("LWHairId"));
         if (tag.contains("LWOutfit")) entityData.set(OUTFIT, tag.getInt("LWOutfit"));
-        if (tag.contains("LWBodyColor")) entityData.set(BODY_COLOR, tag.getString("LWBodyColor"));
-        if (tag.contains("LWBodyColor2")) entityData.set(BODY_COLOR2, tag.getString("LWBodyColor2"));
+        if (tag.contains("LWBodyColor")) entityData.set(BODY_COLOR,
+                restoreRacialAppearance && !racialBaseBodyColor.isBlank() ? racialBaseBodyColor : tag.getString("LWBodyColor"));
+        if (tag.contains("LWBodyColor2")) entityData.set(BODY_COLOR2,
+                restoreRacialAppearance && !racialBaseBodyColor2.isBlank() ? racialBaseBodyColor2 : tag.getString("LWBodyColor2"));
         else entityData.set(BODY_COLOR2, getBodyColor());
-        if (tag.contains("LWBodyColor3")) entityData.set(BODY_COLOR3, tag.getString("LWBodyColor3"));
+        if (tag.contains("LWBodyColor3")) entityData.set(BODY_COLOR3,
+                restoreRacialAppearance && !racialBaseBodyColor3.isBlank() ? racialBaseBodyColor3 : tag.getString("LWBodyColor3"));
         else entityData.set(BODY_COLOR3, getBodyColor());
-        if (getRace() == FighterRace.HUMAN || getRace() == FighterRace.SAIYAN) {
+        if ((getRace() == FighterRace.HUMAN || getRace() == FighterRace.SAIYAN)
+                && !tag.contains("LWBodyColor2")) {
             String playerDefaultBody2 = defaultPlayerBodyColor2(getRace());
             entityData.set(BODY_COLOR2, playerDefaultBody2);
             if (restoreRacialAppearance) racialBaseBodyColor2 = playerDefaultBody2;
@@ -5507,7 +5727,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             entityData.set(BODY_COLOR3, NAMEK_PINK[Math.floorMod(appearanceSeed / 17, NAMEK_PINK.length)]);
             entityData.set(HAIR_COLOR, NAMEK_LIGHT_GREEN[Math.floorMod(appearanceSeed / 29, NAMEK_LIGHT_GREEN.length)]);
         }
-        if (tag.contains("LWHairColor")) entityData.set(HAIR_COLOR, tag.getString("LWHairColor"));
+        if (tag.contains("LWHairColor")) entityData.set(HAIR_COLOR,
+                restoreRacialAppearance && !racialBaseHairColor.isBlank() ? racialBaseHairColor : tag.getString("LWHairColor"));
         if (getRace() == FighterRace.MAJIN) {
             int appearanceSeed = getUUID().hashCode();
             entityData.set(BODY_TYPE, Math.floorMod(getBodyType(), 3));
@@ -5540,8 +5761,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             entityData.set(DISPLAY_SCALE, frostScale);
             setScaleVal(frostScale);
         }
-        if (tag.contains("LWEye1Color")) entityData.set(EYE1_COLOR, tag.getString("LWEye1Color"));
-        if (tag.contains("LWEye2Color")) entityData.set(EYE2_COLOR, tag.getString("LWEye2Color"));
+        if (tag.contains("LWEye1Color")) entityData.set(EYE1_COLOR,
+                restoreRacialAppearance && !racialBaseEye1Color.isBlank() ? racialBaseEye1Color : tag.getString("LWEye1Color"));
+        if (tag.contains("LWEye2Color")) entityData.set(EYE2_COLOR,
+                restoreRacialAppearance && !racialBaseEye2Color.isBlank() ? racialBaseEye2Color : tag.getString("LWEye2Color"));
         // The generic appearance NBT above contains the *currently rendered* form hair/eyes.
         // If a save happened mid-transformation, restore the pre-form appearance one final time
         // after reading those fields so temporary form cosmetics cannot leak across reloads.
@@ -5673,6 +5896,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     public boolean isArsenalInitialized() { return arsenalInitialized; }
     public void setArsenalInitialized(boolean value) { arsenalInitialized = value; }
+    /** Missing means a legacy fighter created before per-player arsenal gating; preserve it. */
+    public int getSpawnEraForArsenal() {
+        return getPersistentData().contains("LWSpawnEra")
+                ? Math.max(0, getPersistentData().getInt("LWSpawnEra")) : 2;
+    }
     public int getArsenalWeaponCooldown() { return arsenalWeaponCooldown; }
     public void setArsenalWeaponCooldown(int ticks) { arsenalWeaponCooldown = Math.max(0, ticks); }
 

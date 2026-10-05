@@ -35,8 +35,7 @@ public final class FighterFullPowerManager {
             player.displayClientMessage(Component.translatable("dmzlivingworld.message.full_power.unavailable", fighter.getFighterName()), false);
             return false;
         }
-        boolean hasRacialForm = fighter.getRacialSkillLevel() > 0
-                && NpcFormConfigBridge.form(fighter.getRace(), fighter.getRacialSkillLevel()) != null;
+        boolean hasRacialForm = fighter.canUseRacialFormNow();
         boolean hasUnusedAwakening = !fighter.isAwakened()
                 && fighter.getRank() != com.dmzlivingworld.entity.FighterRank.ROOKIE;
         if (!hasRacialForm && !hasUnusedAwakening) {

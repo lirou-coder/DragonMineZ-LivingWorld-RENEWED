@@ -38,7 +38,37 @@ public final class NpcFormConfigBridge {
         String number = Integer.toString(level);
         return group.getForms().entrySet().stream()
                 .filter(e -> e.getKey().replace("x", "").replace("times", "").contains(number))
-                .findFirst().map(e -> from(e.getKey(), e.getValue(), level)).orElse(null);
+                .findFirst().map(e -> from(group.getGroupName(), e.getKey(), e.getValue(), level)).orElse(null);
+    }
+
+    public static Form formById(FighterRace race, String id) {
+        if (race == null || id == null || id.isBlank()) return null;
+        return allCandidates(race).stream().filter(form -> form.id().equalsIgnoreCase(id)).findFirst().orElse(null);
+    }
+
+    /** Highest tail form unlocked by racial level; SSJ4 GT remains a separate maximum-skill choice. */
+    public static Form oozaruForSkill(int skillLevel, boolean allowSsj4) {
+        return allCandidates(FighterRace.SAIYAN).stream()
+                .filter(form -> "oozaru".equalsIgnoreCase(form.group()))
+                .filter(form -> form.skillLevel() <= Math.max(0, skillLevel))
+                .filter(form -> allowSsj4 || !isSsj4Gt(form))
+                .max(Comparator.comparingInt(Form::skillLevel).thenComparingDouble(Form::averageMultiplier))
+                .orElse(null);
+    }
+
+    public static Form ssj4GtForSkill(int skillLevel) {
+        return allCandidates(FighterRace.SAIYAN).stream()
+                .filter(form -> "oozaru".equalsIgnoreCase(form.group()))
+                .filter(form -> form.skillLevel() <= Math.max(0, skillLevel))
+                .filter(NpcFormConfigBridge::isSsj4Gt)
+                .max(Comparator.comparingInt(Form::skillLevel).thenComparingDouble(Form::averageMultiplier))
+                .orElse(null);
+    }
+
+    private static boolean isSsj4Gt(Form form) {
+        return form != null && ("ssj4gt".equalsIgnoreCase(form.modelKey())
+                || "ssj4gt".equalsIgnoreCase(form.id())
+                || form.name() != null && form.name().toLowerCase(Locale.ROOT).replace(" ", "").contains("ssj4gt"));
     }
 
     public static RacialFormProfile profile(FighterRace race, int skillLevel) {
@@ -59,7 +89,22 @@ public final class NpcFormConfigBridge {
             for (var form : group.getForms().entrySet()) {
                 FormConfig.FormData data = form.getValue();
                 if (data == null || data.getUnlockOnSkillLevel() == null || data.getUnlockOnSkillLevel() <= 0) continue;
-                result.add(from(form.getKey(), data, data.getUnlockOnSkillLevel()));
+                result.add(from(group.getGroupName(), form.getKey(), data, data.getUnlockOnSkillLevel()));
+            }
+        }
+        return result;
+    }
+
+    private static List<Form> allCandidates(FighterRace race) {
+        List<Form> result = new ArrayList<>();
+        if (race == null) return result;
+        for (var entry : ConfigManager.getAllFormsForRace(race.dmzId()).entrySet()) {
+            FormConfig group = entry.getValue();
+            if (group == null || !isSuperform(group.getFormType()) || group.getForms() == null) continue;
+            for (var form : group.getForms().entrySet()) {
+                FormConfig.FormData data = form.getValue();
+                if (data == null || data.getUnlockOnSkillLevel() == null || data.getUnlockOnSkillLevel() < 0) continue;
+                result.add(from(group.getGroupName(), form.getKey(), data, data.getUnlockOnSkillLevel()));
             }
         }
         return result;
@@ -75,15 +120,16 @@ public final class NpcFormConfigBridge {
         return value.contains("oozaru");
     }
 
-    private static Form from(String id, FormConfig.FormData f, int skillLevel) {
+    private static Form from(String group, String id, FormConfig.FormData f, int skillLevel) {
         Float[] scale = f.getModelScaling();
         float modelScale = scale != null && scale.length > 0 && scale[0] != null ? scale[0] : 1.0F;
-        return new Form(id, f.getName(), skillLevel, positive(f.getStrMultiplier()), positive(f.getDefMultiplier()),
+        return new Form(clean(group), id, f.getName(), skillLevel, positive(f.getStrMultiplier()), positive(f.getDefMultiplier()),
                 positive(f.getVitMultiplier()), positive(f.getPwrMultiplier()), positive(f.getSpeedMultiplier()),
                 positive(f.getAttackSpeed()), modelScale, clean(f.getCustomModel()), clean(f.getHairType()),
                 clean(f.getForcedHairCode()), clean(f.getHairColor()), clean(f.getEye1Color()), clean(f.getEye2Color()), clean(f.getAuraType()),
                 parseColor(f.getAuraColor()), Boolean.TRUE.equals(f.getHasLightnings()), clean(f.getLightningColor()),
-                clean(f.getBodyColor1()), clean(f.getBodyColor2()), clean(f.getBodyColor3()));
+                clean(f.getBodyColor1()), clean(f.getBodyColor2()), clean(f.getBodyColor3()),
+                f.usesHairColorForFur());
     }
 
     private static double positive(Double value) { return value != null && value > 0.0D ? value : 1.0D; }
@@ -93,10 +139,11 @@ public final class NpcFormConfigBridge {
         catch (NumberFormatException ignored) { return 0xFFFFFF; }
     }
 
-    public record Form(String id, String name, int skillLevel, double melee, double defense, double vitality,
+    public record Form(String group, String id, String name, int skillLevel, double melee, double defense, double vitality,
                        double ki, double speed, double attackSpeed, float scale, String modelKey, String hairType,
                        String forcedHairCode, String hairColor, String eyeColor, String eye2Color, String auraType, int auraColor,
-                       boolean lightning, String lightningColor, String bodyColor1, String bodyColor2, String bodyColor3) {
+                       boolean lightning, String lightningColor, String bodyColor1, String bodyColor2, String bodyColor3,
+                       boolean furUsesHairColor) {
         public double averageMultiplier() { return (melee + defense + vitality + ki + speed + attackSpeed) / 6.0D; }
     }
 }

@@ -23,6 +23,19 @@ public final class FighterPowerStatScaler {
         fighter.getLegacyData().putDouble(EFFECTIVE_STATS, safe);
     }
 
+    /** Lowest budget that keeps every configurable archetype at 20 HP and at least 1 in each attack/defense stat. */
+    public static double minimumEffectiveBudget() {
+        double minimumShare = java.util.stream.DoubleStream.of(
+                LivingWorldConfig.BRAWLER_MELEE_SHARE.get(), LivingWorldConfig.BRAWLER_DEFENSE_SHARE.get(), LivingWorldConfig.BRAWLER_KI_SHARE.get(),
+                LivingWorldConfig.MARTIAL_ARTIST_MELEE_SHARE.get(), LivingWorldConfig.MARTIAL_ARTIST_DEFENSE_SHARE.get(), LivingWorldConfig.MARTIAL_ARTIST_KI_SHARE.get(),
+                LivingWorldConfig.SPEED_FIGHTER_MELEE_SHARE.get(), LivingWorldConfig.SPEED_FIGHTER_DEFENSE_SHARE.get(), LivingWorldConfig.SPEED_FIGHTER_KI_SHARE.get(),
+                LivingWorldConfig.GUARDIAN_MELEE_SHARE.get(), LivingWorldConfig.GUARDIAN_DEFENSE_SHARE.get(), LivingWorldConfig.GUARDIAN_KI_SHARE.get(),
+                LivingWorldConfig.KI_SPECIALIST_MELEE_SHARE.get(), LivingWorldConfig.KI_SPECIALIST_DEFENSE_SHARE.get(), LivingWorldConfig.KI_SPECIALIST_KI_SHARE.get())
+                .filter(value -> Double.isFinite(value) && value > 0.0D)
+                .min().orElse(1.0D);
+        return Math.max(23.0D, 1.0D / minimumShare);
+    }
+
     public static double baseHealth(AmbientFighterEntity fighter, double livedMultiplier) {
         double lived = Math.min(1.22D, 1.0D + (Math.max(1.0D, livedMultiplier) - 1.0D) * 0.55D);
         double calculated = 20.0D + healthShare(fighter) * effectiveStatBudget(fighter) * lived;
@@ -47,7 +60,7 @@ public final class FighterPowerStatScaler {
 
     public static double baseDefense(AmbientFighterEntity fighter) {
         double lived = Math.max(1.0D, FighterBattleGrowthManager.combatMultiplier(fighter));
-        return Math.max(0.0D, defenseShare(fighter) * effectiveStatBudget(fighter) * lived
+        return Math.max(1.0D, defenseShare(fighter) * effectiveStatBudget(fighter) * lived
                 * FighterPassiveSkillManager.healthMultiplier(fighter));
     }
 

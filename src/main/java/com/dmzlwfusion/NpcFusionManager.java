@@ -409,6 +409,7 @@ public final class NpcFusionManager {
             template.putBoolean("LWCaptive", false);
             template.putBoolean("LWMeditating", false);
             template.putInt("LWActiveRacialForm", 0);
+            template.putString("LWActiveRacialFormId", "");
             template.putInt("LWKaiokenLevel", 0);
             template.putString("LWBodyColor", body);
             template.putString("LWBodyColor2", body2);

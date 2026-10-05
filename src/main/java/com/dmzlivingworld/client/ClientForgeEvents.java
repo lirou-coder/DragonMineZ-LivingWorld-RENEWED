@@ -133,7 +133,7 @@ public final class ClientForgeEvents {
         nearby.clear();
         for (AmbientFighterEntity fighter : minecraft.level.getEntitiesOfClass(AmbientFighterEntity.class,
                 minecraft.player.getBoundingBox().inflate(radius), entity -> entity.isAlive())) {
-            if (minecraft.player.distanceToSqr(fighter) > (double)radius * radius) continue;
+            if (!isInsideSpeechChatRadius(minecraft, fighter, radius)) continue;
             UUID id = fighter.getUUID();
             nearby.add(id);
             String speech = fighter.getSpeech();
@@ -151,5 +151,20 @@ public final class ClientForgeEvents {
             }
         }
         LAST_MIRRORED_SPEECH.keySet().removeIf(id -> !nearby.contains(id));
+    }
+
+    /**
+     * Client-only spherical range check. Keep all three axes explicit so neither entity-section
+     * lookup nor a large vertical separation can turn the configured chat radius into an X/Z-only
+     * cylinder.
+     */
+    private static boolean isInsideSpeechChatRadius(Minecraft minecraft,
+                                                    AmbientFighterEntity fighter, int radius) {
+        if (minecraft.player == null || fighter == null || fighter.level() != minecraft.player.level()) return false;
+        double dx = fighter.getX() - minecraft.player.getX();
+        double dy = fighter.getY() - minecraft.player.getY();
+        double dz = fighter.getZ() - minecraft.player.getZ();
+        double radiusSquared = (double) radius * radius;
+        return dx * dx + dy * dy + dz * dz <= radiusSquared;
     }
 }

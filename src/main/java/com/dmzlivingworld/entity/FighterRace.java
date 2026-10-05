@@ -33,10 +33,16 @@ public enum FighterRace {
     public String displayName() { return displayName; }
     public String dmzId() { return dmzId; }
     public boolean gendered() { return gendered; }
-            public boolean usesHair() { return this == HUMAN || this == SAIYAN || this == MAJIN
+    public boolean usesHair() { return this == HUMAN || this == SAIYAN || this == MAJIN
                 || (this == BIO_ANDROID && SairensRaceCompat.isBioAndroidHumanModel()) || isSairensRace(); }
 
-        public boolean isSairensRace() { return this == ZAARAKIN || this == ANTORANIAN; }
+    /** Majins may use hair geometry, but DMZ's scalp HairBase is exclusive to human-model races. */
+    public boolean usesHairBase() {
+        return this == HUMAN || this == SAIYAN || this == ZAARAKIN || this == ANTORANIAN
+                || (this == BIO_ANDROID && SairensRaceCompat.isBioAndroidHumanModel());
+    }
+
+    public boolean isSairensRace() { return this == ZAARAKIN || this == ANTORANIAN; }
 
     public static FighterRace byId(int id) {
         for (FighterRace race : values()) if (race.id == id) return race;

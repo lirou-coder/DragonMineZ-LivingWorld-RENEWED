@@ -96,6 +96,15 @@ public final class FighterArsenalManager {
             equipFighterArmor(fighter, fighter.getRank() == FighterRank.VETERAN && fighter.getRandom().nextFloat() < 0.64F);
         }
 
+        // Era 0/1 populations have not reached the point where Fighters naturally carry DMZ
+        // weapons. Armor is intentionally independent. Existing pre-gate fighters and equipment
+        // later gifted/picked up in play are preserved by the initialized/profile paths.
+        if (fighter.getSpawnEraForArsenal() <= 1) {
+            fighter.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+            FighterMemoryManager.refreshLoadedProfile(fighter);
+            return;
+        }
+
         if (!fighter.getMainHandItem().isEmpty()) {
             refreshEquippedGeoItemIdentities(fighter, true);
             ensureCurrentOwnership(fighter);

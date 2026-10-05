@@ -56,6 +56,7 @@ public final class NpcPlayerDamageManager {
         AmbientFighterEntity attacker = responsibleFighter(
                 event.getSource().getEntity(), event.getSource().getDirectEntity());
         if (attacker == null || attacker.getAlignment() != FighterAlignment.GOOD
+                || attacker.isSanctionedMatchParticipant()
                 || player.getHealth() - event.getAmount() > 0.0F) return;
 
         float nonLethalDamage = Math.max(0.0F, player.getHealth() - 1.0F);

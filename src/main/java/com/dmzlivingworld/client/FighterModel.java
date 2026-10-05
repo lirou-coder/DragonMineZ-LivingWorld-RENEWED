@@ -49,6 +49,7 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
     private static final ResourceLocation HEROBRINE = lw("geo/entity/herobrine.geo.json");
     private static final ResourceLocation HEROBRINE_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/player/wide/steve.png");
     private static final ResourceLocation HUMAN = dmz("geo/entity/races/human.geo.json");
+    private static final ResourceLocation HUMAN_SLIM = dmz("geo/entity/races/human_slim.geo.json");
     // DragonMineZ's actual female/buffed Human-Saiyan geometry contains the native
     // "boobas" chest bone. human_slim.geo.json is only a slim-arm model and does
     // not contain the female chest geometry, which made LW women read as slim men.
@@ -57,9 +58,16 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
     private static final ResourceLocation MAJIN_SLIM = dmz("geo/entity/races/majin_slim.geo.json");
     private static final ResourceLocation BIO = dmz("geo/entity/races/bioandroid.geo.json");
     private static final ResourceLocation BUFFED = dmz("geo/entity/races/hbuffed.geo.json");
+    private static final ResourceLocation BUFFED_SLIM = dmz("geo/entity/races/hbuffed_slim.geo.json");
     private static final ResourceLocation BUFFED_FEMALE = dmz("geo/entity/races/hbuffed_fem.geo.json");
     private static final ResourceLocation BUFFED_G3 = dmz("geo/entity/races/hbuffedg3.geo.json");
+    private static final ResourceLocation BUFFED_SLIM_G3 = dmz("geo/entity/races/hbuffed_slimg3.geo.json");
     private static final ResourceLocation BUFFED_FEMALE_G3 = dmz("geo/entity/races/hbuffed_femg3.geo.json");
+    private static final ResourceLocation OOZARU = dmz("geo/entity/races/oozaru.geo.json");
+    private static final ResourceLocation MAJIN_KID = HUMAN_SLIM;
+    private static final ResourceLocation MAJIN_EVIL = HUMAN_SLIM;
+    private static final ResourceLocation MAJIN_SUPER = HUMAN;
+    private static final ResourceLocation MAJIN_ULTRA = BUFFED;
     private static final ResourceLocation FROST_SECOND = dmz("geo/entity/races/frostdemon_second.geo.json");
     private static final ResourceLocation FROST_THIRD = dmz("geo/entity/races/frostdemon_third.geo.json");
     private static final ResourceLocation FROST_FP = dmz("geo/entity/races/frostdemon_fp.geo.json");
@@ -94,10 +102,17 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
         var form = entity.getActiveRacialForm();
         if (form != null) {
             String model = form.modelKey();
-            if ("buffed".equals(model)) return entity.isFemale() ? BUFFED_FEMALE : BUFFED;
-            if ("ssj4gt".equals(model)) return entity.isFemale() ? BUFFED_FEMALE : BUFFED;
+            boolean slim = isSlimBody(entity);
+            if ("oozaru".equals(model)) return OOZARU;
+            if ("buffed".equals(model)) return humanoidVariant(entity, slim, BUFFED, BUFFED_SLIM, BUFFED_FEMALE);
+            if ("ssj4gt".equals(model)) return humanoidVariant(entity, slim, BUFFED, BUFFED_SLIM, BUFFED_FEMALE);
             if ("buffedg3".equals(model) || "ssj4d".equals(model))
-                return entity.isFemale() ? BUFFED_FEMALE_G3 : BUFFED_G3;
+                return humanoidVariant(entity, slim, BUFFED_G3, BUFFED_SLIM_G3, BUFFED_FEMALE_G3);
+            if ("namekian_buffed".equals(model) || "namekian_orange".equals(model)) return BUFFED;
+            if ("majin_kid".equals(model)) return entity.isFemale() ? MAJIN_SLIM : MAJIN_KID;
+            if ("majin_evil".equals(model)) return entity.isFemale() ? MAJIN_SLIM : MAJIN_EVIL;
+            if ("majin_super".equals(model)) return entity.isFemale() ? MAJIN_SLIM : MAJIN_SUPER;
+            if ("majin_ultra".equals(model)) return entity.isFemale() ? BUFFED_FEMALE : MAJIN_ULTRA;
             if ("frostdemon_second".equals(model)) return FROST_SECOND;
             if ("frostdemon_third".equals(model)) return FROST_THIRD;
             if ("frostdemon_fp".equals(model)) return FROST_FP;
@@ -120,13 +135,24 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
                     : dmz("geo/entity/races/human_notail.geo.json");
         }
         return switch (entity.getRace()) {
-            case HUMAN, SAIYAN -> entity.isFemale() ? MAJIN_SLIM : HUMAN;
+            case HUMAN, SAIYAN -> entity.isFemale() ? MAJIN_SLIM : (isSlimBody(entity) ? HUMAN_SLIM : HUMAN);
             case NAMEKIAN -> HUMAN;
-            case MAJIN -> entity.isFemale() ? MAJIN_SLIM : MAJIN;
+            case MAJIN -> entity.isFemale() ? MAJIN_SLIM : (entity.getBodyType() == 2 ? HUMAN : MAJIN);
             case FROST_DEMON -> FROST;
             case BIO_ANDROID -> BIO;
             case ZAARAKIN, ANTORANIAN -> HUMAN;
         };
+    }
+
+    private static boolean isSlimBody(AmbientFighterEntity entity) {
+        var config = com.dragonminez.common.config.ConfigManager.getRaceCharacter(entity.getRace().dmzId());
+        return config != null && config.isSlimBodyType(entity.getBodyType());
+    }
+
+    private static ResourceLocation humanoidVariant(AmbientFighterEntity entity, boolean slim,
+                                                     ResourceLocation wide, ResourceLocation slimModel,
+                                                     ResourceLocation female) {
+        return entity.isFemale() ? female : (slim ? slimModel : wide);
     }
 
     @Override
@@ -189,9 +215,12 @@ public final class FighterModel extends GeoModel<AmbientFighterEntity> {
 
         // DMZ renders the SSJ4 tail through its native character/race-parts state. These
         // embedded body-model bones are a second, non-animated copy and must stay hidden.
+        var activeForm = entity.getActiveRacialForm();
+        boolean femaleMajinFormTail = entity.getRace() == FighterRace.MAJIN && entity.isFemale()
+                && activeForm != null && ("super".equals(activeForm.id()) || "ultra".equals(activeForm.id()));
         boolean hideTail = entity.getRace() == FighterRace.HUMAN
-                || entity.getRace() == FighterRace.SAIYAN
-                || entity.getRace() == FighterRace.MAJIN
+                || (entity.getRace() == FighterRace.SAIYAN && !entity.shouldRenderSaiyanTail())
+                || (entity.getRace() == FighterRace.MAJIN && !femaleMajinFormTail)
                 || entity.getRace() == FighterRace.NAMEKIAN;
         for (String boneName : TAIL_BONES) setHiddenIfPresent(boneName, hideTail);
         // DMZ names these configured Frost Demon options horns1..horns5. Every Frost model,

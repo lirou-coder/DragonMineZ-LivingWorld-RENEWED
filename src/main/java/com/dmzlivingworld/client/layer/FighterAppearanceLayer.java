@@ -7,6 +7,7 @@ import com.dmzlivingworld.world.SairensRaceCompat;
 import com.dragonminez.client.util.ColorUtils;
 import com.dragonminez.client.util.ArmorTextureResolver;
 import com.dragonminez.client.render.util.ModRenderTypes;
+import com.dragonminez.client.render.hair.SaiyanTailMeshBuilder;
 import com.dragonminez.common.init.armor.DbzArmorItem;
 import com.dragonminez.common.config.ConfigManager;
 import com.dragonminez.common.hair.CustomHair;
@@ -20,6 +21,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
+import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.renderer.GeoRenderer;
 import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
 
@@ -43,6 +45,7 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
     private static final ResourceLocation[] MAJIN_MOUTHS = {
             majinFace("majin_mouth_0.png"), majinFace("majin_mouth_1.png")
     };
+    private final SaiyanTailMeshBuilder tailMesh = new SaiyanTailMeshBuilder();
 
     private static final String[] HUMAN_OUTFITS = {
             "fighter", "capsule_corp", "orange_high", "mystic",
@@ -64,6 +67,13 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
 
     public FighterAppearanceLayer(GeoRenderer<AmbientFighterEntity> renderer) {
         super(renderer);
+    }
+
+    @Override
+    public void renderForBone(PoseStack poseStack, AmbientFighterEntity entity, GeoBone bone,
+                              RenderType renderType, MultiBufferSource bufferSource, VertexConsumer buffer,
+                              float partialTick, int packedLight, int packedOverlay) {
+        tailMesh.capture(entity, bone, poseStack);
     }
 
     @Override
@@ -99,6 +109,15 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         float[] eye2 = rgb(e.getEye2Color());
         String gender = e.isFemale() ? "female" : "male";
 
+        var activeForm = e.getActiveRacialFormConfig();
+        if (activeForm != null && "oozaru".equalsIgnoreCase(activeForm.modelKey())) {
+            String root = "textures/entity/races/humansaiyan/oozaru_";
+            layer(model, pose, buffers, e, dmz(root + "layer1.png"), rgb(e.getBodyColor2()), pt, light, overlay);
+            layer(model, pose, buffers, e, dmz(root + "layer2.png"), body, pt, light, overlay);
+            layer(model, pose, buffers, e, dmz(root + "layer3.png"), WHITE, pt, light, overlay);
+            return;
+        }
+
         int bodyType = Math.max(1, Math.min(2, e.getBodyType()));
         String bodyBase = "textures/entity/races/humansaiyan/bodytype_" + gender + "_" + bodyType + "_";
         var raceConfig = ConfigManager.getRaceCharacter(e.getRace().dmzId());
@@ -118,6 +137,17 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
             layer(model, pose, buffers, e, dmz("textures/entity/races/" + gender + "_android.png"), WHITE, pt, light, overlay);
         }
 
+        if (e.getRace() == com.dmzlivingworld.entity.FighterRace.SAIYAN && e.shouldRenderSaiyanTail()) {
+            float[] tailColor = rgb(e.getBodyColor2());
+            if (tailMesh.hasCapture(e)) {
+                RenderType tailType = RenderType.entityCutoutNoCull(SaiyanTailMeshBuilder.TEXTURE);
+                tailMesh.emit(buffers.getBuffer(tailType), tailColor, light, overlay, 1.0F, true);
+            } else {
+                layer(model, pose, buffers, e, dmz("textures/entity/races/tail1.png"), tailColor,
+                        pt, light, overlay);
+            }
+        }
+
         // DMZ's player skin layer paints this scalp texture independently from the
         // strand geometry. Preset id 5 is the native bald option and deliberately
         // suppresses both hair strands and HairBase.
@@ -128,9 +158,14 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
 
         if (e.isSaiyanSsj4Form()) {
             var form = e.getActiveRacialFormConfig();
-            String ssj4Layer = form != null && "ssj4gt".equalsIgnoreCase(form.modelKey())
-                    ? "ssj4gt_layer1.png" : "ssj4d_layer1.png";
-            layer(model, pose, buffers, e, dmz("textures/entity/races/humansaiyan/" + ssj4Layer), WHITE, pt, light, overlay);
+            boolean slim = !e.isFemale() && ConfigManager.getRaceCharacter(e.getRace().dmzId()) != null
+                    && ConfigManager.getRaceCharacter(e.getRace().dmzId()).isSlimBodyType(e.getBodyType());
+            String family = form != null && "ssj4gt".equalsIgnoreCase(form.modelKey()) ? "ssj4gt" : "ssj4d";
+            String ssj4Layer = family + (slim ? "slim" : "") + "_layer1.png";
+            float[] furColor = form != null && form.furUsesHairColor()
+                    ? hair : rgb(e.getBodyColor2());
+            layerWithNativeShadow(model, pose, buffers, e,
+                    "textures/entity/races/humansaiyan/" + ssj4Layer, furColor, pt, light, overlay);
         }
 
         String eye = HUMAN_FACE + "humansaiyan_eye_" + e.getEyesType() + "_";
@@ -138,8 +173,10 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         layer(model, pose, buffers, e, dmz(eye + "1.png"), eye1, pt, light, overlay);
         layer(model, pose, buffers, e, dmz(eye + "2.png"), eye2, pt, light, overlay);
         layer(model, pose, buffers, e, dmz(eye + "3.png"), hair, pt, light, overlay);
-        layer(model, pose, buffers, e, dmz(HUMAN_FACE + "humansaiyan_nose_" + e.getNoseType() + ".png"), body, pt, light, overlay);
-        layer(model, pose, buffers, e, dmz(HUMAN_FACE + "humansaiyan_mouth_" + e.getMouthType() + ".png"), body, pt, light, overlay);
+        renderFaceTexture(model, pose, buffers, e,
+                HUMAN_FACE + "humansaiyan_nose_" + e.getNoseType() + ".png", body, pt, light, overlay);
+        renderFaceTexture(model, pose, buffers, e,
+                HUMAN_FACE + "humansaiyan_mouth_" + e.getMouthType() + ".png", body, pt, light, overlay);
 
         if (RedRibbonExperimentManager.isExperiment(e)) {
             // Use Dragon Mine Z's real Red Ribbon uniform overlay rather than mapping X-7 to an
@@ -210,9 +247,11 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         optionalLayerWithShadow(majinModel, pose, buffers, e,
                 root + "bodytype_" + gender + "_" + bodyType + "_layer3.png",
                 rgb(e.getBodyColor3()), pt, light, overlay);
-        if (shouldRenderHumanSaiyanHairBase(e)) {
-            layer(majinModel, pose, buffers, e, dmz("textures/entity/races/hair_base.png"),
-                    rgb(e.getHairColor()), pt, light, overlay);
+        var activeMajinForm = e.getActiveRacialForm();
+        if (e.isFemale() && activeMajinForm != null
+                && ("super".equals(activeMajinForm.id()) || "ultra".equals(activeMajinForm.id()))) {
+            layer(majinModel, pose, buffers, e, dmz("textures/entity/races/tail1.png"), body,
+                    pt, light, overlay);
         }
         int eyeType = Math.floorMod(e.getEyesType(), MAJIN_EYES.length);
         ResourceLocation[] eye = MAJIN_EYES[eyeType];
@@ -260,9 +299,9 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         // Fifth use their respective slim atlases with body-type-specific layer colours.
         boolean third = "frostdemon_third".equals(modelKey);
         boolean fifth = "fifth".equals(formId) || "frostdemon_fifth".equals(modelKey);
-        boolean finalFamily = "final".equals(formId) || "fullpower".equals(formId)
-                || "frostdemon_fp".equals(modelKey) || fifth;
-        if (!finalFamily) {
+        boolean bulky = activeForm == null || "second".equals(formId)
+                || "frostdemon_second".equals(modelKey) || third;
+        if (bulky) {
             String prefix = third ? "thirdform_bodytype_" : "bodytype_";
             String base = root + prefix + bodyType + "_layer";
             String fallback = root + prefix + "0_layer";
@@ -287,13 +326,25 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
                 layerWithShadow(frostModel, pose, buffers, e, base + "2.png", fallback + "2.png", body2, pt, light, overlay);
             }
         }
+        if ("frostdemon_mecha".equals(modelKey)) {
+            layer(frostModel, pose, buffers, e, dmz(root + "mechaform_layer1.png"), body1,
+                    pt, light, overlay);
+        } else if ("frostdemon_metalcore".equals(modelKey)) {
+            layer(frostModel, pose, buffers, e, dmz(root + "metalcore_layer1.png"), rgb("#9BA377"),
+                    pt, light, overlay);
+            layer(frostModel, pose, buffers, e, dmz(root + "metalcore_layer2.png"), rgb("#20211A"),
+                    pt, light, overlay);
+        }
         String face = root + "faces/";
         int eyeType = Math.floorMod(e.getEyesType(), 7);
         String eye = face + "frostdemon_eye_" + eyeType + "_";
-        float[] detail = (e.isFrostDemonPrimitive() || bodyType == 1) ? body2 : body1;
+        boolean primitiveFace = activeForm == null || "second".equals(formId) || "third".equals(formId);
+        float[] detail = (primitiveFace || bodyType == 1) ? body2 : body1;
         if (!renderBorrowedHumanEyes(frostModel, pose, buffers, e, e.getEyesType(), 7,
                 WHITE, detail, pt, light, overlay)) {
-            layer(frostModel, pose, buffers, e, dmz(eye + "0.png"), fifth ? rgb("#D11A11") : rgb("#F2F2F2"), pt, light, overlay);
+            float[] eyeBackground = fifth ? rgb("#D11A11")
+                    : "frostdemon_metalcore".equals(modelKey) ? rgb("#242424") : rgb("#F2F2F2");
+            layer(frostModel, pose, buffers, e, dmz(eye + "0.png"), eyeBackground, pt, light, overlay);
             // Eye preset 6 intentionally contains only its structural layer in DMZ 2.2.
             if (eyeType < 6) {
                 layer(frostModel, pose, buffers, e, dmz(eye + "1.png"), rgb(e.getEye1Color()), pt, light, overlay);
@@ -339,7 +390,7 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         if (!"xenomax".equals(formId) && !"xenofp".equals(formId))
             layerWithFallback(bioModel, pose, buffers, e,
                     root + phase + "_" + bodyType + "_layer5.png",
-                    root + phase + "_0_layer5.png", rgb("#D9B28D"), pt, light, overlay);
+                    root + phase + "_0_layer5.png", rgb("#EDD747"), pt, light, overlay);
         boolean xenoModel = "bioandroid_xeno".equals(modelKey) || "bioandroid_xenofp".equals(modelKey);
         if (xenoModel) {
             layer(bioModel, pose, buffers, e, dmz(root + "xenoform_layer1.png"), WHITE, pt, light, overlay);
@@ -397,12 +448,7 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
     }
 
     private static boolean shouldRenderHumanSaiyanHairBase(AmbientFighterEntity e) {
-        if (e == null || (e.getRace() != com.dmzlivingworld.entity.FighterRace.HUMAN
-                && e.getRace() != com.dmzlivingworld.entity.FighterRace.SAIYAN
-                && e.getRace() != com.dmzlivingworld.entity.FighterRace.MAJIN
-                && !(e.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID
-                && SairensRaceCompat.isBioAndroidHumanModel())
-                && !e.getRace().isSairensRace())) return false;
+        if (e == null || !e.getRace().usesHairBase()) return false;
         var form = e.getActiveRacialFormConfig();
         if (form != null && !form.forcedHairCode().isBlank()) return true;
         if (e.getHairId() == 5) return false;
@@ -434,7 +480,15 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         String path = humanValue >= 0
                 ? HUMAN_FACE + "humansaiyan_" + type + "_" + humanValue + ".png"
                 : racialPath;
-        if (path != null) layer(model, pose, buffers, e, dmz(path), tint, pt, light, overlay);
+        if (path != null) renderFaceTexture(model, pose, buffers, e, path, tint, pt, light, overlay);
+    }
+
+    /** DMZ 2.2 gives nose/mouth atlases optional translucent shadow companions. */
+    private void renderFaceTexture(BakedGeoModel model, PoseStack pose, MultiBufferSource buffers,
+                                   AmbientFighterEntity e, String path, float[] tint,
+                                   float pt, int light, int overlay) {
+        layer(model, pose, buffers, e, dmz(path), tint, pt, light, overlay);
+        layerWithNativeShadowOnly(model, pose, buffers, e, path, tint, pt, light, overlay);
     }
 
     private static float[] darken(float[] color, float factor) {
@@ -497,6 +551,25 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         bodyLayer(model, pose, buffers, entity, texture, color, partialTick, packedLight, packedOverlay);
         String path = texture.getPath();
         ResourceLocation shadow = dmz(path.substring(0, path.length() - ".png".length()) + "_shadow.png");
+        if (textureExists(shadow)) nativeShadowLayer(model, pose, buffers, entity, shadow,
+                ColorUtils.skinShadowTone(color), partialTick, packedLight, packedOverlay);
+    }
+
+    private void layerWithNativeShadow(BakedGeoModel model, PoseStack pose, MultiBufferSource buffers,
+                                       AmbientFighterEntity entity, String path, float[] color,
+                                       float partialTick, int packedLight, int packedOverlay) {
+        ResourceLocation texture = dmz(path);
+        if (!textureExists(texture)) return;
+        layer(model, pose, buffers, entity, texture, color, partialTick, packedLight, packedOverlay);
+        layerWithNativeShadowOnly(model, pose, buffers, entity, path, color,
+                partialTick, packedLight, packedOverlay);
+    }
+
+    private void layerWithNativeShadowOnly(BakedGeoModel model, PoseStack pose, MultiBufferSource buffers,
+                                           AmbientFighterEntity entity, String path, float[] color,
+                                           float partialTick, int packedLight, int packedOverlay) {
+        if (!path.endsWith(".png")) return;
+        ResourceLocation shadow = dmz(path.substring(0, path.length() - 4) + "_shadow.png");
         if (textureExists(shadow)) nativeShadowLayer(model, pose, buffers, entity, shadow,
                 ColorUtils.skinShadowTone(color), partialTick, packedLight, packedOverlay);
     }

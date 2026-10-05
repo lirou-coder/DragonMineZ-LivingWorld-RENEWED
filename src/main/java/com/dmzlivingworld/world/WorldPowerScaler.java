@@ -27,6 +27,7 @@ public final class WorldPowerScaler {
     private static final double LOCAL_PLAYER_RADIUS = 128.0D;
     private static final double LOCAL_PLAYER_RADIUS_SQR = LOCAL_PLAYER_RADIUS * LOCAL_PLAYER_RADIUS;
     private static final double PLAYER_PRESSURE_CAP_MULTIPLIER = 28.0D;
+    private static final double MINIMUM_ROOKIE_FACTOR = 0.18D / 2.70D;
     private static final String OBSERVED_PLAYER_PRESSURE = "LWObservedPlayerPressure";
     private static final String OBSERVED_PLAYER_PRESSURE_AT = "LWObservedPlayerPressureAt";
     private static final long OBSERVED_PLAYER_PRESSURE_MEMORY_TICKS = 12_000L;
@@ -65,7 +66,11 @@ public final class WorldPowerScaler {
         if (isInitialEra(player)) difficultyReference = Math.max(175.0D, difficultyReference);
         double reference = difficultyReference * LivingWorldConfig.npcStrengthScale()
                 * LivingWorldConfig.npcPowerMultiplier();
-        return Math.max(1.0D, reference * rollReferenceFactor(rank, random));
+        // The weakest possible Rookie roll must still represent the baseline living fighter:
+        // 20 HP plus at least 1 Melee, 1 Ki and 1 Defense (23 effective reference).
+        double minimumEffective = FighterPowerStatScaler.minimumEffectiveBudget();
+        reference = Math.max(minimumEffective / MINIMUM_ROOKIE_FACTOR, reference);
+        return Math.max(minimumEffective, reference * rollReferenceFactor(rank, random));
     }
 
     private static double playerDifficultyMultiplier(ServerPlayer player) {

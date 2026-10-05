@@ -137,8 +137,8 @@ public final class FighterPowerCompareManager {
                 // presentational comparison flare first so it cannot be captured as real power.
                 if (s.aBoosted) { a.endSocialPowerDisplayBoost(); s.aBoosted = false; }
                 if (s.bBoosted) { b.endSocialPowerDisplayBoost(); s.bBoosted = false; }
-                if(a.getRacialSkillLevel()>0 && a.getRandom().nextFloat()<0.48F) a.beginAwakening();
-                if(b.getRacialSkillLevel()>0 && b.getRandom().nextFloat()<0.48F) b.beginAwakening();
+                if(a.canUseRacialFormNow() && a.getRandom().nextFloat()<0.48F) a.beginAwakening();
+                if(b.canUseRacialFormNow() && b.getRandom().nextFloat()<0.48F) b.beginAwakening();
             }
             if(now>=s.end) finish(a,b,s,true);
         }
