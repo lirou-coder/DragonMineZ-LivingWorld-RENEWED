@@ -109,7 +109,10 @@ public final class HostileMobFighterTargetManager {
                 || fighter.isDefeated()
                 || fighter.isCaptive()
                 || fighter.isNonCombatant()
-                || WorldMenaceManager.isWorldMenace(fighter)) {
+                || WorldMenaceManager.isWorldMenace(fighter)
+                // A mob may only acquire a fighter it can actually see.  The inflated AABB
+                // above is a broad-phase lookup, not permission to target through terrain.
+                || !mob.hasLineOfSight(fighter)) {
             return false;
         }
 
