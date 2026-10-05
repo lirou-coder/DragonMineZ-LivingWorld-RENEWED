@@ -38,7 +38,7 @@ public final class FighterLegacyManager {
     }
 
     // Resolve the life budget before the other death listeners inspect permanent-death state.
-    @SubscribeEvent(priority = EventPriority.HIGH)
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onDeath(LivingDeathEvent event) {
         Entity attacker = event.getSource().getEntity();
         if (event.getEntity() instanceof AmbientFighterEntity victim && victim.level() instanceof ServerLevel level) {
@@ -47,6 +47,22 @@ public final class FighterLegacyManager {
             if (WorldMenaceManager.isWorldMenace(victim)) return;
             if (victim.getPersistentData().contains("DMZLWNpcFusionTemp", Tag.TAG_COMPOUND)
                     && victim.getPersistentData().getCompound("DMZLWNpcFusionTemp").getBoolean("Active")) return;
+
+            /*
+             * Unconnected ambient fighters are intentionally ephemeral.  A fighter that has
+             * never been remembered by a player (and was not killed directly by one) has no
+             * relationship, story identity or player-facing legacy to preserve.  Letting it
+             * enter the ordinary life/afterlife pipeline creates pointless tombstones,
+             * broadcasts and wish entries for every naturally spawned casualty.  Cancel the
+             * event and discard it before any other death subscriber can create such state.
+             * Direct player kills count as an interaction, so those victims retain the normal
+             * relationship/death flow even if the relationship record is created by this event.
+             */
+            if (!hasPlayerConnection(victim, attacker)) {
+                event.setCanceled(true);
+                victim.discard();
+                return;
+            }
             String killerName = attacker == null ? "" : attacker.getName().getString();
             int killerPower = 0;
             boolean killerIsPlayer = false;
@@ -100,6 +116,11 @@ public final class FighterLegacyManager {
             int playerPower = (int)Math.min(Integer.MAX_VALUE - 1L, Math.round(PlayerWorldManager.playerBattlePower(player)));
             fighter.recordLegacyBattle(player.getGameProfile().getName(), playerPower, true, false, true);
         }
+    }
+
+    /** Returns whether this fighter has any player-facing history that must survive death. */
+    private static boolean hasPlayerConnection(AmbientFighterEntity fighter, Entity attacker) {
+        return fighter != null && (fighter.isRemembered() || attacker instanceof ServerPlayer);
     }
 
     public static boolean isPermanentDeath(AmbientFighterEntity victim, Entity attacker) {
