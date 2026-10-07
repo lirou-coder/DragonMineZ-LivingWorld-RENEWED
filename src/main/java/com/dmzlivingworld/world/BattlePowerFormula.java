@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import net.minecraftforge.fml.ModList;
+import net.minecraft.world.entity.LivingEntity;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -14,8 +15,13 @@ public final class BattlePowerFormula {
     private static volatile boolean calculatorLookupComplete;
     private static volatile ConfigAccess revampConfig;
     private static volatile boolean configLookupComplete;
+    private static volatile Method mobEntityCalculator;
+    private static volatile Method mobTotalStatsCalculator;
+    private static volatile boolean mobEntityLookupComplete;
 
     private BattlePowerFormula() {}
+
+    public static boolean overhaulInstalled() { return ModList.get().isLoaded("dmzrevamp"); }
 
     public static double battlePower(double effective) {
         double safe = Math.max(1.0D, effective);
@@ -29,6 +35,36 @@ public final class BattlePowerFormula {
         }
         Parameters p = parameters();
         return p.reference * Math.pow(safe / p.divisor, p.exponent);
+    }
+
+    /**
+     * Returns Overhaul's authoritative mob BP, including every configured mob factor
+     * (health, melee, ki, defense, movement, armor and optional attributes).  The
+     * Living World fallback deliberately remains separate for installations without
+     * Overhaul.
+     */
+    public static double battlePowerForMob(LivingEntity entity) {
+        if (entity == null || !ModList.get().isLoaded("dmzrevamp")) return -1.0D;
+        try {
+            Method method = mobEntityCalculator();
+            if (method == null) return -1.0D;
+            Object value = method.invoke(null, entity);
+            double result = value instanceof Number number ? number.doubleValue() : -1.0D;
+            return Double.isFinite(result) && result > 0.0D ? result : -1.0D;
+        } catch (ReflectiveOperationException ignored) {
+            return -1.0D;
+        }
+    }
+
+    public static double totalStatsForMob(LivingEntity entity) {
+        if (entity == null || !overhaulInstalled()) return -1.0D;
+        try {
+            Method method = mobTotalStatsCalculator();
+            if (method == null) return -1.0D;
+            Object value = method.invoke(null, entity);
+            double result = value instanceof Number number ? number.doubleValue() : -1.0D;
+            return Double.isFinite(result) && result > 0.0D ? result : -1.0D;
+        } catch (ReflectiveOperationException ignored) { return -1.0D; }
     }
 
     /**
@@ -86,14 +122,45 @@ public final class BattlePowerFormula {
         return revampCalculator;
     }
 
+    private static Method mobEntityCalculator() {
+        if (!mobEntityLookupComplete) {
+            synchronized (BattlePowerFormula.class) {
+                if (!mobEntityLookupComplete) {
+                    try {
+                        mobEntityCalculator = Class.forName(
+                                        "com.dmzrevamp.revamp.battlepower.AccurateMobBattlePowerCalculator")
+                                .getMethod("calculateCurvedBattlePowerExact", LivingEntity.class);
+                    } catch (ReflectiveOperationException ignored) {
+                        mobEntityCalculator = null;
+                    }
+                    mobEntityLookupComplete = true;
+                }
+            }
+        }
+        return mobEntityCalculator;
+    }
+
+    private static Method mobTotalStatsCalculator() {
+        if (mobTotalStatsCalculator == null) {
+            try {
+                mobTotalStatsCalculator = Class.forName(
+                                "com.dmzrevamp.revamp.battlepower.AccurateMobBattlePowerCalculator")
+                        .getMethod("calculateTotalPower", LivingEntity.class);
+            } catch (ReflectiveOperationException ignored) { }
+        }
+        return mobTotalStatsCalculator;
+    }
+
     private static ConfigAccess configAccess() {
         if (!configLookupComplete) {
             synchronized (BattlePowerFormula.class) {
                 if (!configLookupComplete) {
                     try {
                         Class<?> type = Class.forName("com.dmzrevamp.config.CustomBattlePowerConfig");
-                        revampConfig = new ConfigAccess(type.getMethod("get"), type.getField("referenceMultiplier"),
-                                type.getField("totalStatsDivisor"), type.getField("exponent"));
+                        Method getter = type.getMethod("get");
+                        Class<?> configType = getter.getReturnType();
+                        revampConfig = new ConfigAccess(getter, configType.getField("referenceMultiplier"),
+                                configType.getField("totalStatsDivisor"), configType.getField("exponent"));
                     } catch (ReflectiveOperationException ignored) {
                         revampConfig = null;
                     }

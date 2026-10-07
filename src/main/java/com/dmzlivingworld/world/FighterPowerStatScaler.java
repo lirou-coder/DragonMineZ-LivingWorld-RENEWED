@@ -81,11 +81,15 @@ public final class FighterPowerStatScaler {
 
     public static double currentTotalStats(AmbientFighterEntity fighter) {
         if (fighter == null) return 1.0D;
+        double overhaul = BattlePowerFormula.totalStatsForMob(fighter);
+        if (overhaul > 0.0D) return overhaul;
         return Math.max(1.0D, fighter.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE)
                 + fighter.getDefenseStat() + fighter.getKiBlastDamage() + Math.max(0.0D, fighter.getMaxHealth() - 20.0D));
     }
 
     public static double battlePowerForStats(AmbientFighterEntity fighter, double totalStats) {
+        double overhaul = BattlePowerFormula.battlePowerForMob(fighter);
+        if (overhaul > 0.0D) return overhaul;
         return BattlePowerFormula.battlePower(totalStats);
     }
 

@@ -435,29 +435,32 @@ public final class FighterBattleGrowthManager {
     public static int applyFractionalEarnedGrowth(AmbientFighterEntity fighter, double fraction,
                                                    double ceiling, boolean refreshOnNoWholeGain) {
         if (fighter == null || fighter.level().isClientSide) return fighter == null ? 0 : fighter.getPermanentBattlePower();
-        int base = fighter.getPermanentBattlePower();
-        long cap = Math.round(Math.max(base, ceiling));
+        double baseEffective = Math.max(1.0D, FighterPowerStatScaler.effectiveStatBudget(fighter));
+        int currentBp = fighter.getPermanentBattlePower();
+        double capEffective = Math.max(baseEffective,
+                FighterPowerStatScaler.effectiveFromBattlePower(fighter, Math.max(1.0D, ceiling)));
         var data = fighter.getLegacyData();
-        if (base >= cap) {
+        if (baseEffective >= capEffective) {
             // A cap must not turn deferred fractions into a later burst when the ceiling moves.
             data.putDouble(EARNED_BP_REMAINDER, 0.0D);
             data.remove(LEGACY_MEDITATION_REMAINDER);
             data.putBoolean(REMAINDER_MIGRATED, true);
-            return base;
+            return currentBp;
         }
         double remainder = earnedRemainder(fighter);
-        double exactDelta = Math.max(0.0D, fraction) * Math.max(1, base) + remainder;
+        double exactDelta = Math.max(0.0D, fraction) * baseEffective + remainder;
         long whole = (long)Math.floor(exactDelta);
         double nextRemainder = Math.max(0.0D, exactDelta - whole);
         if (whole <= 0L) {
             data.putDouble(EARNED_BP_REMAINDER, nextRemainder);
-            if (refreshOnNoWholeGain) fighter.setEarnedBattlePowerAndRefresh(base);
-            return base;
+            if (refreshOnNoWholeGain) fighter.refreshFromEffectiveBudget(true);
+            return currentBp;
         }
-        long grown = Math.min(cap, (long)base + whole);
-        if (grown < (long)base + whole) nextRemainder = 0.0D;
+        double grown = Math.min(capEffective, baseEffective + whole);
+        if (grown < baseEffective + whole) nextRemainder = 0.0D;
         data.putDouble(EARNED_BP_REMAINDER, nextRemainder);
-        fighter.setEarnedBattlePowerAndRefresh((int)Math.min(Integer.MAX_VALUE - 1L, Math.max(1L, grown)));
+        FighterPowerStatScaler.setEffectiveStatBudget(fighter, grown);
+        fighter.refreshFromEffectiveBudget(true);
         return fighter.getPermanentBattlePower();
     }
 

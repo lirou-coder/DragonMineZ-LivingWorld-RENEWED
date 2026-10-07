@@ -895,7 +895,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         LivingEntity victim = player.getLastHurtMob();
         if (victim == null || !victim.isAlive() || victim.distanceToSqr(this) > 40.0D * 40.0D) return false;
         if (victim == this || victim instanceof net.minecraft.world.entity.npc.Villager) return true;
-        return victim instanceof AmbientFighterEntity other && other.getAlignment() != FighterAlignment.BAD;
+        // A good fighter may defend another good fighter, but must not join a
+        // player's ordinary fight against a neutral fighter.
+        return victim instanceof AmbientFighterEntity other && other.getAlignment() == FighterAlignment.GOOD;
     }
 
     @Override
@@ -1729,6 +1731,24 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         setPermanentBattlePowerAndRefresh(battlePower, true);
     }
 
+    /** Rebuilds the physical profile from the authoritative effective/reference budget. */
+    public void refreshFromEffectiveBudget(boolean earned) {
+        double effective = FighterPowerStatScaler.effectiveStatBudget(this);
+        long calculated = Math.max(1L, Math.round(FighterPowerStatScaler.battlePowerForEffectiveBudget(this, effective)));
+        int previous = getPermanentBattlePower();
+        legacyData.putLong(PERMANENT_BATTLE_POWER, calculated);
+        if (earned && calculated > previous)
+            legacyData.putInt(EARNED_BATTLE_POWER_FLOOR,
+                    Math.max(calculated >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) calculated,
+                            legacyData.getInt(EARNED_BATTLE_POWER_FLOOR)));
+        setBattlePower(projectedBattlePower());
+        if (!level().isClientSide && entityData.get(READY) && (isRacialFormActive() || isKaiokenActive()))
+            refreshActiveCombatPowerLayer();
+        else if (!level().isClientSide && entityData.get(READY) && !blocksPowerProfileRefresh())
+            refreshCombatStatsFromPower();
+        else if (!level().isClientSide) combatStatsPower = -1;
+    }
+
     private void setPermanentBattlePowerAndRefresh(int battlePower, boolean earned) {
         int previous = getPermanentBattlePower();
         int permanent = Math.max(1, battlePower);
@@ -1893,6 +1913,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     }
 
     public double getDefenseStat() {
+        double overhaulDefense = DmzRevampMobDefenseCompat.defense(this);
+        if (overhaulDefense >= 0.0D) return overhaulDefense;
         return getUnpenalizedDefenseStat() * FighterWeightGravityManager.statMultiplier(this);
     }
 

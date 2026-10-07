@@ -11,8 +11,9 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
+import com.dmzlivingworld.world.FighterWeightGravityManager;
 
-/** Prevents DMZ Overhaul's generic mob defense from stacking with Living World's defense. */
+/** Accesses DMZ Overhaul's authoritative mob_defense attribute when present. */
 @Mod.EventBusSubscriber(modid = LivingWorldMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class DmzRevampMobDefenseCompat {
     private static final ResourceLocation MOB_DEFENSE =
@@ -22,11 +23,23 @@ public final class DmzRevampMobDefenseCompat {
     private DmzRevampMobDefenseCompat() {}
 
     public static void neutralize(AmbientFighterEntity fighter) {
-        if (fighter == null || !ModList.get().isLoaded("dmzrevamp")) return;
+        if (!installed() || fighter == null) return;
         Attribute attribute = mobDefenseAttribute();
-        if (attribute == null) return;
-        AttributeInstance instance = fighter.getAttribute(attribute);
-        if (instance != null && instance.getBaseValue() != 0.0D) instance.setBaseValue(0.0D);
+        AttributeInstance instance = attribute == null ? null : fighter.getAttribute(attribute);
+        if (instance != null) {
+            double value = Math.max(0.0D, fighter.getUnpenalizedDefenseStat()
+                    * FighterWeightGravityManager.statMultiplier(fighter));
+            instance.setBaseValue(value);
+        }
+    }
+
+    public static boolean installed() { return ModList.get().isLoaded("dmzrevamp"); }
+
+    public static double defense(AmbientFighterEntity fighter) {
+        if (fighter == null || !installed()) return -1.0D;
+        Attribute attribute = mobDefenseAttribute();
+        AttributeInstance instance = attribute == null ? null : fighter.getAttribute(attribute);
+        return instance == null ? -1.0D : Math.max(0.0D, instance.getValue());
     }
 
     /** Runs before Overhaul's LOWEST handler, closing any window caused by another mod changing the base value. */

@@ -405,10 +405,11 @@ public final class FighterInspectionManager {
         boolean menace = WorldMenaceManager.isWorldMenace(fighter);
         lines.add("## " + profileText("combat.heading", "Combat"));
         long currentPower = FighterVisualPower.ofLong(fighter);
-        long permanentPower = FighterVisualPower.scaleLong(fighter.getPermanentBattlePowerLong());
         lines.add("* " + profileText("combat.current_power", "Current Power Level: %s", BattlePowerDisplay.format(currentPower)));
-        if (currentPower != permanentPower)
+        if (false) {
+            long permanentPower = FighterVisualPower.scaleLong(fighter.getPermanentBattlePowerLong());
             lines.add("* " + profileText("combat.base_power", "Base permanent Power Level: %s • temporary form/power state is included above", BattlePowerDisplay.format(permanentPower)));
+        }
         lines.add("* " + profileText("combat.stats_v2", "Health %s | Melee %s | Ki %s | Speed %s",
                 String.format(java.util.Locale.ROOT, "%.1f", fighter.getMaxHealth()),
                 String.format(java.util.Locale.ROOT, "%.1f", fighter.getAttributeValue(Attributes.ATTACK_DAMAGE)),

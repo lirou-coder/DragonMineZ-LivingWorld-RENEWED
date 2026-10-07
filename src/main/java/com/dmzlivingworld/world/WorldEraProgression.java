@@ -30,6 +30,14 @@ public final class WorldEraProgression {
         if (event.getPlayer() == null || !(event.getPlayer().level() instanceof ServerLevel level)) return;
         Saga saga = event.getSaga();
         Quest quest = event.getQuest();
+        if (quest != null) {
+            double completedReference = WorldPowerScaler.referenceForQuest(quest);
+            if (Double.isFinite(completedReference) && completedReference > 0.0D) {
+                double previous = event.getPlayer().getPersistentData().getDouble("LWQuestReference");
+                if (!Double.isFinite(previous) || completedReference > previous)
+                    event.getPlayer().getPersistentData().putDouble("LWQuestReference", completedReference);
+            }
+        }
         if (saga == null || quest == null || isMovies(saga) || saga.getQuests().isEmpty()) return;
 
         // Starting a saga, or completing any intermediate quest, never changes world progression.

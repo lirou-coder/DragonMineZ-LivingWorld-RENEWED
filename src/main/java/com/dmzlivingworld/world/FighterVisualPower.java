@@ -12,14 +12,19 @@ public final class FighterVisualPower {
     }
 
     public static long ofLong(AmbientFighterEntity fighter) {
-        return fighter == null ? 1L : scaleLong(fighter.getPermanentBattlePowerLong());
+        if (fighter == null) return 1L;
+        double exact = ofDouble(fighter);
+        if (!Double.isFinite(exact) || exact >= Long.MAX_VALUE) return Long.MAX_VALUE;
+        return Math.max(1L, Math.round(exact));
     }
 
     /** Exact Ki Sense/scouter value before the API's final float conversion. */
     public static double ofDouble(AmbientFighterEntity fighter) {
         if (fighter == null) return 1.0D;
-        double visual = Math.max(1L, fighter.getPermanentBattlePowerLong())
-                * LivingWorldConfig.bpVisualMultiplier();
+        double authoritative = BattlePowerFormula.battlePowerForMob(fighter);
+        if (authoritative <= 0.0D) authoritative = Math.max(1L, fighter.getPermanentBattlePowerLong());
+        double visual = authoritative * (BattlePowerFormula.overhaulInstalled()
+                ? 1.0D : LivingWorldConfig.bpVisualMultiplier());
         if (!Double.isFinite(visual)) return Double.MAX_VALUE;
         return Math.max(1.0D, visual);
     }

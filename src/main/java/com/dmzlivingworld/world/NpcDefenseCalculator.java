@@ -17,6 +17,8 @@ public final class NpcDefenseCalculator {
 
     public static float mitigate(float incoming, double defense, double defensePenetration) {
         if (incoming <= 0.0F || defense <= 0.0D) return incoming;
+        // When Overhaul is installed its mob_defense mixin is the sole mitigation authority.
+        if (com.dmzlivingworld.compat.DmzRevampMobDefenseCompat.installed()) return incoming;
         defense *= 1.0D - clamp01(defensePenetration);
         if (defense <= 0.0D) return incoming;
 

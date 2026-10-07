@@ -497,7 +497,7 @@ public final class RedRibbonExperimentManager {
         if (!profile.isEmpty() && profile.contains("Name", Tag.TAG_STRING)) fighter.initializeFromMemory(profile);
         else {
             fighter.initializeAs(FighterAlignment.NEUTRAL, FighterRank.VETERAN, FighterPersonality.PROUD, FighterRace.HUMAN, FighterArchetype.MARTIAL_ARTIST);
-            int start = (int)Math.min(Integer.MAX_VALUE-1L, Math.max(85_000D, Math.max(WorldPowerScaler.resolveWorldAnchor(level,pos)*5.5D, WorldPowerScaler.activePlayerPowerPressure(level)*1.35D)));
+            int start = 2_800;
             fighter.setWorldMenacePowerReferenceAndRefresh(start);
             fighter.getLegacyData().putDouble("LWPotentialV1", 1.68D);
         }
@@ -546,9 +546,7 @@ public final class RedRibbonExperimentManager {
         } else {
             fighter.initializeAs(FighterAlignment.NEUTRAL, FighterRank.VETERAN, FighterPersonality.PROUD,
                     FighterRace.HUMAN, FighterArchetype.MARTIAL_ARTIST);
-            int start = (int)Math.min(Integer.MAX_VALUE - 1L,
-                    Math.max(85_000D, Math.max(WorldPowerScaler.resolveWorldAnchor(level, fighter.blockPosition()) * 5.5D,
-                            WorldPowerScaler.activePlayerPowerPressure(level) * 1.35D)));
+            int start = 2_800;
             fighter.setWorldMenacePowerReferenceAndRefresh(start);
             fighter.getLegacyData().putDouble("LWPotentialV1", 1.68D);
         }

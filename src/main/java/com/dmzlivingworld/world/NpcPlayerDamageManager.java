@@ -4,7 +4,6 @@ import com.dmzlivingworld.LivingWorldMod;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
 import com.dmzlivingworld.entity.FighterPersonality;
-import com.dragonminez.common.config.ConfigManager;
 import com.dragonminez.common.init.MainEffects;
 import com.dragonminez.common.init.entities.ki.AbstractKiProjectile;
 import com.dragonminez.common.network.NetworkHandler;
@@ -59,12 +58,19 @@ public final class NpcPlayerDamageManager {
                 || attacker.isSanctionedMatchParticipant()
                 || player.getHealth() - event.getAmount() > 0.0F) return;
 
-        float nonLethalDamage = Math.max(0.0F, player.getHealth() - 1.0F);
+        // LivingDamageEvent is the final damage phase (after mitigation, blocking and
+        // penetration). Only preserve the player when that resolved damage is lethal.
+        float safeHealth = Math.max(1.0F, player.getMaxHealth() * 0.05F);
+        float nonLethalDamage = Math.max(0.0F, player.getHealth() - safeHealth);
         if (nonLethalDamage <= 0.0F) event.setCanceled(true);
         else event.setAmount(nonLethalDamage);
 
+        // If the player was already at or below the safety floor, cancellation must
+        // still leave exactly 5% health rather than allowing a zero-health transition.
+        if (event.isCanceled()) player.setHealth(safeHealth);
+
         StatsProvider.get(StatsCapability.INSTANCE, player).ifPresent(stats -> {
-            int knockdownTicks = ConfigManager.getCombatConfig().getKnockdownDurationSeconds() * 20;
+            int knockdownTicks = 5 * 20;
             stats.getStatus().setKnockedDown(true);
             stats.getCooldowns().setCooldown(Cooldowns.KNOCKDOWN_DURATION, knockdownTicks);
             stats.getCooldowns().setCooldown(Cooldowns.KNOCKDOWN_INVULN, knockdownTicks);

@@ -497,7 +497,7 @@ public final class WorldMenaceManager {
         fighter.setPersistenceRequired();
         int returns = Math.max(0, deaths);
         double powerScale = Math.min(24.0D, Math.pow(1.85D, Math.min(8, returns)));
-        int minimumPower = (int)Math.min(12_000_000D, 250_000D * powerScale);
+        int minimumPower = (int)Math.min(12_000_000D, 8_560D * powerScale);
         if (fighter.getWorldMenacePowerReference() < minimumPower)
             fighter.setWorldMenacePowerReferenceAndRefresh(minimumPower);
         // BP is the combat source of truth. Do not layer hidden HP/melee/Ki minimums on top of

@@ -59,8 +59,11 @@ public final class WorldPowerScaler {
 
     public static double rollEffectiveStats(ServerLevel level, ServerPlayer player,
                                             FighterRank rank, RandomSource random) {
-        double sagaReference = sagaKillReference(level, player);
-        double difficultyReference = sagaReference * playerDifficultyMultiplier(player);
+        double questReference = player == null ? initialAvailableReference()
+                : player.getPersistentData().getDouble("LWQuestReference");
+        if (!Double.isFinite(questReference) || questReference <= 0.0D)
+            questReference = initialAvailableReference();
+        double difficultyReference = questReference * playerDifficultyMultiplier(player);
         // Era zero has an intentional floor of 175. Easy difficulty may lower a stronger
         // tutorial anchor, but it can never reintroduce the tiny custom-saga values this floor fixes.
         if (isInitialEra(player)) difficultyReference = Math.max(175.0D, difficultyReference);
@@ -169,6 +172,19 @@ public final class WorldPowerScaler {
         return Double.isFinite(reference) ? reference : -1.0D;
     }
 
+    /** Strongest fully configured enemy in one completed quest, ignoring transformations. */
+    public static double referenceForQuest(Quest quest) {
+        if (quest == null) return -1.0D;
+        double strongest = -1.0D;
+        for (var objective : quest.getObjectives()) {
+            if (objective instanceof KillObjective kill) {
+                double value = killReference(kill);
+                if (Double.isFinite(value) && value > strongest) strongest = value;
+            }
+        }
+        return strongest;
+    }
+
     /** Overhaul injects this accessor into KillObjective; reflection keeps the dependency optional. */
     private static double revampDefense(KillObjective kill) {
         if (kill == null || !ModList.get().isLoaded("dmzrevamp")) return 0.0D;
@@ -228,11 +244,11 @@ public final class WorldPowerScaler {
 
         // Saga references explicitly describe the strongest ordinary Veteran. Preserve the old
         // population proportions by normalizing the historical 0.18..2.70 bands to that maximum.
-        if (veteranMaximumAnchor) factor /= 2.70D;
+        if (veteranMaximumAnchor) factor /= 1.50D;
 
         // Rare natural monsters remain possible independently of the player.
         if (rank == FighterRank.VETERAN && random.nextFloat() < 0.045F) {
-            factor *= 1.40D + random.nextDouble() * 0.35D;
+            factor *= 1.0D + random.nextDouble() * 0.50D;
         }
 
         long result = Math.round(Math.max(90.0D, anchor * factor));
@@ -254,19 +270,19 @@ public final class WorldPowerScaler {
 
     private static double rollReferenceFactor(FighterRank rank, RandomSource random) {
         double min = switch (rank) {
-            case ROOKIE -> 0.18D / 2.70D;
-            case TRAINED -> 0.55D / 2.70D;
-            case VETERAN -> 1.10D / 2.70D;
+            case ROOKIE -> 0.18D;
+            case TRAINED -> 0.55D;
+            case VETERAN -> 1.00D;
         };
         double max = switch (rank) {
-            case ROOKIE -> 0.65D / 2.70D;
-            case TRAINED -> 1.40D / 2.70D;
-            case VETERAN -> 1.0D;
+            case ROOKIE -> 0.65D;
+            case TRAINED -> 1.00D;
+            case VETERAN -> 1.50D;
         };
         double t = (random.nextDouble() + random.nextDouble()) * 0.5D;
         double factor = Mth.lerp(t, min, max);
         if (rank == FighterRank.VETERAN && random.nextFloat() < 0.045F)
-            factor *= 1.40D + random.nextDouble() * 0.35D;
+            factor *= 1.0D + random.nextDouble() * 0.50D;
         return factor;
     }
 
