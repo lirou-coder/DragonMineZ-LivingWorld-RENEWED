@@ -38,7 +38,7 @@ public final class FighterPowerStatScaler {
 
     public static double baseHealth(AmbientFighterEntity fighter, double livedMultiplier) {
         double lived = Math.min(1.22D, 1.0D + (Math.max(1.0D, livedMultiplier) - 1.0D) * 0.55D);
-        double calculated = 20.0D + healthShare(fighter) * effectiveStatBudget(fighter) * lived;
+        double calculated = 20.0D + healthShare(fighter) * effectiveStatBudget(fighter) * 2.0D * lived;
         double stable = fighter.getLegacyData().getDouble(STABLE_MAX_HEALTH);
         double result = Math.max(calculated, Double.isFinite(stable) ? stable : 0.0D);
         fighter.getLegacyData().putDouble(STABLE_MAX_HEALTH, result);
@@ -83,8 +83,10 @@ public final class FighterPowerStatScaler {
         if (fighter == null) return 1.0D;
         double overhaul = BattlePowerFormula.totalStatsForMob(fighter);
         if (overhaul > 0.0D) return overhaul;
-        return Math.max(1.0D, fighter.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE)
-                + fighter.getDefenseStat() + fighter.getKiBlastDamage() + Math.max(0.0D, fighter.getMaxHealth() - 20.0D));
+        // Base DMZ's mob totalStats uses half of max HP, not the full HP value.
+        return Math.max(1.0D, fighter.getMaxHealth() * 0.5D
+                + fighter.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE)
+                + fighter.getDefenseStat() + fighter.getKiBlastDamage());
     }
 
     public static double battlePowerForStats(AmbientFighterEntity fighter, double totalStats) {
@@ -99,7 +101,15 @@ public final class FighterPowerStatScaler {
         // Archetype shares decide only how that budget becomes combat stats; feeding their sum
         // back into BP made identical era rolls display different power and let Overhaul's Ki
         // Sense disagree with the Living World menu.
-        return battlePowerForStats(fighter, Math.max(1.0D, effective));
+        double safe = Math.max(1.0D, effective);
+        if (!BattlePowerFormula.overhaulInstalled()) {
+            // Project the distributed attributes back to the same totalStats definition
+            // without counting the doubled HP allocation twice.
+            double projectedTotal = 10.0D + safe * (meleeShare(fighter) + defenseShare(fighter)
+                    + kiShare(fighter) + healthShare(fighter));
+            return BattlePowerFormula.battlePower(projectedTotal);
+        }
+        return battlePowerForStats(fighter, safe);
     }
 
     /**

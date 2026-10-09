@@ -138,6 +138,18 @@ public final class WorldEraProgression {
 
     public record PlayerEra(int number, String sagaId) {}
 
+    public static int completedSagaCount(net.minecraft.server.level.ServerPlayer player) {
+        if (player == null) return 0;
+        PlayerQuestData quests = player.getCapability(StatsCapability.INSTANCE)
+                .map(stats -> stats.getPlayerQuestData()).orElse(null);
+        if (quests == null) return 0;
+        int count = 0;
+        for (Saga saga : QuestRegistry.getAllSagas().values()) {
+            if (!isMovies(saga) && isSagaCompleted(quests, saga)) count++;
+        }
+        return count;
+    }
+
     private static int sagaDepth(Saga saga) {
         int depth = 1;
         Set<String> visited = new HashSet<>();

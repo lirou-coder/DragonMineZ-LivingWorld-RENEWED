@@ -60,20 +60,63 @@ public final class WorldPowerScaler {
     public static double rollEffectiveStats(ServerLevel level, ServerPlayer player,
                                             FighterRank rank, RandomSource random) {
         double questReference = player == null ? initialAvailableReference()
-                : player.getPersistentData().getDouble("LWQuestReference");
+                : strongestCompletedQuestReference(player);
+        if (player != null && (!Double.isFinite(questReference) || questReference <= 0.0D))
+            questReference = player.getPersistentData().getDouble("LWQuestReference");
         if (!Double.isFinite(questReference) || questReference <= 0.0D)
             questReference = initialAvailableReference();
-        double difficultyReference = questReference * playerDifficultyMultiplier(player);
+        int completedSagas = WorldEraProgression.completedSagaCount(player);
+        double sagaMultiplier = LivingWorldConfig.levelMultiplierPerSaga();
+        double divisor = 2.0D + completedSagas * Math.max(0.0D, sagaMultiplier);
+        double difficultyReference = (questReference / Math.max(0.1D, divisor)) * playerDifficultyMultiplier(player);
         // Era zero has an intentional floor of 175. Easy difficulty may lower a stronger
         // tutorial anchor, but it can never reintroduce the tiny custom-saga values this floor fixes.
         if (isInitialEra(player)) difficultyReference = Math.max(175.0D, difficultyReference);
         double reference = difficultyReference * LivingWorldConfig.npcStrengthScale()
                 * LivingWorldConfig.npcPowerMultiplier();
+        // Until the player's progression reaches the first saga's strongest authored enemy,
+        // that encounter is the population ceiling; the maximum Veteran roll is 1.5x it.
+        double firstSagaMaximum = firstSagaMaximumReference();
+        if (Double.isFinite(firstSagaMaximum) && firstSagaMaximum > 0.0D
+                && questReference < firstSagaMaximum) {
+            reference = Math.min(reference, (firstSagaMaximum / divisor) * 1.5D);
+        }
         // The weakest possible Rookie roll must still represent the baseline living fighter:
         // 20 HP plus at least 1 Melee, 1 Ki and 1 Defense (23 effective reference).
         double minimumEffective = FighterPowerStatScaler.minimumEffectiveBudget();
         reference = Math.max(minimumEffective / MINIMUM_ROOKIE_FACTOR, reference);
         return Math.max(minimumEffective, reference * rollReferenceFactor(rank, random));
+    }
+
+    private static double firstSagaMaximumReference() {
+        Saga first = WorldEraProgression.initialSaga();
+        if (first == null) return -1.0D;
+        double strongest = -1.0D;
+        for (Quest quest : first.getQuests()) {
+            double value = referenceForQuest(quest);
+            if (Double.isFinite(value) && value > strongest) strongest = value;
+        }
+        return strongest;
+    }
+
+    /** Rebuilds the anchor directly from the player's completed quest data, avoiding stale or
+     * missing cached references when custom saga files are reloaded. */
+    private static double strongestCompletedQuestReference(ServerPlayer player) {
+        if (player == null) return -1.0D;
+        var quests = player.getCapability(StatsCapability.INSTANCE)
+                .map(stats -> stats.getPlayerQuestData()).orElse(null);
+        if (quests == null) return -1.0D;
+        double strongest = -1.0D;
+        for (Saga saga : QuestRegistry.getAllSagas().values()) {
+            if (WorldEraProgression.isMovies(saga)) continue;
+            for (Quest quest : saga.getQuests()) {
+                if (!quests.isQuestCompleted(com.dragonminez.common.quest.PlayerQuestData.sagaQuestKey(
+                        saga.getId(), quest.getId()))) continue;
+                double value = referenceForQuest(quest);
+                if (Double.isFinite(value) && value > strongest) strongest = value;
+            }
+        }
+        return strongest;
     }
 
     private static double playerDifficultyMultiplier(ServerPlayer player) {

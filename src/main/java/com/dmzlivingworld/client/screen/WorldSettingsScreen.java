@@ -1087,7 +1087,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     private void changeAdvanced(int r,int d){if(r==6)canMeditationProcSkillProgression=d>0;else if(r==8)treatRaceBlacklistAsWhitelist=d>0;
         else if(r==11)treatDimensionWhitelistAsBlacklist=d>0;else if(!isTextRow(6,r))setAdvancedNumeric(r,advancedNumericValue(r)+d*(r>=15?.01D:r==3?.01D:r==2?.1D:r==5?.01D:1D));}
     private void setAdvancedNumeric(int r,double v){if(r>=15)archetypeShares[r-15]=clamp(v,0D,10D);else switch(r){case 0->maxRememberedDeadFighters=clamp((int)Math.round(v),0,4096);
-        case 1->npcDespawnProtectionRadius=clamp((int)Math.round(v),96,4096);case 2->levelMultiplierPerSaga=clamp(v,.1D,1000D);
+        case 1->npcDespawnProtectionRadius=clamp((int)Math.round(v),96,4096);case 2->levelMultiplierPerSaga=clamp(v,0D,1000D);
         case 3->maxDefenseMitigation=clamp(v,0D,.99D);case 4->bpVisualMultiplier=clamp(v,0D,1_000_000D);case 5->npcPowerMultiplier=clamp(v,0D,1_000_000D);case 13->npcCombatLives=clamp((int)Math.round(v),1,100);case 14->racialSkillMinimumEra=clamp((int)Math.round(v),0,10000);default->{}}}
     private void commitAdvanced(int r,String raw){if(r==7)npcRaceBlacklist=raw;else if(r==9)canUseClothes=raw;else if(r==10)dimensionWhitelist=raw;else if(r==12)companionDimensionBlacklist=raw;
         else setAdvancedNumeric(r,r == 5 ? Double.parseDouble(raw) / 100.0D : Double.parseDouble(raw));}

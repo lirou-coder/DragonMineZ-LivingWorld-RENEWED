@@ -159,9 +159,10 @@ public final class LivingWorldConfig {
                         "Changing it does not rewrite the current BP of fighters who already exist and never directly matches NPC BP to the player.")
                 .defineInRange("npcStrengthPercent", 100, 25, 1000);
         LEVEL_MULTIPLIER_PER_SAGA = builder.comment(
-                        "Effective stat budget per required level of the final quest in the current saga.",
-                        "Used from the Saiyan saga onward; default: required level x 5.")
-                .defineInRange("levelMultiplierPerSaga", 5.0D, 0.1D, 1000.0D);
+                        "Amount added to the Reference divisor for each completed saga.",
+                        "With a positive value, the divisor is 1 + completed sagas times this value.",
+                        "Zero disables saga divisor growth and restores the native divisor 2. Default: 1.5.")
+                .defineInRange("levelMultiplierPerSaga", 1.5D, 0.0D, 1000.0D);
         MAX_DEFENSE_MITIGATION = builder.comment(
                         "Maximum fraction of one incoming hit that an NPC's flat Defense can remove.",
                         "0.7 means Defense can absorb at most 70%, so at least 30% always passes through.",
@@ -201,26 +202,26 @@ public final class LivingWorldConfig {
                 "Fraction of the effective stat budget assigned to each real combat attribute.",
                 "0.20 means 20%. Values are intentionally not normalized, so their sum may be below or above 1.0.",
                 "Health share is added above the vanilla 20 HP baseline.");
-        BRAWLER_MELEE_SHARE = share(builder, "brawlerMelee", .20D);
-        BRAWLER_DEFENSE_SHARE = share(builder, "brawlerDefense", .10D);
-        BRAWLER_KI_SHARE = share(builder, "brawlerKi", .06D);
-        BRAWLER_HEALTH_SHARE = share(builder, "brawlerHealth", .64D);
-        MARTIAL_ARTIST_MELEE_SHARE = share(builder, "martialArtistMelee", .17D);
-        MARTIAL_ARTIST_DEFENSE_SHARE = share(builder, "martialArtistDefense", .14D);
-        MARTIAL_ARTIST_KI_SHARE = share(builder, "martialArtistKi", .17D);
-        MARTIAL_ARTIST_HEALTH_SHARE = share(builder, "martialArtistHealth", .52D);
-        SPEED_FIGHTER_MELEE_SHARE = share(builder, "speedFighterMelee", .15D);
-        SPEED_FIGHTER_DEFENSE_SHARE = share(builder, "speedFighterDefense", .08D);
-        SPEED_FIGHTER_KI_SHARE = share(builder, "speedFighterKi", .15D);
-        SPEED_FIGHTER_HEALTH_SHARE = share(builder, "speedFighterHealth", .62D);
-        GUARDIAN_MELEE_SHARE = share(builder, "guardianMelee", .10D);
-        GUARDIAN_DEFENSE_SHARE = share(builder, "guardianDefense", .20D);
-        GUARDIAN_KI_SHARE = share(builder, "guardianKi", .10D);
-        GUARDIAN_HEALTH_SHARE = share(builder, "guardianHealth", .60D);
-        KI_SPECIALIST_MELEE_SHARE = share(builder, "kiSpecialistMelee", .06D);
-        KI_SPECIALIST_DEFENSE_SHARE = share(builder, "kiSpecialistDefense", .10D);
-        KI_SPECIALIST_KI_SHARE = share(builder, "kiSpecialistKi", .20D);
-        KI_SPECIALIST_HEALTH_SHARE = share(builder, "kiSpecialistHealth", .64D);
+        BRAWLER_MELEE_SHARE = share(builder, "brawlerMelee", .40D);
+        BRAWLER_DEFENSE_SHARE = share(builder, "brawlerDefense", .20D);
+        BRAWLER_KI_SHARE = share(builder, "brawlerKi", .20D);
+        BRAWLER_HEALTH_SHARE = share(builder, "brawlerHealth", .20D);
+        MARTIAL_ARTIST_MELEE_SHARE = share(builder, "martialArtistMelee", .275D);
+        MARTIAL_ARTIST_DEFENSE_SHARE = share(builder, "martialArtistDefense", .25D);
+        MARTIAL_ARTIST_KI_SHARE = share(builder, "martialArtistKi", .275D);
+        MARTIAL_ARTIST_HEALTH_SHARE = share(builder, "martialArtistHealth", .20D);
+        SPEED_FIGHTER_MELEE_SHARE = share(builder, "speedFighterMelee", .25D);
+        SPEED_FIGHTER_DEFENSE_SHARE = share(builder, "speedFighterDefense", .25D);
+        SPEED_FIGHTER_KI_SHARE = share(builder, "speedFighterKi", .25D);
+        SPEED_FIGHTER_HEALTH_SHARE = share(builder, "speedFighterHealth", .25D);
+        GUARDIAN_MELEE_SHARE = share(builder, "guardianMelee", .20D);
+        GUARDIAN_DEFENSE_SHARE = share(builder, "guardianDefense", .30D);
+        GUARDIAN_KI_SHARE = share(builder, "guardianKi", .20D);
+        GUARDIAN_HEALTH_SHARE = share(builder, "guardianHealth", .30D);
+        KI_SPECIALIST_MELEE_SHARE = share(builder, "kiSpecialistMelee", .20D);
+        KI_SPECIALIST_DEFENSE_SHARE = share(builder, "kiSpecialistDefense", .20D);
+        KI_SPECIALIST_KI_SHARE = share(builder, "kiSpecialistKi", .40D);
+        KI_SPECIALIST_HEALTH_SHARE = share(builder, "kiSpecialistHealth", .20D);
         builder.pop();
         NPC_GROWTH_PERCENT = builder.comment(
                         "Living World fighter earned growth speed.",
@@ -452,7 +453,7 @@ public final class LivingWorldConfig {
         NPC_KI_MODE.set(clamp(value.npcKiMode(), 0, 3));
         MAX_REMEMBERED_DEAD_FIGHTERS.set(clamp(value.maxRememberedDeadFighters(), 0, 4096));
         NPC_DESPAWN_PROTECTION_RADIUS.set(clamp(value.npcDespawnProtectionRadius(), 96, 4096));
-        LEVEL_MULTIPLIER_PER_SAGA.set(clamp(value.levelMultiplierPerSaga(), .1D, 1000D));
+        LEVEL_MULTIPLIER_PER_SAGA.set(clamp(value.levelMultiplierPerSaga(), 0D, 1000D));
         MAX_DEFENSE_MITIGATION.set(clamp(value.maxDefenseMitigation(), 0D, .99D));
         BP_VISUAL_MULTIPLIER.set(clamp(value.bpVisualMultiplier(), 0D, 1_000_000D));
         NPC_POWER_MULTIPLIER.set(clamp(value.npcPowerMultiplier(), 0D, 1_000_000D));
