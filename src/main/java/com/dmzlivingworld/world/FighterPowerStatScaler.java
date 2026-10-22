@@ -38,11 +38,13 @@ public final class FighterPowerStatScaler {
 
     public static double baseHealth(AmbientFighterEntity fighter, double livedMultiplier) {
         double lived = Math.min(1.22D, 1.0D + (Math.max(1.0D, livedMultiplier) - 1.0D) * 0.55D);
+        // HP is intentionally doubled by the Living World archetype model. Keep the stable
+        // value only as a temporary-form safeguard; never let an old transformed maximum leak
+        // into the normal base profile, otherwise a fighter can retain tens of thousands of HP
+        // while melee/ki/defense have already returned to their ordinary shares.
         double calculated = 20.0D + healthShare(fighter) * effectiveStatBudget(fighter) * 2.0D * lived;
-        double stable = fighter.getLegacyData().getDouble(STABLE_MAX_HEALTH);
-        double result = Math.max(calculated, Double.isFinite(stable) ? stable : 0.0D);
-        fighter.getLegacyData().putDouble(STABLE_MAX_HEALTH, result);
-        return result;
+        fighter.getLegacyData().putDouble(STABLE_MAX_HEALTH, calculated);
+        return calculated;
     }
 
     /** A temporary powered state may raise max HP, but exhaustion must never take it away. */

@@ -10,6 +10,7 @@ import com.dragonminez.common.stats.StatsCapability;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.CommandEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -28,6 +29,7 @@ public final class WorldEraProgression {
     @SubscribeEvent
     public static void onQuestCompleted(DMZEvent.QuestCompletedEvent event) {
         if (event.getPlayer() == null || !(event.getPlayer().level() instanceof ServerLevel level)) return;
+        refreshPlayerReference(event.getPlayer());
         Saga saga = event.getSaga();
         Quest quest = event.getQuest();
         if (quest != null) {
@@ -52,7 +54,49 @@ public final class WorldEraProgression {
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)
                 || !(player.level() instanceof ServerLevel level)) return;
+        refreshPlayerReference(player);
         redefineFromCurrentPlayers(level.getServer().getPlayerList().getPlayers(), WorldEraData.get(level));
+    }
+
+    @SubscribeEvent
+    public static void onSpawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)
+            refreshPlayerReference(player);
+    }
+
+    @SubscribeEvent
+    public static void onDimensionChange(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)
+            refreshPlayerReference(player);
+    }
+
+    /** Rebuilds the cached quest anchor immediately after external DMZ state mutations. */
+    public static void refreshPlayerReference(net.minecraft.server.level.ServerPlayer player) {
+        if (player == null) return;
+        double strongest = -1.0D;
+        PlayerQuestData quests = player.getCapability(StatsCapability.INSTANCE)
+                .map(stats -> stats.getPlayerQuestData()).orElse(null);
+        if (quests != null) {
+            for (Saga saga : QuestRegistry.getAllSagas().values()) {
+                if (isMovies(saga)) continue;
+                for (Quest quest : saga.getQuests()) {
+                    if (!quests.isQuestCompleted(PlayerQuestData.sagaQuestKey(saga.getId(), quest.getId()))) continue;
+                    double value = WorldPowerScaler.referenceForQuest(quest);
+                    if (Double.isFinite(value) && value > strongest) strongest = value;
+                }
+            }
+        }
+        if (strongest > 0.0D) player.getPersistentData().putDouble("LWQuestReference", strongest);
+        else player.getPersistentData().remove("LWQuestReference");
+        QUEST_STATE_SIGNATURES.put(player.getUUID(), quests == null ? 0 : quests.getCompletedQuestIds().hashCode());
+    }
+
+    @SubscribeEvent
+    public static void onDmzQuestCommand(CommandEvent event) {
+        String input = event.getParseResults().getReader().getString();
+        if (input == null || !input.trim().toLowerCase(java.util.Locale.ROOT).startsWith("dmzquest")) return;
+        if (event.getParseResults().getContext().getSource().getEntity()
+                instanceof net.minecraft.server.level.ServerPlayer player) refreshPlayerReference(player);
     }
 
     /**
@@ -71,6 +115,7 @@ public final class WorldEraProgression {
                     .map(stats -> stats.getPlayerQuestData()).orElse(null);
             int signature = quests == null ? 0 : quests.getCompletedQuestIds().hashCode();
             Integer previous = QUEST_STATE_SIGNATURES.put(player.getUUID(), signature);
+            if (previous == null || previous != signature) refreshPlayerReference(player);
             if (previous == null || previous != signature) changed = true;
         }
         QUEST_STATE_SIGNATURES.keySet().removeIf(id -> event.getServer().getPlayerList().getPlayer(id) == null);

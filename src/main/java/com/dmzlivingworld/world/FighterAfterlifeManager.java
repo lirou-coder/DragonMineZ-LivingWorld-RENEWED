@@ -6,7 +6,6 @@ import com.dmzlivingworld.entity.FighterAlignment;
 import com.dmzlivingworld.entity.LWEntities;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -24,11 +23,9 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.lang.reflect.Method;
 import java.util.*;
 
 /** Persistent distinction between dead fighters and people permanently removed by assimilation. */
@@ -38,11 +35,13 @@ public final class FighterAfterlifeManager {
     private static final long RECOVERY_DELAY_TICKS = 20L * 15L;
     private static final long SOUL_RECOVERY_DELAY_TICKS = 20L * 5L;
     private static final String SOUL_RECOVERY_AT = "LWDeadSoulRecoveryAt";
-    private static final ResourceKey<Level> OTHERWORLD = ResourceKey.create(Registries.DIMENSION,
+    /* Build the registry key directly.  This avoids linking against the
+       remapped Registries.DIMENSION field, which is not present under the
+       production 2.2 runtime names and caused a NoSuchFieldError during
+       class initialization. */
+    private static final ResourceKey<Level> OTHERWORLD = ResourceKey.create(
+            ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath("minecraft", "dimension")),
             ResourceLocation.fromNamespaceAndPath("dragonminez", "otherworld"));
-    private static final ResourceKey<Level> NETHER = Level.NETHER;
-    private static volatile Method dmzPlusHellMethod;
-    private static volatile boolean dmzPlusHellLookupComplete;
 
     private FighterAfterlifeManager() {}
 
@@ -132,7 +131,6 @@ public final class FighterAfterlifeManager {
         Data data = Data.get(server.overworld());
         restoreRecovering(server, data);
         for (UUID forgotten : data.trimDead()) discardSoul(server, forgotten);
-        boolean hellEnabled = dmzPlusHellEnabled();
         SoulSnapshot souls = scanSouls(server);
         restoreDefeatedSouls(server);
 
@@ -143,11 +141,13 @@ public final class FighterAfterlifeManager {
                 if (souls.visibleGood >= 5) continue;
                 if (ensureGoodSoul(server, entry, souls)) souls.visibleGood++;
             }
-        }
-
-        if (hellEnabled) {
-            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-                tryNaturalHellOpportunity(player, data, souls);
+            // Evil/neutral dead fighters no longer use DMZ Plus' Hell module. They are
+            // represented in the Otherworld as subterranean souls, always below Y=90.
+            for (CompoundTag entry : List.copyOf(data.dead.values())) {
+                FighterAlignment alignment = FighterAlignment.byId(entry.getInt("Alignment"));
+                if (alignment == FighterAlignment.GOOD || isWorldMenaceRecord(entry)) continue;
+                if (souls.visibleOtherworld >= 5) break;
+                if (ensureSubterraneanSoul(server, entry, souls)) souls.visibleOtherworld++;
             }
         }
     }
@@ -229,68 +229,26 @@ public final class FighterAfterlifeManager {
         return true;
     }
 
-    private static void tryNaturalHellOpportunity(ServerPlayer player, Data data, SoulSnapshot souls) {
-        if (player == null || player.isSpectator() || player.isCreative()
-                || !(player.level() instanceof ServerLevel level) || !level.dimension().equals(NETHER)) return;
-
-        int checkInterval = LivingWorldConfig.naturalCheckIntervalTicks();
-        long gameTime = level.getGameTime();
-        int stagger = Math.floorMod(player.getUUID().hashCode(), checkInterval);
-        if (Math.floorMod(gameTime + stagger, checkInterval) != 0) return;
-
-        int attempts = LivingWorldConfig.naturalActivityAttempts();
-        if (attempts <= 0) return;
-        RandomSource random = player.getRandom();
-        for (int opportunity = 0; opportunity < attempts; opportunity++) {
-            if (random.nextDouble() >= LivingWorldConfig.naturalSpawnRoll()) continue;
-            if (trySpawnHellSoulNearPlayer(player, level, data, souls, random)) return;
-        }
-    }
-
-    private static boolean trySpawnHellSoulNearPlayer(ServerPlayer player, ServerLevel level, Data data,
-                                                      SoulSnapshot souls, RandomSource random) {
-        int localCap = LivingWorldConfig.nearbyFighterCap();
-        int hostileCap = LivingWorldConfig.nearbyHostileCap();
-        if (localCap <= 0 || hostileCap <= 0) return false;
-
-        List<AmbientFighterEntity> nearby = level.getEntitiesOfClass(
-                AmbientFighterEntity.class,
-                player.getBoundingBox().inflate(160.0D, 512.0D, 160.0D)
-        );
-        if (nearby.size() >= localCap) return false;
-        long nearbyHostile = nearby.stream().filter(f -> f.getAlignment() == FighterAlignment.BAD).count();
-        if (nearbyHostile >= hostileCap) return false;
-
-        List<CompoundTag> candidates = data.dead.values().stream()
-                .filter(entry -> !isWorldMenaceRecord(entry))
-                .filter(FighterAfterlifeManager::isWantedRecord)
-                .filter(entry -> entry.hasUUID("Id") && !souls.ids(level).contains(entry.getUUID("Id")))
-                .toList();
-        if (candidates.isEmpty()) return false;
-
-        CompoundTag entry = candidates.get(random.nextInt(candidates.size()));
-        BlockPos pos = AmbientFighterSpawner.findSafeGroundAroundSeparated(
-                level, player.blockPosition(), random, 38, 72, 28, 16.0D);
-        if (pos == null) return false;
-
+    private static boolean ensureSubterraneanSoul(MinecraftServer server, CompoundTag entry, SoulSnapshot souls) {
+        ServerLevel destination = server.getLevel(OTHERWORLD);
+        if (destination == null || !entry.hasUUID("Id")) return false;
         UUID id = entry.getUUID("Id");
-        if (!level.getEntitiesOfClass(AmbientFighterEntity.class,
-                new AABB(pos.getX(), pos.getY(), pos.getZ(),
-                        pos.getX() + 1.0D, pos.getY() + 2.0D, pos.getZ() + 1.0D)
-                        .inflate(160.0D, 512.0D, 160.0D),
-                f -> f.isDeadSoul() && f.getPersistentData().hasUUID("LWAfterlifeRecord")
-                        && id.equals(f.getPersistentData().getUUID("LWAfterlifeRecord"))).isEmpty()) return false;
-
-        AmbientFighterEntity soul = LWEntities.AMBIENT_FIGHTER.get().create(level);
+        if (souls.ids(destination).contains(id)) return false;
+        AmbientFighterEntity soul = LWEntities.AMBIENT_FIGHTER.get().create(destination);
         if (soul == null) return false;
-        soul.moveTo(pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D, random.nextFloat() * 360F, 0F);
+        RandomSource random = destination.getRandom();
+        BlockPos center = destination.getSharedSpawnPos();
+        BlockPos at = AmbientFighterSpawner.findSafeGroundAroundSeparated(destination, center, random,
+                20, 89, 96, 16.0D);
+        if (at == null || at.getY() >= 90) return false;
         soul.initializeFromMemory(entry.getCompound("Profile"));
+        soul.moveTo(at.getX() + .5D, at.getY(), at.getZ() + .5D, random.nextFloat() * 360F, 0F);
         soul.setDeadSoul(true);
         soul.getPersistentData().putUUID("LWAfterlifeRecord", id);
+        soul.getPersistentData().putBoolean("LWSubterraneanAfterlife", true);
         soul.setPersistenceRequired();
-        if (!level.noCollision(soul)) return false;
-        if (!level.addFreshEntity(soul)) return false;
-        souls.ids(level).add(id);
+        if (!destination.noCollision(soul) || !destination.addFreshEntity(soul)) return false;
+        souls.ids(destination).add(id);
         return true;
     }
 
@@ -304,7 +262,10 @@ public final class FighterAfterlifeManager {
                         fighter.discard();
                         continue;
                     }
-                    if (level.dimension().equals(OTHERWORLD)) snapshot.visibleGood++;
+                    if (level.dimension().equals(OTHERWORLD)) {
+                        if (fighter.getAlignment() == FighterAlignment.GOOD) snapshot.visibleGood++;
+                        else snapshot.visibleOtherworld++;
+                    }
                     if (fighter.getPersistentData().hasUUID("LWAfterlifeRecord"))
                         ids.add(fighter.getPersistentData().getUUID("LWAfterlifeRecord"));
                 }
@@ -318,46 +279,16 @@ public final class FighterAfterlifeManager {
         return snapshot;
     }
 
-    private static boolean dmzPlusHellEnabled() {
-        if (!ModList.get().isLoaded("dmzplus")) return false;
-        try {
-            Method method = dmzPlusHellMethod();
-            return method != null && Boolean.TRUE.equals(method.invoke(null));
-        } catch (ReflectiveOperationException ignored) { return false; }
-    }
-
     public static boolean canUseNetherHell(AmbientFighterEntity fighter, ResourceKey<Level> dimension) {
-        return fighter != null
-                && dimension != null
-                && dimension.equals(NETHER)
-                && fighter.isDeadSoul()
-                && fighter.isWanted()
-                && dmzPlusHellEnabled();
+        // Kept as a compatibility API for callers from older builds; Hell is no longer used.
+        return false;
     }
 
     /** True when a dead-soul projection is standing in the afterlife assigned to it. */
     public static boolean isProperAfterlifeDimension(AmbientFighterEntity fighter) {
         if (fighter == null || !fighter.isDeadSoul()) return false;
         ResourceKey<Level> dimension = fighter.level().dimension();
-        if (dimension.equals(OTHERWORLD)) return fighter.getAlignment() == FighterAlignment.GOOD;
-        return canUseNetherHell(fighter, dimension);
-    }
-
-    private static Method dmzPlusHellMethod() {
-        if (!dmzPlusHellLookupComplete) {
-            synchronized (FighterAfterlifeManager.class) {
-                if (!dmzPlusHellLookupComplete) {
-                    try {
-                        dmzPlusHellMethod = Class.forName("com.kiziro.dmzplus.config.DMZPlusConfig")
-                                .getMethod("hellEnabled");
-                    } catch (ReflectiveOperationException ignored) {
-                        dmzPlusHellMethod = null;
-                    }
-                    dmzPlusHellLookupComplete = true;
-                }
-            }
-        }
-        return dmzPlusHellMethod;
+        return dimension.equals(OTHERWORLD);
     }
 
     private static UUID recordId(AmbientFighterEntity fighter) {
@@ -467,6 +398,7 @@ public final class FighterAfterlifeManager {
     private static final class SoulSnapshot {
         private final Map<ResourceKey<Level>, Set<UUID>> idsByDimension = new HashMap<>();
         private int visibleGood;
+        private int visibleOtherworld;
         private BlockPos kaiosama;
 
         private Set<UUID> ids(ServerLevel level) {

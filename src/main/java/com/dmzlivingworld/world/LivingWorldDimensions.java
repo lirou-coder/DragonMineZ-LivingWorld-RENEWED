@@ -2,7 +2,6 @@ package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.config.LivingWorldConfig;
 
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -12,7 +11,8 @@ import net.minecraft.world.level.Level;
 /** Exact DMZ 2.1.3 world keys Living World intentionally supports. */
 public final class LivingWorldDimensions {
     public static final ResourceKey<Level> NAMEK = ResourceKey.create(
-            Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath("dragonminez", "namek"));
+            ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath("minecraft", "dimension")),
+            ResourceLocation.fromNamespaceAndPath("dragonminez", "namek"));
 
     private LivingWorldDimensions() {}
 

@@ -61,8 +61,15 @@ public final class WorldPowerScaler {
                                             FighterRank rank, RandomSource random) {
         double questReference = player == null ? initialAvailableReference()
                 : strongestCompletedQuestReference(player);
-        if (player != null && (!Double.isFinite(questReference) || questReference <= 0.0D))
-            questReference = player.getPersistentData().getDouble("LWQuestReference");
+        if (player != null) {
+            // The capability is authoritative, but commands/addons can update its
+            // quest map one tick before the registry snapshot is visible to this
+            // scanner. Keep the refreshed per-player anchor as a safety net instead
+            // of replacing it with the tiny tutorial fallback during that window.
+            double cachedReference = player.getPersistentData().getDouble("LWQuestReference");
+            if (Double.isFinite(cachedReference) && cachedReference > questReference)
+                questReference = cachedReference;
+        }
         if (!Double.isFinite(questReference) || questReference <= 0.0D)
             questReference = initialAvailableReference();
         int completedSagas = WorldEraProgression.completedSagaCount(player);
@@ -160,7 +167,7 @@ public final class WorldPowerScaler {
                 int objectiveStep = -1;
                 for (; objectiveIndex != objectiveEnd; objectiveIndex += objectiveStep) {
                     if (!(quest.getObjectives().get(objectiveIndex) instanceof KillObjective kill)
-                            || kill.getSpawnMode() != KillObjective.SpawnMode.QUEST) continue;
+                            || !isQuestSpawnCombatObjective(kill)) continue;
                     double reference = killReference(kill);
                     if (Double.isFinite(reference) && reference > 0.0D) return reference;
                 }
@@ -181,7 +188,7 @@ public final class WorldPowerScaler {
                 boolean foundKillQuest = false;
                 for (var objective : quest.getObjectives()) {
                     if (!(objective instanceof KillObjective kill)
-                            || kill.getSpawnMode() != KillObjective.SpawnMode.QUEST) continue;
+                            || !isQuestSpawnCombatObjective(kill)) continue;
                     foundKillQuest = true;
                     double reference = killReference(kill);
                     if (reference > 0.0D) weakest = Math.min(weakest, reference);
@@ -200,16 +207,24 @@ public final class WorldPowerScaler {
             List<?> objectives = saga.getQuests().get(q).getObjectives();
             for (int o = objectives.size() - 1; o >= 0; o--) {
                 if (objectives.get(o) instanceof KillObjective kill
-                        && kill.getSpawnMode() == KillObjective.SpawnMode.QUEST) return killReference(kill);
+                        && isQuestSpawnCombatObjective(kill)) {
+                    double reference = killReference(kill);
+                    if (Double.isFinite(reference) && reference > 0.0D) return reference;
+                }
             }
         }
         return -1.0D;
     }
 
     private static double killReference(KillObjective kill) {
+        if (!isQuestSpawnCombatObjective(kill)) return -1.0D;
         double hp = Math.max(0.0D, kill.getHealth());
         double melee = Math.max(0.0D, kill.getMeleeDamage());
         double ki = Math.max(0.0D, kill.getKiDamage());
+        // A quest target is usable as a world anchor only when all three base
+        // combat values are authored. This avoids treating partially configured
+        // KILL/SPAR objectives as very weak anchors.
+        if (!(hp > 0.0D && melee > 0.0D && ki > 0.0D)) return -1.0D;
         double reference = hp / 2.0D + melee + ki;
         if (ModList.get().isLoaded("dmzrevamp")) reference += revampDefense(kill);
         return Double.isFinite(reference) ? reference : -1.0D;
@@ -220,12 +235,22 @@ public final class WorldPowerScaler {
         if (quest == null) return -1.0D;
         double strongest = -1.0D;
         for (var objective : quest.getObjectives()) {
-            if (objective instanceof KillObjective kill) {
+            if (objective instanceof KillObjective kill && isQuestSpawnCombatObjective(kill)) {
                 double value = killReference(kill);
                 if (Double.isFinite(value) && value > strongest) strongest = value;
             }
         }
         return strongest;
+    }
+
+    /**
+     * DMZ 2.2 represents both KILL and SPAR objectives as KillObjective
+     * subclasses (SparObjective extends KillObjective). Keeping this check at
+     * the common superclass means every mission type that actually spawns a
+     * configured QUEST entity is included, while non-quest/world spawns are not.
+     */
+    private static boolean isQuestSpawnCombatObjective(KillObjective objective) {
+        return objective != null && objective.getSpawnMode() == KillObjective.SpawnMode.QUEST;
     }
 
     /** Overhaul injects this accessor into KillObjective; reflection keeps the dependency optional. */

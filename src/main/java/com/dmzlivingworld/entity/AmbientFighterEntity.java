@@ -690,6 +690,17 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     public void initializeAs(FighterAlignment alignment, FighterRank rank, FighterPersonality personality,
                              FighterRace race, FighterArchetype archetype, ServerPlayer progressionPlayer) {
         RandomSource random = getRandom();
+        // Every newly created fighter must use the progression of the player it is
+        // being spawned for.  Several encounter/compatibility paths call the
+        // lower-level spawner overload without passing that context; previously
+        // those entities silently fell back to the tiny global/tutorial anchor.
+        // Resolve the nearest active player here as a final safety net.
+        if (progressionPlayer == null && level() instanceof ServerLevel server) {
+            progressionPlayer = server.players().stream()
+                    .filter(candidate -> !candidate.isSpectator())
+                    .min(java.util.Comparator.comparingDouble(this::distanceToSqr))
+                    .orElse(null);
+        }
         // Keep the progression context that authored this naturally spawned person. Arsenal
         // initialization runs on the following server tick, when the spawning player may no
         // longer be the nearest player (or even remain online).
@@ -717,6 +728,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         // Replacing this tag after the calculation erased LWEffectiveStats and made command-spawned
         // fighters reconstruct their entire profile from DMZ's still-default BP of 1.
         legacyData = new CompoundTag();
+        // A newly materialized fighter must never inherit a persisted transformed HP ceiling.
+        // The base profile is rebuilt from its current effective budget below.
+        legacyData.remove("LWStableMaxHealth");
         if (level() instanceof ServerLevel server) {
             double effective = WorldPowerScaler.rollEffectiveStats(server, progressionPlayer, rank, random);
             FighterPowerStatScaler.setEffectiveStatBudget(this, effective);
@@ -826,6 +840,18 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         setLightning(false);
         combatConfigured = false;
         configureCombatProfile(true);
+        // The Overhaul calculator reads the entity's real attributes.  The old
+        // order calculated BP before configureCombatProfile() had applied the
+        // effective budget, leaving faction/encounter spawns with BP 1; their
+        // subsequent power adjustment then permanently collapsed the budget.
+        if (level() instanceof ServerLevel) {
+            long calculated = Math.max(1L, Math.round(
+                    FighterPowerStatScaler.battlePowerForStats(this,
+                            FighterPowerStatScaler.currentTotalStats(this))));
+            legacyData.putLong(PERMANENT_BATTLE_POWER, calculated);
+            setBattlePower((int)Math.min(Integer.MAX_VALUE - 1L, calculated));
+            combatStatsPower = getBattlePower();
+        }
     }
 
     @Override
@@ -915,6 +941,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         }
 
         super.aiStep();
+        enforceSubterraneanAfterlifeLimit();
         if (!level().isClientSide && postSparPeaceTicks > 0) {
             enforcePostSparPeace();
             if (postSparIncomingGraceTicks > 0) postSparIncomingGraceTicks--;
@@ -1196,6 +1223,19 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         faceFlightMovement();
     }
 
+    /** Dead evil/neutral souls are permanently subterranean in the Otherworld. */
+    private void enforceSubterraneanAfterlifeLimit() {
+        if (level().isClientSide || !getPersistentData().getBoolean("LWSubterraneanAfterlife")) return;
+        if (!level().dimension().location().toString().equals("dragonminez:otherworld")) return;
+        if (getY() < 90.0D) return;
+        setPos(getX(), 89.9D, getZ());
+        Vec3 motion = getDeltaMovement();
+        setDeltaMovement(motion.x, Math.min(0.0D, motion.y), motion.z);
+        setFlying(false);
+        setFlyingFast(false);
+        setNoGravity(false);
+    }
+
     /**
      * Last-resort ownership reconciliation for DMZ's flying/noGravity pair. Individual systems still
      * own their normal landing logic; this only cleans a state that nobody can currently justify.
@@ -1203,6 +1243,12 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
      */
     private void reconcileFlightOwnership() {
         if (level().isClientSide || !isAlive()) return;
+        if (getPersistentData().getBoolean("LWSubterraneanAfterlife")) {
+            setFlying(false);
+            setFlyingFast(false);
+            setNoGravity(false);
+            return;
+        }
         boolean ownsFlight = getTarget() != null || isRetreating() || isAwakening()
                 || isMeditating() || isPreparingMeditation()
                 || isAmbientFlightActivity() || isIdleFlightTravelling()
@@ -1633,6 +1679,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     private void configureCombatProfile(boolean refillHealth) {
         FighterRank rank = getRank();
+        // Rebuild the base profile from the current effective budget. A stale health ceiling
+        // from an older transformed/profiled state must not survive a fresh summon.
+        getLegacyData().remove("LWStableMaxHealth");
         setAiTierById(rank.aiTier());
         setCanFly(hasFlightUnlocked() && !isNonCombatant());
         if (!hasFlightUnlocked() || isNonCombatant()) { setFlying(false); setFlyingFast(false); setNoGravity(false); }

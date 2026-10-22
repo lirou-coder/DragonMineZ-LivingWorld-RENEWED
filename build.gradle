@@ -74,7 +74,7 @@ minecraft {
             // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
             property 'forge.logging.console.level', 'debug'
 
-            // DragonMineZ 2.1.3 ships a production Mixin refmap containing SRG
+            // DragonMineZ 2.2 ships a production Mixin refmap containing SRG
             // member names. In a ForgeGradle userdev client Minecraft is mapped
             // to Mojang names, so Mixin must remap dependency refmaps at runtime.
             property 'mixin.env.remapRefMap', 'true'
@@ -137,7 +137,7 @@ dependencies {
 
     // Compile against the adjacent DMZ 2.2 source build while it is under development. Packaged
     // releases still declare DMZ as an external required dependency and never embed this jar.
-    implementation fg.deobf("local:dragonminez:2.2-alpha-slim")
+    implementation fg.deobf("local:dragonminez:2.2")
     implementation fg.deobf("curse.maven:geckolib-388172:8285794")
     implementation fg.deobf("curse.maven:curios-309927:6418456")
     implementation fg.deobf("curse.maven:terrablender-563928:6290448")

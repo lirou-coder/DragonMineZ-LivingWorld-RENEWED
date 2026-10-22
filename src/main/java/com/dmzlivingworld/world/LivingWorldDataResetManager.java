@@ -27,6 +27,10 @@ public final class LivingWorldDataResetManager {
             persistent.remove("LivingWorld");
             persistent.remove("LivingWorldFighters");
             persistent.remove("LWCompanion");
+            // Resetting Living World data must not reset story progression. Rebuild
+            // the player's quest anchor immediately so the next natural spawn uses
+            // the current DMZ quest state rather than the tutorial fallback.
+            WorldEraProgression.refreshPlayerReference(player);
         }
     }
 }
