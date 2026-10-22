@@ -108,10 +108,13 @@ public final class FighterAfterlifeManager {
         Data data = Data.get(level);
         UUID id = recordId(fighter);
         if (data.assimilated.contains(id)) return;
+        fighter.getPersistentData().putBoolean("LWHasDied", true);
+        CompoundTag profile = fighter.writeMemoryProfile();
+        profile.putBoolean("HasDied", true);
         CompoundTag entry = new CompoundTag();
         entry.putUUID("Id", id);
         entry.putInt("Alignment", fighter.getAlignment().id());
-        entry.put("Profile", fighter.writeMemoryProfile());
+        entry.put("Profile", profile);
         data.dead.put(id, entry);
         data.trimDead();
         data.setDirty();

@@ -87,6 +87,15 @@ public final class FighterCombatDirector {
     public static void configure(AmbientFighterEntity fighter) {
         fighter.getSkillPool().clear();
 
+        // Ki is an uncommon combat specialty for ambient fighters. Persist the
+        // roll so later reconfiguration (training, reloads or form changes) does
+        // not silently reroll the fighter's identity.
+        boolean hasKi = WorldMenaceManager.isHerobrine(fighter)
+                || (fighter.getPersistentData().contains("LWHasKiAttack")
+                ? fighter.getPersistentData().getBoolean("LWHasKiAttack")
+                : fighter.getRandom().nextFloat() < 0.10F);
+        fighter.getPersistentData().putBoolean("LWHasKiAttack", hasKi);
+
         FighterRank rank = fighter.getRank();
         FighterArchetype style = fighter.getArchetype();
         int variant = combatVariant(fighter);
@@ -151,7 +160,7 @@ public final class FighterCombatDirector {
             }
         }
 
-        if (LivingWorldConfig.npcKiMode() != 2 && fighter.getRace() != com.dmzlivingworld.entity.FighterRace.ZAARAKIN) {
+        if (hasKi && LivingWorldConfig.npcKiMode() != 2 && fighter.getRace() != com.dmzlivingworld.entity.FighterRace.ZAARAKIN) {
             configureKiIdentity(fighter, rank, style, variant);
             configureDmz22Techniques(fighter, rank, style, variant);
             FighterTechniqueManager.applyLearnedTechniques(fighter);

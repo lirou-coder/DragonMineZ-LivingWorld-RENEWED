@@ -773,7 +773,7 @@ public final class DBZMeditation {
         DMZTrainingBridge.FormProgress progress =
             DMZTrainingBridge.gainActiveFormMastery(
                 player,
-                perMinute / 60.0D * gravityMultiplier
+                perMinute / 60.0D * gravityMultiplier * otherworldDeadMultiplier(player)
             );
 
         if (progress.gained() <= 0.0D) {
@@ -1745,7 +1745,13 @@ public final class DBZMeditation {
         if (scale <= 0) return;
         CompoundTag data = player.getPersistentData();
         int progressionUnit = DMZTrainingBridge.getMeditationTpUnit(player);
-        double raw = stageMultiplier * (double)progressionUnit * gravityMultiplier;
+        double otherworldMultiplier = 1.0D;
+        try {
+            otherworldMultiplier = StatsProvider.get(StatsCapability.INSTANCE, player)
+                    .map(stats -> Math.max(1.0D, stats.getTpOtherworldMultiplier()))
+                    .orElse(1.0D);
+        } catch (Throwable ignored) { }
+        double raw = stageMultiplier * (double)progressionUnit * gravityMultiplier * otherworldMultiplier;
         int actualGain = (int)Math.max(1L, Math.min(MAX_SAFE_TP_AWARD, Math.round(raw * scale / 100.0D)));
         data.putInt(TP_CARRY, 0);
         queueTpBridge(player, actualGain);
@@ -1771,6 +1777,16 @@ public final class DBZMeditation {
         try {
             return Math.max(1.0D, 1.0D + bonusGravity
                     * ConfigManager.getServerConfig().getGravity().getMasteryBonusPerGravity());
+        } catch (Throwable ignored) {
+            return 1.0D;
+        }
+    }
+
+    private static double otherworldDeadMultiplier(ServerPlayer player) {
+        try {
+            return StatsProvider.get(StatsCapability.INSTANCE, player)
+                    .map(data -> Math.max(1.0D, data.getTpOtherworldMultiplier()))
+                    .orElse(1.0D);
         } catch (Throwable ignored) {
             return 1.0D;
         }

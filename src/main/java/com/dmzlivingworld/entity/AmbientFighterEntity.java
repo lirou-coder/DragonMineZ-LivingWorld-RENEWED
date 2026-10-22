@@ -1,6 +1,7 @@
 package com.dmzlivingworld.entity;
 
 import com.dmzlivingworld.compat.DmzRevampMobDefenseCompat;
+import com.dmzlivingworld.compat.DmzMasterSafeZoneCompat;
 import com.dragonminez.common.hair.CustomHair;
 import com.dragonminez.common.hair.HairManager;
 import com.dragonminez.common.hair.HairStyleSlot;
@@ -49,6 +50,7 @@ import com.dmzlivingworld.world.FactionRole;
 import com.dmzlivingworld.world.FactionStructure;
 import com.dmzlivingworld.world.FactionWorldData;
 import com.dmzlivingworld.world.WorldFaction;
+import com.dmzlivingworld.world.WorldEraProgression;
 import com.dmzlivingworld.world.WantedManager;
 import com.dmzlivingworld.world.WorldPowerScaler;
 import com.dmzlivingworld.world.WorldEraData;
@@ -138,6 +140,8 @@ import java.util.UUID;
  * chasing, melee, dashing, aerial pursuit and Ki execution stay native to DMZ.
  */
 public class AmbientFighterEntity extends LivingWorldSagasEntity {
+    private static final String PENDING_SPAR_GROWTH = "LWSparPendingGrowthFraction";
+    private static final String PENDING_SPAR_CEILING = "LWSparPendingGrowthCeiling";
     private static final String SAIYAN_TAIL_REGROW_AT = "LWSaiyanTailRegrowAt";
     private static final int SAIYAN_TAIL_REGROW_TICKS = 40 * 60 * 20;
     private static final int DATA_VERSION = 23;
@@ -801,7 +805,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         socialPlayerApproach = false;
         trainingSessions = 0;
         rivalName = "";
-        kaiokenPotential = rollKaiokenPotential(random);
+        // Fresh living fighters never start with Kaioken potential. It is unlocked only by
+        // surviving a definitive death and returning through the afterlife/revival pipeline.
+        kaiokenPotential = false;
         kaiokenTicks = 0;
         kaiokenBasePower = 0;
         partyId = null;
@@ -2019,8 +2025,17 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             return false;
         }
 
+        // A player below the configured story threshold is never selected as a
+        // first target by ambient aggression. Direct attacks, Spar and hurt-by
+        // retaliation still set the target through their explicit paths.
+        if (target instanceof ServerPlayer player
+                && WorldEraProgression.completedSagaCount(player) < LivingWorldConfig.minSagaAggroPlayer()) {
+            return false;
+        }
+
         // Affiliated fighters obey their generated social map before broad alignment.
         if (isFactionMember() && target instanceof ServerPlayer player) {
+            if (WorldEraProgression.completedSagaCount(player) < LivingWorldConfig.minSagaAggroPlayer()) return false;
             return FactionManager.shouldAttackPlayer(this, player);
         }
         if (isFactionMember() && target instanceof AmbientFighterEntity other && other.isFactionMember()) {
@@ -2053,7 +2068,12 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         // that Minecraft (or another mod) marks as an Enemy is therefore a threat that
         // heroes may engage. NEUTRAL and BAD fighters still rely on HurtByTargetGoal
         // and only fight these mobs after being attacked first.
-        if (target instanceof Enemy || target instanceof Monster) return true;
+        if (target instanceof Enemy || target instanceof Monster) {
+            // Quest-spawned enemies belong to the player's authored encounter and
+            // must never be intercepted by an ambient hero.
+            return !target.getPersistentData().contains("dmz_quest_key")
+                    && !target.getPersistentData().contains("dmz_quest_owner");
+        }
 
         ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(target.getType());
         if (key == null) return false;
@@ -2509,6 +2529,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             super.setTarget(null);
             return;
         }
+        if (!level().isClientSide && target instanceof ServerPlayer player
+                && blocksAutomaticPlayerTarget(player)) {
+            super.setTarget(null);
+            return;
+        }
         if (!level().isClientSide && target instanceof AmbientFighterEntity other
                 && !WorldMenaceManager.allowsHerobrineFighterCombat(this, other)) {
             super.setTarget(null);
@@ -2628,6 +2653,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (isRetreatThreat(target)) return false;
         if (target instanceof ServerPlayer player && PlayerCreationSafety.isCreating(player)) return false;
         if (target instanceof ServerPlayer player && PlayerSpawnCombatSafety.blocksTarget(this, player)) return false;
+        if (target instanceof ServerPlayer player && blocksAutomaticPlayerTarget(player)) return false;
         if (!com.dmzlivingworld.world.FactionRequestMissionManager.allowsMissionTarget(this, target)) return false;
         if (isPostSparOpponent(target)) return false;
         if (isDefeated() || isCaptive() || isNonCombatant() || isMeditating()) return false;
@@ -2661,6 +2687,19 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             if (other.getAlignment() == getAlignment() && !isDuelOpponent(other)) return false;
         }
         return super.canAttack(target);
+    }
+
+    /**
+     * Central target gate for player aggression.  Hurt-by retaliation and sanctioned spars are
+     * explicit player-initiated exceptions; every other automatic acquisition obeys the saga
+     * threshold and the DMZ master safe area.
+     */
+    private boolean blocksAutomaticPlayerTarget(ServerPlayer player) {
+        boolean playerInitiated = getLastHurtByMob() == player
+                || (sanctionedMatchParticipant && isSanctionedOpponent(player));
+        if (playerInitiated) return false;
+        if (DmzMasterSafeZoneCompat.isInsideMasterSafeZone(player)) return true;
+        return WorldEraProgression.completedSagaCount(player) < LivingWorldConfig.minSagaAggroPlayer();
     }
 
     private void enforceMinecraftMobCombatGate() {
@@ -3148,7 +3187,13 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     public boolean isDeadSoul() { return entityData.get(DEAD_SOUL); }
     public void setDeadSoul(boolean dead) {
         entityData.set(DEAD_SOUL, dead);
-        if (dead) getPersistentData().putBoolean("LWDeadSoul", true);
+        if (dead) {
+            getPersistentData().putBoolean("LWDeadSoul", true);
+            if (!getPersistentData().getBoolean("LWHasDied")) {
+                getPersistentData().putBoolean("LWHasDied", true);
+                kaiokenPotential = rollKaiokenPotential(getRandom());
+            }
+        }
         else getPersistentData().remove("LWDeadSoul");
     }
     public FighterArchetype getArchetype() { return FighterArchetype.byId(entityData.get(ARCHETYPE)); }
@@ -3323,6 +3368,45 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     public String getSpeech() { return entityData.get(SPEECH); }
     public boolean isRetreating() { return retreatTicks > 0; }
     public boolean isAwakened() { return entityData.get(AWAKENED); }
+
+    /**
+     * Queues the NPC's spar growth until it is back in its base form.  Spar rewards are
+     * deliberately based on the form used for the comparison, but the permanent reference
+     * must never be inflated by applying that reward to transformed attributes.
+     */
+    public void queueSparGrowthWhenBase(double fraction, double ceilingFraction) {
+        if (fraction <= 0.0D || !Double.isFinite(fraction)) return;
+        CompoundTag data = getPersistentData();
+        if (isRacialFormActive() || isKaiokenActive() || isAwakened()) {
+            data.putDouble(PENDING_SPAR_GROWTH,
+                    data.getDouble(PENDING_SPAR_GROWTH) + fraction);
+            data.putDouble(PENDING_SPAR_CEILING,
+                    Math.max(data.getDouble(PENDING_SPAR_CEILING), Math.max(0.0D, ceilingFraction)));
+            return;
+        }
+        double permanent = Math.max(1.0D, getPermanentBattlePower());
+        double cap = Math.max(0.0D, ceilingFraction);
+        FighterBattleGrowthManager.queueAdjustedFraction(this, fraction,
+                Math.max(permanent * (1.0D + cap), permanent + 1.0D));
+    }
+
+    /** Applies deferred spar growth once all temporary form layers have ended. */
+    public void applyPendingSparGrowth() {
+        if (isRacialFormActive() || isKaiokenActive() || isAwakened()) return;
+        CompoundTag data = getPersistentData();
+        double fraction = data.getDouble(PENDING_SPAR_GROWTH);
+        if (!(fraction > 0.0D) || !Double.isFinite(fraction)) {
+            data.remove(PENDING_SPAR_GROWTH);
+            data.remove(PENDING_SPAR_CEILING);
+            return;
+        }
+        double cap = data.getDouble(PENDING_SPAR_CEILING);
+        data.remove(PENDING_SPAR_GROWTH);
+        data.remove(PENDING_SPAR_CEILING);
+        double permanent = Math.max(1.0D, getPermanentBattlePower());
+        FighterBattleGrowthManager.queueAdjustedFraction(this, fraction,
+                Math.max(permanent * (1.0D + Math.max(0.0D, cap)), permanent + 1.0D));
+    }
     public boolean isAwakening() { return awakeningTicks > 0 || isTransforming(); }
     public float getDisplayScale() { return entityData.get(DISPLAY_SCALE); }
     public String genderLabel() { return getRace().gendered() ? (isFemale() ? "Female" : "Male") : "â€”"; }
@@ -3721,6 +3805,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         if (getPersistentData().contains(SAIYAN_TAIL_REGROW_AT))
             tag.putLong("SaiyanTailRegrowAt", getPersistentData().getLong(SAIYAN_TAIL_REGROW_AT));
         tag.putBoolean("Awakened", isAwakened());
+        tag.putBoolean("HasDied", getPersistentData().getBoolean("LWHasDied"));
         // Wishes rebuild an NPC from this compact profile, so the personal bond is identity data too.
         if (memoryOwnerId != null) tag.putUUID("MemoryOwner", memoryOwnerId);
         if (memoryRecordId != null) tag.putUUID("MemoryRecord", memoryRecordId);
@@ -3834,6 +3919,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         FighterRace race = FighterRace.byId(profile.getInt("Race"));
         FighterArchetype archetype = FighterArchetype.byId(profile.getInt("Archetype"));
         initializeAs(alignment, rank, personality, race, archetype);
+        boolean hasDied = profile.getBoolean("HasDied") || profile.getBoolean("LWHasDied");
+        getPersistentData().putBoolean("LWHasDied", hasDied);
+        kaiokenPotential = hasDied && rollKaiokenPotential(getRandom());
         readDialogueHistory(profile, "DialogueHistory");
         com.dmzlivingworld.world.ReactiveWorldManager.restore(this, profile);
         com.dmzlivingworld.world.WorldMenaceManager.restoreProfile(this, profile);
@@ -4088,6 +4176,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         setKiCharge(false);
         setBattlePower(projectedBattlePower());
         if (entityData.get(READY)) refreshCombatStatsFromPower();
+        applyPendingSparGrowth();
         level().playSound(null, blockPosition(), MainSounds.TRANSFORM_OFF.get(), SoundSource.HOSTILE, 1.0F, 0.95F);
     }
 
@@ -4197,7 +4286,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         racialCalmTicks = 0;
         // Rebuild from canonical BP now that the temporary form multiplier has ended. This is
         // what makes a training gain earned during the form real in HP, melee and Ki as well.
-        if (!isKaiokenActive()) refreshCombatStatsFromPower();
+        if (!isKaiokenActive()) {
+            refreshCombatStatsFromPower();
+            applyPendingSparGrowth();
+        }
     }
 
     public void finishFullPowerState() {
@@ -4224,6 +4316,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             level().playSound(null, blockPosition(), MainSounds.TRANSFORM_OFF.get(), SoundSource.HOSTILE, 1.0F, 0.95F);
             setBattlePower(projectedBattlePower());
             if (entityData.get(READY)) refreshCombatStatsFromPower();
+            applyPendingSparGrowth();
         }
     }
 
@@ -5250,7 +5343,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         setLightning(false);
         setKiCharge(false);
         kaiokenTicks = 0;
-        if (!isRacialFormActive()) refreshCombatStatsFromPower();
+        if (!isRacialFormActive()) {
+            refreshCombatStatsFromPower();
+            applyPendingSparGrowth();
+        }
         level().playSound(null, blockPosition(), MainSounds.TRANSFORM_OFF.get(), SoundSource.HOSTILE, 0.8F, 0.95F);
     }
 

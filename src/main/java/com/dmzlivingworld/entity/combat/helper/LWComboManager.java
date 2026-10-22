@@ -56,6 +56,10 @@ public class LWComboManager {
             case 8 -> handleRapidKicks(user, target, timer);
             case 9 -> handleSpiritBreakingCannon(user, target, timer);
             case 11 -> handleSuperGodFist(user, target, timer);
+            // DMZ 2.2 added these strike variants. Living World keeps its safety-aware
+            // combo implementation while exposing the new attack slots to the AI.
+            case 12, 13 -> handleMeteorCombination(user, target, timer);
+            case 14 -> handleSpiritBreakingCannon(user, target, timer);
 
         }
     }

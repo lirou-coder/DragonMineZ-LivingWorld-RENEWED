@@ -16,6 +16,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import com.dragonminez.common.config.ConfigManager;
+import com.dragonminez.common.config.TpSource;
 import com.dragonminez.common.network.NetworkHandler;
 import com.dragonminez.common.network.S2C.StatsSyncS2C;
 import com.dragonminez.common.stats.StatsCapability;
@@ -519,19 +520,19 @@ public final class SparManager {
                 // personal cap. Suppression below 100 reduces TP and extended Release above 100
                 // (Potential Unlock/Zenkai/Overhaul) increases it proportionally.
                 double releaseRatio = currentRelease / 100.0D;
-                float reward = (float)Math.min(Float.MAX_VALUE,
+                int baseReward = (int)Math.min(Integer.MAX_VALUE,
                         onePointCost * 60.0D * factor * releaseRatio);
+                int reward = data.applyTpBoosts(TpSource.TRAINING, Math.max(0, baseReward));
                 data.getResources().addTrainingPoints(reward, false);
                 NetworkHandler.sendToTrackingEntityAndSelf(new StatsSyncS2C(player), player);
-                player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar.tp_reward", (int)reward), false);
+                player.displayClientMessage(Component.translatable("dmzlivingworld.message.spar.tp_reward", reward), false);
             }
         });
 
         // The reward is queued through the normal earned-growth path: installments settle while
         // aftermath/rest runs and every installment rebuilds the archetype's complete stat spread.
-        double ceiling = Math.max(fighter.getPermanentBattlePower() * 1.10D,
-                fighter.getPermanentBattlePower() + 1.0D);
-        FighterBattleGrowthManager.queueAdjustedFraction(fighter, 0.10D * factor, ceiling);
+        double trainingBonus = FighterWeightGravityManager.trainingMultiplier(fighter);
+        fighter.queueSparGrowthWhenBase(0.10D * factor * trainingBonus, 0.10D);
     }
 
     /** Shared end-of-fight BP matching curve used by spars and unsanctioned battles. */
@@ -558,9 +559,10 @@ public final class SparManager {
             int onePointCost = data.calculateRecursiveCost(1, maxStats);
             if (onePointCost <= 0 || onePointCost == Integer.MAX_VALUE) return;
             double releaseRatio = Math.max(0, data.getResources().getPowerRelease()) / 100.0D;
-            float reward = (float)Math.min(Float.MAX_VALUE,
+            int baseReward = (int)Math.min(Integer.MAX_VALUE,
                     onePointCost * 60.0D * factor * rewardScale * releaseRatio);
-            if (reward <= 0.0F) return;
+            int reward = data.applyTpBoosts(TpSource.TRAINING, Math.max(0, baseReward));
+            if (reward <= 0) return;
             data.getResources().addTrainingPoints(reward, false);
             NetworkHandler.sendToTrackingEntityAndSelf(new StatsSyncS2C(player), player);
         });
@@ -572,10 +574,9 @@ public final class SparManager {
     public static void grantMatchedFighterGrowth(AmbientFighterEntity fighter, double factor,
                                                   double rewardScale) {
         if (fighter == null || factor <= 0.0D || rewardScale <= 0.0D) return;
-        double permanent = fighter.getPermanentBattlePower();
-        double ceiling = Math.max(permanent * (1.0D + 0.10D * rewardScale), permanent + 1.0D);
-        FighterBattleGrowthManager.queueAdjustedFraction(fighter,
-                0.10D * factor * rewardScale, ceiling);
+        double trainingBonus = FighterWeightGravityManager.trainingMultiplier(fighter);
+        fighter.queueSparGrowthWhenBase(0.10D * factor * rewardScale * trainingBonus,
+                0.10D * rewardScale);
     }
 
     private static void rememberReconnectState(ServerPlayer player, AmbientFighterEntity fighter, long elapsed) {

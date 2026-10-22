@@ -1,6 +1,7 @@
 package com.dmzlivingworld.world;
 
 import com.dmzlivingworld.LivingWorldMod;
+import com.dmzlivingworld.compat.DmzMasterSafeZoneCompat;
 import com.dmzlivingworld.config.LivingWorldConfig;
 import com.dmzlivingworld.entity.AmbientFighterEntity;
 import com.dmzlivingworld.entity.FighterAlignment;
@@ -202,6 +203,7 @@ public final class AmbientFighterSpawner {
                                                  FighterPersonality personality, FighterRace race,
                                                  FighterArchetype archetype, RandomSource random) {
         if (!level.getWorldBorder().isWithinBounds(pos) || !isUsableGround(level, pos)) return null;
+        if (DmzMasterSafeZoneCompat.isInsideMasterSafeZone(level, pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D)) return null;
 
         AmbientFighterEntity fighter = LWEntities.AMBIENT_FIGHTER.get().create(level);
         if (fighter == null) return null;

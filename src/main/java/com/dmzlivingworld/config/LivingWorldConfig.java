@@ -40,6 +40,7 @@ public final class LivingWorldConfig {
     public static final ForgeConfigSpec.IntValue WANTED_PRESSURE_DECAY_MINUTES;
     public static final ForgeConfigSpec.IntValue NPC_COMBAT_LIVES;
     public static final ForgeConfigSpec.IntValue RACIAL_SKILL_MINIMUM_ERA;
+    public static final ForgeConfigSpec.IntValue MIN_SAGA_AGGRO_PLAYER;
     public static final ForgeConfigSpec.DoubleValue BRAWLER_MELEE_SHARE, BRAWLER_DEFENSE_SHARE, BRAWLER_KI_SHARE, BRAWLER_HEALTH_SHARE;
     public static final ForgeConfigSpec.DoubleValue MARTIAL_ARTIST_MELEE_SHARE, MARTIAL_ARTIST_DEFENSE_SHARE, MARTIAL_ARTIST_KI_SHARE, MARTIAL_ARTIST_HEALTH_SHARE;
     public static final ForgeConfigSpec.DoubleValue SPEED_FIGHTER_MELEE_SHARE, SPEED_FIGHTER_DEFENSE_SHARE, SPEED_FIGHTER_KI_SHARE, SPEED_FIGHTER_HEALTH_SHARE;
@@ -197,6 +198,10 @@ public final class LivingWorldConfig {
                         "Minimum numeric world era required for newly spawned NPCs to have a racial skill above zero.",
                         "Era 0 means no saga is complete; default 1 unlocks racial skills after the first completed saga.")
                 .defineInRange("racialSkillMinimumEra", 1, 0, 10000);
+        MIN_SAGA_AGGRO_PLAYER = builder.comment(
+                        "Minimum number of non-Movies sagas a player must complete before Living World NPCs may target that player first.",
+                        "Self-defense, Spar and player-initiated combat are not blocked by this setting.")
+                .defineInRange("minSagaAggroPlayer", 1, 0, 10000);
         builder.push("archetypeStatDistribution");
         builder.comment(
                 "Fraction of the effective stat budget assigned to each real combat attribute.",
@@ -358,6 +363,7 @@ public final class LivingWorldConfig {
     public static int wantedPressureDecayMinutes() { return WANTED_PRESSURE_DECAY_MINUTES.get(); }
     public static int npcCombatLives() { return NPC_COMBAT_LIVES.get(); }
     public static int racialSkillMinimumEra() { return RACIAL_SKILL_MINIMUM_ERA.get(); }
+    public static int minSagaAggroPlayer() { return MIN_SAGA_AGGRO_PLAYER.get(); }
     public static double npcStrengthScale() { return npcStrengthPercent() / 100.0D; }
     public static int npcGrowthPercent() { return NPC_GROWTH_PERCENT.get(); }
     public static double npcGrowthScale() { return npcGrowthPercent() / 100.0D; }

@@ -23,11 +23,14 @@ import com.dmzlivingworld.entity.combat.ai.LWCombatContext;
 import com.dmzlivingworld.entity.combat.helper.LWComboManager;
 import com.dmzlivingworld.entity.combat.helper.LWDBSagasAnimationHandler;
 import com.dmzlivingworld.entity.combat.helper.LWSkillManager;
+import com.dmzlivingworld.world.StrikeClashCompat;
 import com.dragonminez.common.quest.QuestService;
 import com.dragonminez.common.stats.StatsCapability;
 import com.dragonminez.common.stats.StatsData;
 import com.dragonminez.common.stats.StatsProvider;
 import com.dragonminez.common.stats.techniques.TechniqueDispatcher;
+import com.dragonminez.common.network.NetworkHandler;
+import com.dragonminez.common.network.S2C.TriggerAnimationS2C;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -182,7 +185,8 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
         METEOR_COMBINATION(3, Tier.STRONG), ANDROID_ABSORPTION(4, Tier.STRONG),
         GUM_PUNCH(5, Tier.MEDIUM), GUM_EXPAND(6, Tier.WEAK), SLEEP_RECOVERY(7, Tier.WEAK),
         RAPID_KICKS(8, Tier.WEAK), SPIRIT_BREAKING_CANNON(9, Tier.STRONG),
-        SUPER_GOD_FIST(11, Tier.STRONG);
+        SUPER_GOD_FIST(11, Tier.STRONG), DEADLY_DANCE_VEGETTO(12, Tier.STRONG),
+        METEOR_BURST(13, Tier.STRONG), MYSTIC_BALL(14, Tier.STRONG);
 
         private final int id;
         private final Tier tier;
@@ -275,6 +279,7 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
     private int currentComboCooldown = 0;
     public int comboTimer = 0;
     private LivingEntity comboTarget = null;
+    private boolean strikeClashAnimationActive = false;
     private int activeComboId = -1;
     private int[] allowedCombos = new int[0];
 
@@ -763,6 +768,17 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
     }
 
     @Override
+    public void aiStep() {
+        if (!this.level().isClientSide && BeamClashManager.isClashing(this.getUUID())) {
+            this.getNavigation().stop();
+            this.setDeltaMovement(Vec3.ZERO);
+            this.setNoGravity(false);
+            return;
+        }
+        super.aiStep();
+    }
+
+    @Override
     public void tick() {
         super.tick();
 
@@ -771,6 +787,24 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
             if (!this.isAlive()) {
                 if (this.isCasting()) this.stopCasting();
                 if (this.isComboing()) this.stopCombo();
+                return;
+            }
+
+            boolean strikeClashing = BeamClashManager.isClashing(this.getUUID());
+            if (this.strikeClashAnimationActive && !strikeClashing) {
+                NetworkHandler.sendToTrackingEntityAndSelf(new TriggerAnimationS2C(this.getUUID(),
+                        TriggerAnimationS2C.AnimationType.KI_ANIMATION_STOP, 0, -1, ""), this);
+                this.strikeClashAnimationActive = false;
+            }
+            if (strikeClashing) {
+                // StrikeClash owns the entity completely until it concludes. Do not
+                // let the normal brain, navigation, casting or combo executor run.
+                this.getNavigation().stop();
+                this.setDeltaMovement(Vec3.ZERO);
+                this.setAttacking(false);
+                this.setKiCharge(false);
+                this.setEvading(false);
+                this.setFlyingFast(false);
                 return;
             }
 
@@ -1218,6 +1252,7 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
     }
 
     public void stopCombo() {
+        StrikeClashCompat.end(this);
         this.setComboing(false);
         this.entityData.set(CURRENT_COMBO_ID, -1);
         this.comboTimer = 0;
@@ -1256,7 +1291,22 @@ public abstract class LivingWorldSagasEntity extends PathfinderMob implements Ge
         this.entityData.set(CURRENT_COMBO_ID, resolved);
         this.comboTimer = 0;
         this.currentComboCooldown = Math.round(this.comboCooldownMax * ComboType.tierOf(resolved).getCooldownFactor());
+        if (isStrikeRushCombo(resolved)) StrikeClashCompat.begin(this);
     }
+
+    private static boolean isStrikeRushCombo(int comboId) {
+        return comboId == ComboType.BASIC.getId()
+                || comboId == ComboType.AIR.getId()
+                || comboId == ComboType.RAPID_KICKS.getId()
+                || comboId == ComboType.METEOR_COMBINATION.getId();
+    }
+
+    public boolean isStrikeRushing() { return StrikeClashCompat.isRushing(this); }
+    public boolean isStrikeClashing() { return StrikeClashCompat.isClashing(this); }
+    public LivingEntity getStrikeRushTarget() { return this.comboTarget; }
+    public void beginStrikeClash() { this.setComboing(true); }
+    public void endStrikeClash(Boolean won) { StrikeClashCompat.end(this); this.stopCombo(); }
+    public void markStrikeClashAnimation() { this.strikeClashAnimationActive = true; }
 
     public void startComboAuto() {
         this.startCombo(-1);

@@ -21,6 +21,7 @@
     ,"WishTypeAdapterMixin"
     ,"TargetHelperCompanionMixin"
     ,"MeditationGravityLogicMixin"
+    ,"StrikeClashLivingWorldMixin"
   ],
   "client": [
     "FighterModelAnimationMixin",
