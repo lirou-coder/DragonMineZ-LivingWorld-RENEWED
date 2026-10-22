@@ -110,6 +110,13 @@ public final class FighterRescueManager {
         ServerPlayer savior = level.getServer().getPlayerList().getPlayer(tag.getUUID(SAVIOR));
         if (savior == null) { clear(fighter); return; }
         double ratio = Math.max(0.0D, Math.min(1.0D, fighter.getHealth() / Math.max(1.0D, fighter.getMaxHealth())));
+        // A rescue is only a genuine intervention while the fighter is critically hurt.
+        // Do this check before calculating relationship points so merely killing a threat near
+        // a healthy fighter cannot trigger the rescue interaction.
+        if (ratio > 0.50D) {
+            clear(fighter);
+            return;
+        }
         int points = Math.max(1, Math.min(20, (int)Math.ceil((1.0D - ratio) * 20.0D)));
         FighterMemoryManager.strengthenRelationship(savior, fighter, points,
                 FighterRelationshipManager.BondEvent.RESCUE, "Saved this fighter from a deadly encounter");
