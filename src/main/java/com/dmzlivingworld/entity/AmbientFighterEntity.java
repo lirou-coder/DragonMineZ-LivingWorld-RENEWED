@@ -115,6 +115,9 @@ import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.WanderingTrader;
 import net.minecraft.world.entity.player.Player;
+import com.dragonminez.common.stats.StatsCapability;
+import com.dragonminez.common.stats.StatsData;
+import com.dragonminez.common.stats.StatsProvider;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
@@ -225,6 +228,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     private static final EntityDataAccessor<Boolean> FLIGHT_UNLOCKED =
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> RACIAL_SKILL_LEVEL =
+            SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> GOD_KI_LEVEL =
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> ACTIVE_RACIAL_FORM_LEVEL =
             SynchedEntityData.defineId(AmbientFighterEntity.class, EntityDataSerializers.INT);
@@ -638,6 +643,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         entityData.define(STORY_ROLE, STORY_NONE);
         entityData.define(FLIGHT_UNLOCKED, false);
         entityData.define(RACIAL_SKILL_LEVEL, 0);
+        entityData.define(GOD_KI_LEVEL, 0);
         entityData.define(ACTIVE_RACIAL_FORM_LEVEL, 0);
         entityData.define(ACTIVE_RACIAL_FORM_ID, "");
         entityData.define(HAS_SAIYAN_TAIL, false);
@@ -777,6 +783,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
                 : WorldEraProgression.eraFor(progressionPlayer).number();
         entityData.set(RACIAL_SKILL_LEVEL, spawnEra >= LivingWorldConfig.racialSkillMinimumEra()
                 ? rollInitialRacialSkill(random, rank, race) : 0);
+        // God Ki is never assigned by natural spawning; it can only be awakened through
+        // eligible player-led meditation or spar training.
+        entityData.set(GOD_KI_LEVEL, 0);
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, 0);
         entityData.set(ACTIVE_RACIAL_FORM_ID, "");
         entityData.set(AMBIENT_POSE, 0);
@@ -4192,6 +4201,10 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     /** Selects the normal racial tree unless this born-tailed Saiyan currently meets Oozaru rules. */
     private NpcFormConfigBridge.Form selectCombatRacialForm(int skillLevel) {
+        if (getGodKiLevel() > 0) {
+            NpcFormConfigBridge.Form divine = NpcFormConfigBridge.godForm(getRace(), getGodKiLevel());
+            if (divine != null) return divine;
+        }
         if (getRace() == FighterRace.SAIYAN && isSaiyanTailBearer()) {
             int level = Math.max(0, skillLevel);
             // A born-tailed Saiyan at maximum racial skill always uses GT SSJ4 when available.
@@ -4759,6 +4772,9 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     public void setStoryRole(int role) { entityData.set(STORY_ROLE, Math.max(STORY_NONE, Math.min(STORY_PEACEKEEPER, role))); }
     public boolean hasFlightUnlocked() { return entityData.get(FLIGHT_UNLOCKED); }
     public int getRacialSkillLevel() { return entityData.get(RACIAL_SKILL_LEVEL); }
+    public int getGodKiLevel() { return entityData.get(GOD_KI_LEVEL); }
+    public boolean hasGodKi() { return getGodKiLevel() > 0; }
+    private void setGodKiLevel(int level) { entityData.set(GOD_KI_LEVEL, Math.max(0, Math.min(NpcFormConfigBridge.maxGodSkillLevel(getRace()), level))); }
     public int getActiveRacialFormLevel() { return entityData.get(ACTIVE_RACIAL_FORM_LEVEL); }
     public String getActiveRacialFormId() { return entityData.get(ACTIVE_RACIAL_FORM_ID); }
     public boolean isRacialFormActive() { return getActiveRacialFormLevel() > 0 || !getActiveRacialFormId().isBlank(); }
@@ -5342,6 +5358,24 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
         FighterGoalManager.onTraining(this);
         FighterPromotionManager.evaluate(this);
+        tryGodKiTraining();
+    }
+
+    /** God Ki is a player-taught, exceptionally rare progression; natural spawns never roll it. */
+    private void tryGodKiTraining() {
+        if (!(level() instanceof ServerLevel server) || getGodKiLevel() >= NpcFormConfigBridge.maxGodSkillLevel(getRace())) return;
+        ServerPlayer teacher = server.getEntitiesOfClass(ServerPlayer.class, getBoundingBox().inflate(12.0D), p -> {
+            if (!p.isAlive()) return false;
+            StatsData data = StatsProvider.get(StatsCapability.INSTANCE, p).resolve().orElse(null);
+            return data != null && data.getSkills().getSkillLevel("godforms") >= 1;
+        }).stream().findFirst().orElse(null);
+        if (teacher == null) return;
+        // Initial awakening is deliberately tiny; later levels are rarer still.
+        float chance = getGodKiLevel() == 0 ? 0.004F : 0.00035F;
+        if (getRandom().nextFloat() >= chance) return;
+        int next = getGodKiLevel() == 0 ? 1 : getGodKiLevel() + 1;
+        setGodKiLevel(next);
+        recordLegacyEvent("Unlocked God Ki level " + next + " through player training");
     }
 
     private static boolean rollInitialFlight(RandomSource random, FighterRank rank) {
@@ -5705,6 +5739,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         tag.putInt("LWTrainingSessions", trainingSessions);
         tag.putBoolean("LWFlightUnlocked", hasFlightUnlocked());
         tag.putInt("LWRacialSkillLevel", getRacialSkillLevel());
+        tag.putInt("LWGodKiLevel", getGodKiLevel());
         tag.putInt("LWRacialTrainingProgress", racialTrainingProgress);
         tag.putInt("LWActiveRacialForm", getActiveRacialFormLevel());
         tag.putString("LWActiveRacialFormId", getActiveRacialFormId());
@@ -5840,6 +5875,7 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         trainingSessions = tag.contains("LWTrainingSessions") ? tag.getInt("LWTrainingSessions") : 0;
         entityData.set(FLIGHT_UNLOCKED, tag.contains("LWFlightUnlocked") ? tag.getBoolean("LWFlightUnlocked") : getRank().canFly());
         entityData.set(RACIAL_SKILL_LEVEL, tag.contains("LWRacialSkillLevel") ? tag.getInt("LWRacialSkillLevel") : 0);
+        setGodKiLevel(tag.contains("LWGodKiLevel") ? tag.getInt("LWGodKiLevel") : 0);
         racialTrainingProgress = tag.contains("LWRacialTrainingProgress") ? tag.getInt("LWRacialTrainingProgress") : 0;
         entityData.set(ACTIVE_RACIAL_FORM_LEVEL, tag.contains("LWActiveRacialForm") ? tag.getInt("LWActiveRacialForm") : 0);
         entityData.set(ACTIVE_RACIAL_FORM_ID, tag.contains("LWActiveRacialFormId") ? tag.getString("LWActiveRacialFormId") : "");

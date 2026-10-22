@@ -8,6 +8,7 @@ import com.dmzlivingworld.entity.FighterPersonality;
 import com.dragonminez.common.stats.StatsCapability;
 import com.dragonminez.common.stats.StatsData;
 import com.dragonminez.common.events.DMZEvent;
+import com.dragonminez.common.util.TransformationsHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -182,6 +183,30 @@ public final class FighterPowerSpikeReactionManager {
             double ratio = sourcePower / Math.max(1.0D, observer.getBattlePower());
             observer.getLookControl().setLookAt(source, 42.0F, 36.0F);
             String subject = npcSource && source instanceof AmbientFighterEntity f ? f.getFighterName() : "you";
+            StatsData sourceStats = source instanceof ServerPlayer sp
+                    ? sp.getCapability(StatsCapability.INSTANCE).orElse(null) : null;
+            if (transform && sourceStats != null && TransformationsHelper.hasGodFormActive(sourceStats)
+                    && !observer.hasGodKi()) {
+                String divineKey = switch (observer.getPersonality()) {
+                    case CAUTIOUS -> "dialogue.power_spike.divine_without_godki.cautious";
+                    case PROUD -> "dialogue.power_spike.divine_without_godki.proud";
+                    case AGGRESSIVE -> "dialogue.power_spike.divine_without_godki.aggressive";
+                    default -> "dialogue.power_spike.divine_without_godki.normal";
+                };
+                observer.speak(pick(observer,
+                        LWLang.speechKey(divineKey + ".0", "I can no longer sense your Ki, but the pressure around you is overwhelming!"),
+                        LWLang.speechKey(divineKey + ".1", "That divine pressure is impossible to read. Keep your distance."),
+                        LWLang.speechKey(divineKey + ".2", "Your Ki vanished, but something far greater took its place."),
+                        LWLang.speechKey(divineKey + ".3", "I don't understand that form... but I know it is dangerous.")), 88);
+                ReactiveWorldManager.react(observer,
+                        observer.getAlignment() == com.dmzlivingworld.entity.FighterAlignment.BAD
+                                ? ReactiveWorldManager.Mood.FOCUSED : ReactiveWorldManager.Mood.WARY,
+                        "feeling divine pressure without God Ki", 900);
+                FighterMemoryManager.refreshLoadedProfile(observer);
+                acted++;
+                if (acted >= 3) break;
+                continue;
+            }
             if (ratio >= 2.0D && (observer.getPersonality() == FighterPersonality.CAUTIOUS
                     || ReactiveWorldManager.temperament(observer) == ReactiveWorldManager.Temperament.ALOOF)) {
                 ReactiveWorldManager.reactStrong(observer, ReactiveWorldManager.Mood.WARY,

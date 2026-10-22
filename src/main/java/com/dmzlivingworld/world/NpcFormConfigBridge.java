@@ -26,6 +26,17 @@ public final class NpcFormConfigBridge {
         return candidates(race).stream().mapToInt(Form::skillLevel).max().orElse(0);
     }
 
+    /** God-form tree unlocked by the DMZ godforms skill. */
+    public static Form godForm(FighterRace race, int skillLevel) {
+        if (race == null || skillLevel <= 0) return null;
+        return godCandidates(race).stream().filter(f -> f.skillLevel() == skillLevel)
+                .max(Comparator.comparingDouble(Form::averageMultiplier)).orElse(null);
+    }
+
+    public static int maxGodSkillLevel(FighterRace race) {
+        return godCandidates(race).stream().mapToInt(Form::skillLevel).max().orElse(0);
+    }
+
     public static int nextUnlockLevel(FighterRace race, int current) {
         return candidates(race).stream().mapToInt(Form::skillLevel)
                 .filter(level -> level > current).min().orElse(current);
@@ -93,6 +104,27 @@ public final class NpcFormConfigBridge {
             }
         }
         return result;
+    }
+
+    private static List<Form> godCandidates(FighterRace race) {
+        List<Form> result = new ArrayList<>();
+        if (race == null) return result;
+        for (var entry : ConfigManager.getAllFormsForRace(race.dmzId()).entrySet()) {
+            FormConfig group = entry.getValue();
+            if (group == null || group.getForms() == null || !isGodForm(group)) continue;
+            for (var form : group.getForms().entrySet()) {
+                FormConfig.FormData data = form.getValue();
+                if (data == null || data.getUnlockOnSkillLevel() == null || data.getUnlockOnSkillLevel() <= 0) continue;
+                result.add(from(group.getGroupName(), form.getKey(), data, data.getUnlockOnSkillLevel()));
+            }
+        }
+        return result;
+    }
+
+    private static boolean isGodForm(FormConfig group) {
+        String type = group.getFormType() == null ? "" : group.getFormType().toLowerCase(Locale.ROOT);
+        String name = group.getGroupName() == null ? "" : group.getGroupName().toLowerCase(Locale.ROOT);
+        return type.contains("god") || name.contains("god");
     }
 
     private static List<Form> allCandidates(FighterRace race) {
