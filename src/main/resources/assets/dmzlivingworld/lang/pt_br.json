@@ -4883,4 +4883,10 @@
   "dmzlivingworld.dialogue.weight.too_light.proud": "Você chama isso de peso? É leve demais para mim.",
   "dmzlivingworld.dialogue.weight.too_light.aggressive": "Leve demais! Traga um peso de treino de verdade!",
   "dmzlivingworld.dialogue.weight.too_light.cautious": "É seguro, mas leve demais para ser útil."
+  "dmzlivingworld.dialogue.aggression.warning.heroic": "Tenha cuidado. Não me ataque novamente.",
+  "dmzlivingworld.dialogue.aggression.warning.calm": "Cuidado. Não repita isso.",
+  "dmzlivingworld.dialogue.aggression.warning.proud": "Não tente isso de novo.",
+  "dmzlivingworld.dialogue.aggression.warning.aggressive": "Veja bem. O próximo golpe será revidado.",
+  "dmzlivingworld.dialogue.aggression.warning.cautious": "Cuidado. Vou revidar se continuar me atacando.",
+  "dmzlivingworld.dialogue.aggression.escalated": "Já chega. Faça isso de novo e vai se arrepender."
 }

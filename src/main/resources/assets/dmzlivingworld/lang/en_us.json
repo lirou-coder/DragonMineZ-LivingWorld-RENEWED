@@ -4874,5 +4874,11 @@
   "dmzlivingworld.dialogue.weight.too_light.calm": "Too light. It would not challenge me enough.",
   "dmzlivingworld.dialogue.weight.too_light.proud": "You call that a weight? It is far too light for me.",
   "dmzlivingworld.dialogue.weight.too_light.aggressive": "Too light! Bring me a real training weight!",
-  "dmzlivingworld.dialogue.weight.too_light.cautious": "It is safe, but too light to be useful."
+  "dmzlivingworld.dialogue.weight.too_light.cautious": "It is safe, but too light to be useful.",
+  "dmzlivingworld.dialogue.aggression.warning.heroic": "Please be careful. Do not attack me again.",
+  "dmzlivingworld.dialogue.aggression.warning.calm": "Take care. Do not repeat that.",
+  "dmzlivingworld.dialogue.aggression.warning.proud": "Do not try that again.",
+  "dmzlivingworld.dialogue.aggression.warning.aggressive": "Watch yourself. The next hit will be answered.",
+  "dmzlivingworld.dialogue.aggression.warning.cautious": "Careful. I will retaliate if you keep attacking me.",
+  "dmzlivingworld.dialogue.aggression.escalated": "Enough. Do that again and you will regret it."
 }

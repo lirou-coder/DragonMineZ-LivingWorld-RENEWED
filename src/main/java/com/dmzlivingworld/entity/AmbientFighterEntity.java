@@ -2346,6 +2346,25 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             return false;
         }
 
+        // A glancing player hit is a warning, not an act of aggression.  Count
+        // final (already mitigated) damage for the five-hit escalation rule and
+        // keep the NPC completely out of the retaliation/relationship pipeline
+        // until either 10% of max HP is dealt or five hits occur in one minute.
+        boolean warningOnlyPlayerHit = false;
+        if (!level().isClientSide && attackerEntity instanceof ServerPlayer player
+                && !sanctionedMatchParticipant) {
+            warningOnlyPlayerHit = registerPlayerProvocation(player, amount);
+            if (warningOnlyPlayerHit) {
+                boolean damaged = super.hurt(source, amount);
+                if (damaged) {
+                    setTarget(null);
+                    setLastHurtByMob(null);
+                    setAggressive(false);
+                }
+                return damaged;
+            }
+        }
+
         // Only an accepted, mitigated combat hit may sever the tail. Spars and protected
         // companion hits have already returned above, so a friendly exercise cannot cause
         // a permanent racial-state change.
@@ -2431,6 +2450,42 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             }
         }
         return super.hurt(source, amount);
+    }
+
+    private boolean registerPlayerProvocation(ServerPlayer player, float finalDamage) {
+        long now = level().getGameTime();
+        CompoundTag data = getPersistentData();
+        String attacker = player.getUUID().toString();
+        String previous = data.getString("LWProvocationPlayer");
+        long started = data.getLong("LWProvocationStarted");
+        int hits = data.getInt("LWProvocationHits");
+        if (!attacker.equals(previous) || now - started > 1200L) {
+            hits = 0;
+            started = now;
+            data.putString("LWProvocationPlayer", attacker);
+            data.putLong("LWProvocationStarted", started);
+        }
+        hits++;
+        data.putInt("LWProvocationHits", hits);
+        boolean strong = finalDamage >= getMaxHealth() * 0.10F;
+        if (strong || hits >= 5) {
+            data.remove("LWProvocationPlayer");
+            data.remove("LWProvocationStarted");
+            data.remove("LWProvocationHits");
+            if (hits >= 5 && !strong) {
+                speakKey("dialogue.aggression.escalated", "Enough. Do that again and you will regret it.", 72);
+            }
+            return false;
+        }
+        String key = "dialogue.aggression.warning." + getPersonality().name().toLowerCase(java.util.Locale.ROOT);
+        speakKey(key, switch (getPersonality()) {
+            case PROUD -> "Do not try that again.";
+            case CAUTIOUS -> "Careful. I will retaliate if you keep attacking me.";
+            case AGGRESSIVE -> "Watch yourself. The next hit will be answered.";
+            case HEROIC -> "Please be careful. Do not attack me again.";
+            default -> "Take care. Do not repeat that.";
+        }, 72);
+        return true;
     }
 
     private void maybeApplyCinematicLaunch(AmbientFighterEntity attacker) {
