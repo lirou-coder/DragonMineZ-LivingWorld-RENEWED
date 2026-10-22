@@ -4889,4 +4889,15 @@
   "dmzlivingworld.dialogue.aggression.warning.aggressive": "Cuidado. El prÃ³ximo golpe tendrÃ¡ respuesta.",
   "dmzlivingworld.dialogue.aggression.warning.cautious": "Cuidado. ContraatacarÃ© si sigues atacÃ¡ndome.",
   "dmzlivingworld.dialogue.aggression.escalated": "Basta ya. Si lo haces otra vez, te arrepentirÃ¡s."
+  ,"dmzlivingworld.screen.fighter.action.god_ritual": "Iniciar Ritual del Dios",
+  "dmzlivingworld.message.god_ritual.unavailable": "No tienes suficientes compañeros Saiyan elegibles para el Ritual del Dios.",
+  "dmzlivingworld.message.god_ritual.request": "%s quiere realizar un Ritual del Dios con sus compañeros, pero no tiene suficientes Saiyans. ¿Le ayudas?",
+  "dmzlivingworld.message.god_ritual.yes": "[Sí]",
+  "dmzlivingworld.message.god_ritual.no": "[No]",
+  "dmzlivingworld.message.god_ritual.accepted": "Aceptaste ayudar en el Ritual del Dios.",
+  "dmzlivingworld.message.god_ritual.invalid": "Esta solicitud del Ritual del Dios ya no es válida.",
+  "dmzlivingworld.message.god_ritual.no_helpers": "No hubo suficientes Saiyans voluntarios para el ritual.",
+  "dmzlivingworld.screen.dossier.content.travel.god_ritual": "Iniciar Ritual del Dios"
+  ,"dmzlivingworld.screen.world_settings.row.npc_behaviour.11": "Máximo de compañeros",
+  "dmzlivingworld.screen.world_settings.help.npc_behaviour.max_companions": "Número máximo de compañeros que puede tener un jugador: %s"
 }

@@ -10,6 +10,7 @@ import com.dmzlivingworld.world.FactionRequestMissionManager;
 import com.dmzlivingworld.world.WorldMenaceManager;
 import com.dmzlivingworld.world.ReactiveInteractionManager;
 import com.dmzlivingworld.world.SparManager;
+import com.dmzlivingworld.world.LivingWorldGodRitualManager;
 import com.dmzlwfusion.LWFusionManager;
 import com.dragonminez.common.stats.StatsCapability;
 import net.minecraft.network.FriendlyByteBuf;
@@ -71,6 +72,13 @@ public record FighterActionPacket(String action, UUID fighterId) {
                 // value rejected here too so an old client or manual packet cannot bypass the rule.
                 if (WorldMenaceManager.isWorldMenace(fighter)) {
                     sender.displayClientMessage(net.minecraft.network.chat.Component.translatable("dmzlivingworld.message.action.world_menace"), false);
+                    return;
+                }
+                if ("godritual".equals(msg.action)) {
+                    if (!LivingWorldGodRitualManager.start(sender, fighter)) {
+                        sender.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                                "dmzlivingworld.message.god_ritual.unavailable"), false);
+                    }
                     return;
                 }
                 if (!"talk".equals(msg.action) && !"spar".equals(msg.action) && !"fullpower".equals(msg.action)) {

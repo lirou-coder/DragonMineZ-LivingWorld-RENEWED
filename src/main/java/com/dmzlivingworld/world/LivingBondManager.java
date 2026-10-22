@@ -64,7 +64,6 @@ public final class LivingBondManager {
     private static final Map<UUID, DefenseThreat> DEFENSE_THREATS = new HashMap<>();
     private static final Map<UUID, Deque<Vec3>> TRAVEL_TRAILS = new HashMap<>();
     private static final int MAX_MEDITATION_PARTNERS = 4;
-    private static final int MAX_COMPANIONS = 5;
     private static final long FRIENDLY_FIRE_RESET_TICKS = 2400L;
     private enum InviteType { TRAVEL }
     private record Invite(UUID npc, InviteType type, long expires) {}
@@ -1031,7 +1030,7 @@ public final class LivingBondManager {
             npc.speakKey("dialogue.bond.travel.let_go", 58);
             return true;
         }
-        if (companionIds(player).size() >= MAX_COMPANIONS) {
+        if (companionIds(player).size() >= LivingWorldConfig.maxCompanions()) {
             player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
                     "dmzlivingworld.message.companion.limit").withStyle(net.minecraft.ChatFormatting.RED), false);
             return false;
@@ -1119,7 +1118,7 @@ public final class LivingBondManager {
         boolean hadRoster = root.contains("CompanionIds", Tag.TAG_LIST);
         if (root.contains("CompanionIds", Tag.TAG_LIST)) {
             ListTag list = root.getList("CompanionIds", Tag.TAG_STRING);
-            for (int i = 0; i < list.size() && result.size() < MAX_COMPANIONS; i++) {
+            for (int i = 0; i < list.size() && result.size() < LivingWorldConfig.maxCompanions(); i++) {
                 try { UUID id = UUID.fromString(list.getString(i)); if (!result.contains(id)) result.add(id); }
                 catch (IllegalArgumentException ignored) { }
             }
@@ -1134,7 +1133,7 @@ public final class LivingBondManager {
 
     private static void writeCompanionIds(CompoundTag root, List<UUID> ids) {
         ListTag list = new ListTag();
-        ids.stream().limit(MAX_COMPANIONS).forEach(id -> list.add(StringTag.valueOf(id.toString())));
+        ids.stream().limit(LivingWorldConfig.maxCompanions()).forEach(id -> list.add(StringTag.valueOf(id.toString())));
         root.put("CompanionIds", list);
         if (ids.isEmpty()) root.remove("Companion"); else root.putUUID("Companion", ids.get(0));
     }
@@ -1150,7 +1149,7 @@ public final class LivingBondManager {
         if (!root.contains("CompanionIds", Tag.TAG_LIST)) return false;
         ListTag list = root.getList("CompanionIds", Tag.TAG_STRING);
         String id = sought.toString();
-        for (int i = 0; i < list.size() && i < MAX_COMPANIONS; i++) {
+        for (int i = 0; i < list.size() && i < LivingWorldConfig.maxCompanions(); i++) {
             if (id.equalsIgnoreCase(list.getString(i))) return true;
         }
         return false;
@@ -1248,6 +1247,20 @@ public final class LivingBondManager {
         ServerPlayer owner = level.getServer().getPlayerList().getPlayer(ownerId);
         if (owner == null || !isCompanion(owner, fighter)) return false;
         return player.getUUID().equals(ownerId) || PartyManager.areInSameParty(owner, player);
+    }
+
+    /** Prevents accidental or AI-driven friendly fire between companions owned by one player. */
+    public static boolean areSamePlayerCompanions(AmbientFighterEntity first, AmbientFighterEntity second) {
+        if (first == null || second == null || first == second) return false;
+        if (first.isSanctionedMatchParticipant() && first.isSanctionedOpponent(second)) return false;
+        if (second.isSanctionedMatchParticipant() && second.isSanctionedOpponent(first)) return false;
+        if (!first.getPersistentData().hasUUID("LWCompanionOwner")
+                || !second.getPersistentData().hasUUID("LWCompanionOwner")) return false;
+        UUID owner = first.getPersistentData().getUUID("LWCompanionOwner");
+        if (!owner.equals(second.getPersistentData().getUUID("LWCompanionOwner"))) return false;
+        if (!(first.level() instanceof ServerLevel level)) return false;
+        ServerPlayer player = level.getServer().getPlayerList().getPlayer(owner);
+        return player != null && isCompanion(player, first) && isCompanion(player, second);
     }
 
     /** True only while this player's current travelling companion has an active combat target. */

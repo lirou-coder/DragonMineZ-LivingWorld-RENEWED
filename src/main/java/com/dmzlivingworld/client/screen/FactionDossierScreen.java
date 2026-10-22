@@ -753,6 +753,11 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
                                 LWNetwork.peopleMemoryAction(action, null);
                                 return true;
                             }
+                            if (action.startsWith("god_ritual:")) {
+                                try { LWNetwork.requestFighterAction("godritual", UUID.fromString(action.substring("god_ritual:".length()))); }
+                                catch (IllegalArgumentException ignored) { }
+                                return true;
+                            }
                             Component confirmTitle = "companion_end".equals(action)
                                     ? LWLang.text("screen.dossier.confirm.end_trip", "End this trip?")
                                     : LWLang.text("screen.dossier.confirm.title", "Are you sure?");
@@ -807,6 +812,7 @@ public final class FactionDossierScreen extends Screen implements LivingWorldScr
             if ("recall".equals(action)) return "companion_recall";
             if ("end".equals(action)) return "companion_end";
         }
+        if (raw.startsWith("@godritual:") && end > 11) return "god_ritual:" + raw.substring(11, end);
         if (raw.startsWith("@meditation:") && end > 12) {
             String action = raw.substring(12, end);
             if ("invite".equals(action)) return "meditation_invite";

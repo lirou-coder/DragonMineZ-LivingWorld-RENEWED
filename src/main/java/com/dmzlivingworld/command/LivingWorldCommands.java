@@ -43,6 +43,7 @@ import com.dmzlivingworld.world.WorldEraData;
 import com.dmzlivingworld.world.WorldIncidentData;
 import com.dmzlivingworld.world.PlayerWorldManager;
 import com.dmzlivingworld.world.LivingBondManager;
+import com.dmzlivingworld.world.LivingWorldGodRitualManager;
 import com.dmzlivingworld.world.FactionRequestManager;
 import com.dmzlivingworld.world.PrisonerWorldData;
 import com.dmzlivingworld.world.FactionEncounterManager;
@@ -96,6 +97,18 @@ public final class LivingWorldCommands {
 
     @SubscribeEvent
     public static void register(RegisterCommandsEvent event) {
+        // Public response endpoint used by clickable God Ritual invitations. The
+        // accepting player is fully validated server-side by the ritual manager.
+        event.getDispatcher().register(Commands.literal("livingworld")
+                .then(Commands.literal("godritual")
+                        .then(Commands.literal("accept")
+                                .then(Commands.argument("owner", StringArgumentType.word())
+                                        .executes(ctx -> acceptGodRitual(ctx.getSource().getPlayerOrException(),
+                                                StringArgumentType.getString(ctx, "owner")))))
+                        .then(Commands.literal("decline")
+                                .then(Commands.argument("owner", StringArgumentType.word())
+                                        .executes(ctx -> declineGodRitual(ctx.getSource().getPlayerOrException(),
+                                                StringArgumentType.getString(ctx, "owner")))))));
         event.getDispatcher().register(
                 Commands.literal("lw")
                         .requires(source -> source.hasPermission(2))
@@ -450,6 +463,22 @@ public final class LivingWorldCommands {
                         .then(Commands.literal("settings")
                                 .executes(ctx -> openSettings(ctx.getSource().getPlayerOrException())))
         );
+    }
+
+    private static int acceptGodRitual(ServerPlayer player, String ownerText) {
+        try {
+            if (LivingWorldGodRitualManager.accept(player, UUID.fromString(ownerText))) {
+                player.displayClientMessage(Component.translatable("dmzlivingworld.message.god_ritual.accepted"), true);
+                return 1;
+            }
+        } catch (IllegalArgumentException ignored) { }
+        player.displayClientMessage(Component.translatable("dmzlivingworld.message.god_ritual.invalid"), true);
+        return 0;
+    }
+
+    private static int declineGodRitual(ServerPlayer player, String ownerText) {
+        try { LivingWorldGodRitualManager.decline(player, UUID.fromString(ownerText)); } catch (IllegalArgumentException ignored) { }
+        return 1;
     }
 
     private static int debugExperimentStatus(ServerPlayer player) {
@@ -853,6 +882,8 @@ public final class LivingWorldCommands {
             lines.add(". " + dossierText("travel.regroup_hint", "If they fall behind, change dimensions, or their chunk unloads, Living World attempts to regroup them automatically."));
             lines.add("@travel:recall|" + dossierText("travel.regroup", "Regroup companion"));
             lines.add("@travel:end|" + dossierText("travel.end", "End travel"));
+            UUID ritualCompanion = LivingBondManager.companionId(player);
+            if (ritualCompanion != null) lines.add("@godritual:" + ritualCompanion + "|" + dossierText("travel.god_ritual", "Initiate God Ritual"));
         }
         LWNetwork.sendFactionDossier(player, new FactionDossierPacket("travel", 0, dossierText("travel.title", "Living World — Companion"),
                 dossierText("travel.subtitle", "Manage the fighters currently travelling with you"), lines));

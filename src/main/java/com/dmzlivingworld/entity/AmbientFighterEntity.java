@@ -2293,6 +2293,13 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         Entity attackerEntity = source.getEntity();
+        // DMZ's Surge marks its burst as non-lethal immediately before applying
+        // damage. Companions are allies and must be ignored by that area burst.
+        if (!level().isClientSide && attackerEntity instanceof ServerPlayer player
+                && getPersistentData().getBoolean("dmz_surge_non_lethal")
+                && LivingBondManager.isCompanion(player, this)) return false;
+        if (!level().isClientSide && attackerEntity instanceof AmbientFighterEntity attacker
+                && LivingBondManager.areSamePlayerCompanions(this, attacker)) return false;
         if (!level().isClientSide && attackerEntity instanceof AmbientFighterEntity attacker
                 && !WorldMenaceManager.allowsHerobrineFighterCombat(attacker, this)) return false;
         if (!level().isClientSide && SanctionedMatchGuard.isPostSparInvulnerable(this)) return false;
@@ -2639,6 +2646,11 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
             return;
         }
         if (!level().isClientSide && target instanceof AmbientFighterEntity other
+                && LivingBondManager.areSamePlayerCompanions(this, other)) {
+            super.setTarget(null);
+            return;
+        }
+        if (!level().isClientSide && target instanceof AmbientFighterEntity other
                 && !WorldMenaceManager.allowsHerobrineFighterCombat(this, other)) {
             super.setTarget(null);
             return;
@@ -2671,6 +2683,8 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     @Override
     public boolean doHurtTarget(Entity target) {
+        if (!level().isClientSide && target instanceof AmbientFighterEntity other
+                && LivingBondManager.areSamePlayerCompanions(this, other)) return false;
         if (!level().isClientSide && target instanceof AmbientFighterEntity other
                 && !WorldMenaceManager.allowsHerobrineFighterCombat(this, other)) return false;
         if (!level().isClientSide && isRetreatThreat(target)) return false;

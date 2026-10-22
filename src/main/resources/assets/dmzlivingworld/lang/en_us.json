@@ -2236,6 +2236,7 @@
   "dmzlivingworld.screen.world_settings.row.npc_behaviour.8": "Enable World Menaces",
   "dmzlivingworld.screen.world_settings.row.npc_behaviour.9": "Wanted pressure decay",
   "dmzlivingworld.screen.world_settings.row.npc_behaviour.10": "Enable NPCs on Creative Mode",
+  "dmzlivingworld.screen.world_settings.row.npc_behaviour.11": "Maximum Companions",
   "dmzlivingworld.screen.world_settings.row.advanced.0": "Remembered dead fighters",
   "dmzlivingworld.screen.world_settings.row.advanced.1": "NPC despawn protection",
   "dmzlivingworld.screen.world_settings.row.advanced.2": "Saga level multiplier",
@@ -2374,6 +2375,7 @@
   "dmzlivingworld.screen.world_settings.help.npc_behaviour.wanted.on": "One Wanted star is removed after this many peaceful real-time minutes",
   "dmzlivingworld.screen.world_settings.help.npc_behaviour.creative.on": "Natural Living World NPCs can spawn around players in Creative mode",
   "dmzlivingworld.screen.world_settings.help.npc_behaviour.creative.off": "Players in Creative mode do not trigger natural Living World NPC spawning",
+  "dmzlivingworld.screen.world_settings.help.npc_behaviour.max_companions": "Maximum number of companions a player may have: %s",
   "dmzlivingworld.value.blocks": "%s blocks",
   "dmzlivingworld.value.seconds_short": "%ss",
   "dmzlivingworld.value.minutes": "%s minutes",
@@ -4880,5 +4882,14 @@
   "dmzlivingworld.dialogue.aggression.warning.proud": "Do not try that again.",
   "dmzlivingworld.dialogue.aggression.warning.aggressive": "Watch yourself. The next hit will be answered.",
   "dmzlivingworld.dialogue.aggression.warning.cautious": "Careful. I will retaliate if you keep attacking me.",
-  "dmzlivingworld.dialogue.aggression.escalated": "Enough. Do that again and you will regret it."
+  "dmzlivingworld.dialogue.aggression.escalated": "Enough. Do that again and you will regret it.",
+  "dmzlivingworld.screen.fighter.action.god_ritual": "Initiate God Ritual",
+  "dmzlivingworld.message.god_ritual.unavailable": "You do not have enough eligible Saiyan companions for the God Ritual.",
+  "dmzlivingworld.message.god_ritual.request": "%s wants to perform a God Ritual with their companions but does not have enough Saiyans. Help them?",
+  "dmzlivingworld.message.god_ritual.yes": "[Yes]",
+  "dmzlivingworld.message.god_ritual.no": "[No]",
+  "dmzlivingworld.message.god_ritual.accepted": "You agreed to help with the God Ritual.",
+  "dmzlivingworld.message.god_ritual.invalid": "This God Ritual request is no longer valid.",
+  "dmzlivingworld.message.god_ritual.no_helpers": "There were not enough willing Saiyans for the ritual."
+  ,"dmzlivingworld.screen.dossier.content.travel.god_ritual": "Initiate God Ritual"
 }

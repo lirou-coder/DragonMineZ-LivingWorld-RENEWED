@@ -39,6 +39,7 @@ public final class LivingWorldConfig {
     public static final ForgeConfigSpec.BooleanValue ENABLE_NPCS_ON_CREATIVE_MODE;
     public static final ForgeConfigSpec.IntValue WANTED_PRESSURE_DECAY_MINUTES;
     public static final ForgeConfigSpec.IntValue NPC_COMBAT_LIVES;
+    public static final ForgeConfigSpec.IntValue MAX_COMPANIONS;
     public static final ForgeConfigSpec.IntValue RACIAL_SKILL_MINIMUM_ERA;
     public static final ForgeConfigSpec.IntValue MIN_SAGA_AGGRO_PLAYER;
     public static final ForgeConfigSpec.DoubleValue BRAWLER_MELEE_SHARE, BRAWLER_DEFENSE_SHARE, BRAWLER_KI_SHARE, BRAWLER_HEALTH_SHARE;
@@ -92,6 +93,8 @@ public final class LivingWorldConfig {
                         "Maximum number of dead fighter profiles retained for afterlife spawning and Dragon Ball wishes.",
                         "When the limit is exceeded, the oldest retained death is forgotten first.")
                 .defineInRange("maxRememberedDeadFighters", 20, 0, 4096);
+        MAX_COMPANIONS = builder.comment("Maximum number of Living World companions a player may have.")
+                .defineInRange("maxCompanions", 5, 0, 64);
         FACTION_RESIDENT_CAP = builder.comment("Maximum physical resident cell size that one faction territory can request. Still bounded by the local fighter cap.")
                 .defineInRange("factionResidentCap", 15, 4, 512);
         builder.pop();
@@ -357,6 +360,7 @@ public final class LivingWorldConfig {
     public static double bpVisualMultiplier() { return BP_VISUAL_MULTIPLIER.get(); }
     public static double npcPowerMultiplier() { return NPC_POWER_MULTIPLIER.get(); }
     public static int maxRememberedDeadFighters() { return MAX_REMEMBERED_DEAD_FIGHTERS.get(); }
+    public static int maxCompanions() { return MAX_COMPANIONS.get(); }
     public static boolean canMeditationProcSkillProgression() { return CAN_MEDITATION_PROC_SKILL_PROGRESSION.get(); }
     public static boolean worldMenacesEnabled() { return ENABLE_WORLD_MENACES.get(); }
     public static boolean npcsEnabledOnCreativeMode() { return ENABLE_NPCS_ON_CREATIVE_MODE.get(); }
@@ -421,7 +425,7 @@ public final class LivingWorldConfig {
                 automaticPowerSensing(), worldIncidents(), worldEventAlerts(), worldEventAlertRadius(),
                 socialTalk(), talkBaseGain(), talkRelationshipCap(), talkCooldownMinSeconds(), talkCooldownMaxSeconds(),
                 npcSocializing(), npcChaosPercent(), companionSagaHelp(), npcKiMode(), npcStrengthPercent(), npcGrowthPercent(), attackMinecraftMobs(),
-                npcChatFrequencyPercent(), earthGuardianResponsePercent(), maxRememberedDeadFighters(), npcDespawnProtectionRadius(),
+                npcChatFrequencyPercent(), earthGuardianResponsePercent(), maxRememberedDeadFighters(), maxCompanions(), npcDespawnProtectionRadius(),
                 levelMultiplierPerSaga(), maxDefenseMitigation(), bpVisualMultiplier(), npcPowerMultiplier(), canMeditationProcSkillProgression(),
                 npcRaceBlacklist(), treatRaceBlacklistAsWhitelist(), canUseClothes(), dimensionWhitelist(), treatDimensionWhitelistAsBlacklist(), companionDimensionBlacklist(),
                 archetypeShares(), worldMenacesEnabled(), wantedPressureDecayMinutes(), npcCombatLives(), racialSkillMinimumEra(), npcsEnabledOnCreativeMode());
@@ -458,6 +462,7 @@ public final class LivingWorldConfig {
         EARTH_GUARDIAN_RESPONSE_PERCENT.set(clamp(value.earthGuardianResponsePercent(), 0, 500));
         NPC_KI_MODE.set(clamp(value.npcKiMode(), 0, 3));
         MAX_REMEMBERED_DEAD_FIGHTERS.set(clamp(value.maxRememberedDeadFighters(), 0, 4096));
+        MAX_COMPANIONS.set(clamp(value.maxCompanions(), 0, 64));
         NPC_DESPAWN_PROTECTION_RADIUS.set(clamp(value.npcDespawnProtectionRadius(), 96, 4096));
         LEVEL_MULTIPLIER_PER_SAGA.set(clamp(value.levelMultiplierPerSaga(), 0D, 1000D));
         MAX_DEFENSE_MITIGATION.set(clamp(value.maxDefenseMitigation(), 0D, .99D));
@@ -484,7 +489,7 @@ public final class LivingWorldConfig {
     public static Snapshot defaults() {
         return new Snapshot(2, 20, 6, true, true, true, 2, 256, 15,
                 true, true, true, 1400, true, 2, 20, 120, 240, true, 100, true, 1, 100, 100, true, 100, 100,
-                20, 288, 5D, .7D, 1D, 1D, true, List.of(), false,
+                20, 5, 288, 5D, .7D, 1D, 1D, true, List.of(), false,
                 List.of("human", "saiyan", "namekian", "majin"), List.of("minecraft:overworld", "dragonminez:namek"), false,
                 List.of("dmzplus:cereal_orbit", "dmzplus:earth_orbit", "dmzplus:hell_planet_orbit", "dmzplus:namek_orbit", "dmzplus:vampa_orbit", "dmzplus:vegeta_orbit", "dmzplus:yardrat_orbit", "dmzplus:otherworld_space", "dmzplus:universe_7_deep_space", "dragonminez:otherworld"),
                 List.of(.20,.10,.06,.64, .17,.14,.17,.52, .15,.08,.15,.62, .10,.20,.10,.60, .06,.10,.20,.64), true, 60, 3, 1, false);
@@ -521,7 +526,7 @@ public final class LivingWorldConfig {
                            boolean npcSocializing, int npcChaosPercent, boolean companionSagaHelp, int npcKiMode,
                            int npcStrengthPercent, int npcGrowthPercent, boolean attackMinecraftMobs,
                            int npcChatFrequencyPercent, int earthGuardianResponsePercent,
-                           int maxRememberedDeadFighters, int npcDespawnProtectionRadius,
+                           int maxRememberedDeadFighters, int maxCompanions, int npcDespawnProtectionRadius,
                            double levelMultiplierPerSaga, double maxDefenseMitigation, double bpVisualMultiplier, double npcPowerMultiplier,
                            boolean canMeditationProcSkillProgression, List<String> npcRaceBlacklist,
                            boolean treatRaceBlacklistAsWhitelist, List<String> canUseClothes,

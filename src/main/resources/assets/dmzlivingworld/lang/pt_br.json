@@ -4889,4 +4889,15 @@
   "dmzlivingworld.dialogue.aggression.warning.aggressive": "Veja bem. O próximo golpe será revidado.",
   "dmzlivingworld.dialogue.aggression.warning.cautious": "Cuidado. Vou revidar se continuar me atacando.",
   "dmzlivingworld.dialogue.aggression.escalated": "Já chega. Faça isso de novo e vai se arrepender."
+  ,"dmzlivingworld.screen.fighter.action.god_ritual": "Iniciar Ritual do Deus",
+  "dmzlivingworld.message.god_ritual.unavailable": "VocÃª nÃ£o tem companheiros Saiyajins elegÃ­veis suficientes para o Ritual do Deus.",
+  "dmzlivingworld.message.god_ritual.request": "%s quer realizar um Ritual do Deus com seus companheiros, mas nÃ£o tem Saiyajins suficientes. AjudÃ¡-lo?",
+  "dmzlivingworld.message.god_ritual.yes": "[Sim]",
+  "dmzlivingworld.message.god_ritual.no": "[NÃ£o]",
+  "dmzlivingworld.message.god_ritual.accepted": "VocÃª aceitou ajudar no Ritual do Deus.",
+  "dmzlivingworld.message.god_ritual.invalid": "Este pedido do Ritual do Deus nÃ£o Ã© mais vÃ¡lido.",
+  "dmzlivingworld.message.god_ritual.no_helpers": "NÃ£o houve Saiyajins voluntÃ¡rios suficientes para o ritual.",
+  "dmzlivingworld.screen.dossier.content.travel.god_ritual": "Iniciar Ritual do Deus"
+  ,"dmzlivingworld.screen.world_settings.row.npc_behaviour.11": "Máximo de Companheiros",
+  "dmzlivingworld.screen.world_settings.help.npc_behaviour.max_companions": "Número máximo de companheiros que um jogador pode ter: %s"
 }

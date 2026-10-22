@@ -39,7 +39,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     private boolean factionEncounters, dynamicEncounters, recurringFighters, automaticPowerSensing,
             worldIncidents, worldEventAlerts, socialTalk, npcSocializing, companionSagaHelp, attackMinecraftMobs,
             worldMenacesEnabled, npcsEnabledOnCreativeMode;
-    private int maxRememberedDeadFighters, npcDespawnProtectionRadius, npcCombatLives, racialSkillMinimumEra;
+    private int maxRememberedDeadFighters, maxCompanions, npcDespawnProtectionRadius, npcCombatLives, racialSkillMinimumEra;
     private double levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier, npcPowerMultiplier;
     private boolean canMeditationProcSkillProgression, treatRaceBlacklistAsWhitelist, treatDimensionWhitelistAsBlacklist;
     private String npcRaceBlacklist, canUseClothes, dimensionWhitelist, companionDimensionBlacklist;
@@ -118,7 +118,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         worldMenacesEnabled=v.worldMenacesEnabled(); wantedPressureDecayMinutes=v.wantedPressureDecayMinutes();
         npcsEnabledOnCreativeMode=v.npcsEnabledOnCreativeMode();
         npcChatFrequencyPercent=v.npcChatFrequencyPercent(); earthGuardianResponsePercent=v.earthGuardianResponsePercent();
-        maxRememberedDeadFighters=v.maxRememberedDeadFighters(); npcDespawnProtectionRadius=v.npcDespawnProtectionRadius(); npcCombatLives=v.npcCombatLives(); racialSkillMinimumEra=v.racialSkillMinimumEra();
+        maxRememberedDeadFighters=v.maxRememberedDeadFighters(); maxCompanions=v.maxCompanions(); npcDespawnProtectionRadius=v.npcDespawnProtectionRadius(); npcCombatLives=v.npcCombatLives(); racialSkillMinimumEra=v.racialSkillMinimumEra();
         levelMultiplierPerSaga=v.levelMultiplierPerSaga(); maxDefenseMitigation=v.maxDefenseMitigation(); bpVisualMultiplier=v.bpVisualMultiplier(); npcPowerMultiplier=v.npcPowerMultiplier();
         canMeditationProcSkillProgression=v.canMeditationProcSkillProgression();
         npcRaceBlacklist=String.join(",",v.npcRaceBlacklist()); treatRaceBlacklistAsWhitelist=v.treatRaceBlacklistAsWhitelist();
@@ -163,7 +163,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 factionResidentCap, automaticPowerSensing, worldIncidents, worldEventAlerts, worldEventAlertRadius,
                 socialTalk, talkBaseGain, talkRelationshipCap, talkCooldownMinSeconds, talkCooldownMaxSeconds,
                 npcSocializing, npcChaosPercent, companionSagaHelp, npcKiMode, npcStrengthPercent, npcGrowthPercent, attackMinecraftMobs,
-                npcChatFrequencyPercent, earthGuardianResponsePercent, maxRememberedDeadFighters, npcDespawnProtectionRadius,
+                npcChatFrequencyPercent, earthGuardianResponsePercent, maxRememberedDeadFighters, maxCompanions, npcDespawnProtectionRadius,
                 levelMultiplierPerSaga, maxDefenseMitigation, bpVisualMultiplier, npcPowerMultiplier, canMeditationProcSkillProgression,
                 csv(npcRaceBlacklist), treatRaceBlacklistAsWhitelist, csv(canUseClothes), csv(dimensionWhitelist),
                 treatDimensionWhitelistAsBlacklist, csv(companionDimensionBlacklist), java.util.Arrays.stream(archetypeShares).boxed().toList(), worldMenacesEnabled, wantedPressureDecayMinutes, npcCombatLives, racialSkillMinimumEra, npcsEnabledOnCreativeMode);
@@ -189,7 +189,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     }
 
     private int rowCount() {
-        return switch (tab) { case 0 -> 12; case 1 -> 6; case 2 -> 13; case 3 -> 15; case 4 -> 10; case 6 -> 35; default -> 11; };
+        return switch (tab) { case 0 -> 12; case 1 -> 6; case 2 -> 13; case 3 -> 15; case 4 -> 10; case 6 -> 35; default -> 12; };
     }
 
     private boolean serverTab() { return tab == 0 || tab == 1 || tab == 3 || tab == 5 || tab == 6; }
@@ -377,7 +377,8 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 7 -> LWLang.string("screen.world_settings.help.npc_behaviour.minecraft_mobs." + (attackMinecraftMobs ? "on" : "off"));
             case 8 -> LWLang.string("screen.world_settings.help.npc_behaviour.menaces." + (worldMenacesEnabled ? "on" : "off"));
             case 9 -> LWLang.string(wantedPressureDecayMinutes <= 0 ? "screen.world_settings.help.npc_behaviour.wanted.off" : "screen.world_settings.help.npc_behaviour.wanted.on");
-            default -> LWLang.string("screen.world_settings.help.npc_behaviour.creative." + (npcsEnabledOnCreativeMode ? "on" : "off"));
+            case 10 -> LWLang.string("screen.world_settings.help.npc_behaviour.creative." + (npcsEnabledOnCreativeMode ? "on" : "off"));
+            default -> LWLang.string("screen.world_settings.help.npc_behaviour.max_companions", maxCompanions);
         };
     }
 
@@ -409,7 +410,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             default -> switch (r) { case 0 -> npcChaosPercent+"%"; case 1 -> onOff(automaticPowerSensing);
                 case 2 -> onOff(companionSagaHelp); case 3 -> kiModeLabel(); case 4 -> npcStrengthPercent+"%";
                 case 5 -> npcGrowthPercent+"%"; case 6 -> npcChatFrequencyPercent+"%"; case 7 -> onOff(attackMinecraftMobs); case 8 -> onOff(worldMenacesEnabled);
-                case 9 -> LWLang.string("value.minutes", wantedPressureDecayMinutes); default -> onOff(npcsEnabledOnCreativeMode); };
+                case 9 -> LWLang.string("value.minutes", wantedPressureDecayMinutes); case 10 -> onOff(npcsEnabledOnCreativeMode); default -> Integer.toString(maxCompanions); };
         };
     }
 
@@ -488,6 +489,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
                 case 8 -> worldMenacesEnabled=stepSign>0;
                 case 9 -> wantedPressureDecayMinutes=clamp(wantedPressureDecayMinutes+stepSign*5,0,10080);
                 case 10 -> npcsEnabledOnCreativeMode=stepSign>0;
+                case 11 -> maxCompanions=clamp(maxCompanions+stepSign,0,64);
                 default -> {}
             } }
             case 6 -> changeAdvanced(r, stepSign);
@@ -778,6 +780,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         attackMinecraftMobs = d.attackMinecraftMobs();
         worldMenacesEnabled = d.worldMenacesEnabled(); wantedPressureDecayMinutes=d.wantedPressureDecayMinutes();
         npcsEnabledOnCreativeMode = d.npcsEnabledOnCreativeMode();
+        maxCompanions = d.maxCompanions();
     }
 
     private void resetAdvancedDefaults() {
@@ -1015,6 +1018,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
             case 5 -> npcGrowthPercent = clamp(value, 0, 1000);
             case 6 -> npcChatFrequencyPercent = clamp(value, 0, 500);
             case 9 -> wantedPressureDecayMinutes = clamp(value, 0, 10080);
+            case 11 -> maxCompanions = clamp(value, 0, 64);
             default -> throw new NumberFormatException("not numeric");
         }
     }
