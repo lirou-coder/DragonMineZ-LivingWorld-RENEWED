@@ -124,14 +124,19 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         ResourceLocation slimLayer = dmz(bodyBase + "slim_layer1.png");
         if (raceConfig != null && raceConfig.isSlimBodyType(bodyType)
                 && Minecraft.getInstance().getResourceManager().getResource(slimLayer).isPresent()) bodyBase += "slim_";
-        bodyLayer(model, pose, buffers, e, dmz(bodyBase + "layer1.png"),
-                ColorUtils.skinBaseTone(body), pt, light, overlay);
-        ResourceLocation humanShadow = dmz(bodyBase + "layer2.png");
+        // DMZ 2.2 stores the humanoid shadow as a companion mask for layer1
+        // (`layer1_shadow.png`), not as a second body layer.  Using layer2 here
+        // silently skipped the real shadow atlas and made all Human/Saiyan skin
+        // shading disappear.  Resolve the same mask and tint pipeline as DMZ.
+        ResourceLocation humanBase = dmz(bodyBase + "layer1.png");
+        ResourceLocation humanShadow = dmz(bodyBase + "layer1_shadow.png");
         if (textureExists(humanShadow)) {
-            // Exact DMZ 2.2 pipeline: the main atlas uses skinBaseTone and the separate
-            // translucent atlas uses skinShadowTone, both derived from BodyColor1.
+            bodyLayer(model, pose, buffers, e, humanBase,
+                    ColorUtils.skinBaseTone(body), pt, light, overlay);
             nativeShadowLayer(model, pose, buffers, e, humanShadow,
                     ColorUtils.skinShadowTone(body), pt, light, overlay);
+        } else {
+            bodyLayer(model, pose, buffers, e, humanBase, body, pt, light, overlay);
         }
         if (e.getRace() == com.dmzlivingworld.entity.FighterRace.BIO_ANDROID && SairensRaceCompat.isBioAndroidHumanModel()) {
             layer(model, pose, buffers, e, dmz("textures/entity/races/" + gender + "_android.png"), WHITE, pt, light, overlay);
@@ -419,13 +424,19 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         float[] body = rgb(e.getBodyColor());
         float[] body2 = rgb(e.getBodyColor2());
         float[] body3 = rgb(e.getBodyColor3());
-        layer(model, pose, buffers, e, dmz("textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_" + bodyType + ".png"), body, pt, light, overlay);
+        layerWithShadow(model, pose, buffers, e,
+                "textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_" + bodyType + ".png",
+                "textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_1.png", body, pt, light, overlay);
         if (shouldRenderHumanSaiyanHairBase(e)) {
             layer(model, pose, buffers, e, dmz("textures/entity/races/hair_base.png"), rgb(e.getHairColor()), pt, light, overlay);
         }
-        layer(model, pose, buffers, e, dmz("textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_" + bodyType + "_layer2.png"), body2, pt, light, overlay);
+        layerWithShadow(model, pose, buffers, e,
+                "textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_" + bodyType + "_layer2.png",
+                "textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_1_layer2.png", body2, pt, light, overlay);
         if ("zaarakin".equals(raceRoot)) {
-            layer(model, pose, buffers, e, dmz("textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_" + bodyType + "_layer3.png"), body3, pt, light, overlay);
+            layerWithShadow(model, pose, buffers, e,
+                    "textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_" + bodyType + "_layer3.png",
+                    "textures/entity/races/" + raceRoot + "/bodytype_" + gender + "_1_layer3.png", body3, pt, light, overlay);
         }
         String faceRoot = "textures/entity/races/" + raceRoot + "/faces/";
         if (!renderBorrowedHumanEyes(model, pose, buffers, e, e.getEyesType(), eyeCount,
@@ -500,16 +511,16 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
         ItemStack dmzArmor = equippedDmzArmor(e);
         if (!dmzArmor.isEmpty() && dmzArmor.getItem() instanceof DbzArmorItem armor
                 && "dragonminez".equals(armor.getModId())) {
-            layer(model, pose, buffers, e,
+            outfitLayer(model, pose, buffers, e,
                     ArmorTextureResolver.resolve(armor.getModId(), armor.getItemId(), EquipmentSlot.CHEST, dmzArmor),
                     WHITE, pt, light, overlay);
-            layer(model, pose, buffers, e,
+            outfitLayer(model, pose, buffers, e,
                     ArmorTextureResolver.resolve(armor.getModId(), armor.getItemId(), EquipmentSlot.LEGS, dmzArmor),
                     WHITE, pt, light, overlay);
             return;
         }
-        layer(model, pose, buffers, e, dmz("textures/armor/" + outfit + "_layer1.png"), WHITE, pt, light, overlay);
-        layer(model, pose, buffers, e, dmz("textures/armor/" + outfit + "_layer2.png"), WHITE, pt, light, overlay);
+        outfitLayer(model, pose, buffers, e, dmz("textures/armor/" + outfit + "_layer1.png"), WHITE, pt, light, overlay);
+        outfitLayer(model, pose, buffers, e, dmz("textures/armor/" + outfit + "_layer2.png"), WHITE, pt, light, overlay);
     }
 
     private static ItemStack equippedDmzArmor(AmbientFighterEntity fighter) {
@@ -531,14 +542,26 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
                 partialTick, packedLight, packedOverlay, rgb[0], rgb[1], rgb[2], 1.0F);
     }
 
+    /** Clothing is submitted after body shadows and must remain in the same translucent
+     * overlay pass so it is composited above the skin shadow mask. */
+    private void outfitLayer(BakedGeoModel model, PoseStack pose, MultiBufferSource buffers,
+                             AmbientFighterEntity entity, ResourceLocation texture, float[] rgb,
+                             float partialTick, int packedLight, int packedOverlay) {
+        if (!faceTextureAllowed(entity, texture)) return;
+        RenderType type = ModRenderTypes.skinOverlayTranslucent(texture);
+        VertexConsumer consumer = buffers.getBuffer(type);
+        getRenderer().reRender(model, pose, buffers, entity, type, consumer,
+                partialTick, packedLight, packedOverlay, rgb[0], rgb[1], rgb[2], 1.0F);
+    }
+
     /** Mirrors DMZ 2.2's native racial-texture fallback to body type zero. */
     private void layerWithFallback(BakedGeoModel model, PoseStack pose, MultiBufferSource buffers,
                                    AmbientFighterEntity entity, String selectedPath, String fallbackPath,
                                    float[] color, float partialTick, int packedLight, int packedOverlay) {
         ResourceLocation selected = dmz(selectedPath);
         ResourceLocation texture = textureExists(selected) ? selected : dmz(fallbackPath);
-        if (textureExists(texture)) bodyLayer(model, pose, buffers, entity, texture, color,
-                partialTick, packedLight, packedOverlay);
+        if (textureExists(texture)) layerWithShadow(model, pose, buffers, entity,
+                selectedPath, fallbackPath, color, partialTick, packedLight, packedOverlay);
     }
 
     /** Renders the extra per-body-layer shading introduced by DMZ 2.2. */
@@ -594,7 +617,11 @@ public final class FighterAppearanceLayer extends GeoRenderLayer<AmbientFighterE
     private void nativeShadowLayer(BakedGeoModel model, PoseStack pose, MultiBufferSource buffers,
                                    AmbientFighterEntity entity, ResourceLocation texture, float[] color,
                                    float partialTick, int packedLight, int packedOverlay) {
-        RenderType type = RenderType.entityTranslucent(texture);
+        // Use DMZ's skin-overlay translucent format rather than the vanilla entity
+        // format.  The latter has a different vertex layout under Embeddium/Oculus
+        // and caused the render-stage ArrayIndexOutOfBounds crash when a humanoid
+        // shadow mask was first drawn.
+        RenderType type = ModRenderTypes.skinOverlayTranslucent(texture);
         VertexConsumer consumer = buffers.getBuffer(type);
         getRenderer().reRender(model, pose, buffers, entity, type, consumer,
                 partialTick, packedLight, packedOverlay, color[0], color[1], color[2], 1.0F);

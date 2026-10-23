@@ -679,7 +679,7 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
     }
 
     private int speechModeIndex() {
-        if (!speechToChat) return 0;
+        if (!speechToChat) return dialogueVisible ? 3 : 0;
         return dialogueVisible ? 2 : 1;
     }
 
@@ -687,19 +687,23 @@ public final class WorldSettingsScreen extends Screen implements LivingWorldScre
         return switch (speechModeIndex()) {
             case 1 -> LWLang.string("value.speech.chat_only");
             case 2 -> LWLang.string("value.speech.chat_overhead");
+            case 3 -> LWLang.string("value.speech.overhead");
             default -> LWLang.string("value.off");
         };
     }
 
     private void setSpeechMode(int mode) {
-        mode = clamp(mode, 0, 2);
+        mode = clamp(mode, 0, 3);
         if (mode == 0) {
             speechToChat = false;
         } else if (mode == 1) {
             speechToChat = true;
             dialogueVisible = false;
-        } else {
+        } else if (mode == 2) {
             speechToChat = true;
+            dialogueVisible = true;
+        } else {
+            speechToChat = false;
             dialogueVisible = true;
         }
     }

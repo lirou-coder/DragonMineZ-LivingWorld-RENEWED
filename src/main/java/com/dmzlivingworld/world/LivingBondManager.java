@@ -798,7 +798,7 @@ public final class LivingBondManager {
         if (!LivingWorldDimensions.isSupported(targetLevel)) return null;
         CompoundTag root = root(player);
         UUID id = companionId(player);
-        UUID recordId = root.hasUUID("CompanionRecord") ? root.getUUID("CompanionRecord") : null;
+        UUID recordId = companionRecord(root, id);
         AmbientFighterEntity companion = findLoadedCompanion(player, id);
         if (recordId != null && FighterLegacyWorldData.get(targetLevel).isDeadRecord(recordId)) {
             if (companion != null) companion.discard();
@@ -849,8 +849,7 @@ public final class LivingBondManager {
         }
 
         CompoundTag profile = companion != null ? companion.writeMemoryProfile()
-                : root.contains("CompanionProfile", net.minecraft.nbt.Tag.TAG_COMPOUND)
-                ? root.getCompound("CompanionProfile").copy() : new CompoundTag();
+                : companionProfile(root, id);
         UUID previousUuid = companion != null ? companion.getUUID() : id;
         if (companion != null) {
             LOGGER.info("[LW CompanionRecovery] travelling companion uuid={} is loaded outside the player's current dimension; preserving profile before safe recreation",
@@ -923,9 +922,19 @@ public final class LivingBondManager {
         if (player == null || root == null || npc == null) return;
         npc.getPersistentData().putUUID("LWCompanionOwner", player.getUUID());
         root.putString("CompanionName", npc.getFighterName());
-        root.put("CompanionProfile", npc.writeMemoryProfile().copy());
+        CompoundTag profile = npc.writeMemoryProfile().copy();
+        root.put("CompanionProfile", profile.copy());
+        CompoundTag profiles = root.contains("CompanionProfiles", Tag.TAG_COMPOUND)
+                ? root.getCompound("CompanionProfiles") : new CompoundTag();
+        profiles.put(npc.getUUID().toString(), profile);
+        root.put("CompanionProfiles", profiles);
         if (npc.getMemoryRecordId() != null) root.putUUID("CompanionRecord", npc.getMemoryRecordId());
         else root.remove("CompanionRecord");
+        CompoundTag records = root.contains("CompanionRecords", Tag.TAG_COMPOUND)
+                ? root.getCompound("CompanionRecords") : new CompoundTag();
+        if (npc.getMemoryRecordId() != null) records.putUUID(npc.getUUID().toString(), npc.getMemoryRecordId());
+        else records.remove(npc.getUUID().toString());
+        root.put("CompanionRecords", records);
         root.putString("CompanionDimension", npc.level().dimension().location().toString());
         root.putInt("CompanionLastX", npc.blockPosition().getX());
         root.putInt("CompanionLastY", npc.blockPosition().getY());
@@ -1102,7 +1111,10 @@ public final class LivingBondManager {
         Deque<Vec3> trail = new ArrayDeque<>();
         trail.add(player.position().add(0.0D, 0.8D, 0.0D));
         TRAVEL_TRAILS.put(player.getUUID(), trail);
-        if (firstCompanion) rememberCompanionState(player, root, npc); else save(player, root);
+        // Keep an independent persisted profile for every roster member.  Reusing the
+        // legacy single CompanionProfile for all slots caused teleport recovery to
+        // recreate one fighter repeatedly in every missing slot.
+        rememberCompanionState(player, root, npc);
         npc.setPersistenceRequired();
     }
 
@@ -1180,6 +1192,8 @@ public final class LivingBondManager {
         TRAVEL_TRAILS.remove(player.getUUID());
         root.remove("Companion"); root.remove("CompanionIds"); root.remove("CompanionName"); root.remove("CompanionJoined");
         root.remove("CompanionRecord"); root.remove("CompanionProfile"); root.remove("CompanionDimension");
+        root.remove("CompanionProfiles");
+        root.remove("CompanionRecords");
         root.remove("CompanionLastX"); root.remove("CompanionLastY"); root.remove("CompanionLastZ");
         root.remove("CompanionMissingSince"); root.remove("LastCompanionRegroup");
         root.remove("CompanionFriendlyFireStrikes"); root.remove("CompanionLastFriendlyFire");
@@ -1190,6 +1204,24 @@ public final class LivingBondManager {
             for (String key : travelKeys) released.getPersistentData().remove(key);
         }
         save(player, root);
+    }
+
+    private static CompoundTag companionProfile(CompoundTag root, UUID id) {
+        if (root == null || id == null) return new CompoundTag();
+        if (root.contains("CompanionProfiles", Tag.TAG_COMPOUND)) {
+            CompoundTag profiles = root.getCompound("CompanionProfiles");
+            if (profiles.contains(id.toString(), Tag.TAG_COMPOUND)) return profiles.getCompound(id.toString()).copy();
+        }
+        return root.contains("CompanionProfile", Tag.TAG_COMPOUND) ? root.getCompound("CompanionProfile").copy() : new CompoundTag();
+    }
+
+    private static UUID companionRecord(CompoundTag root, UUID id) {
+        if (root == null || id == null) return null;
+        if (root.contains("CompanionRecords", Tag.TAG_COMPOUND)) {
+            CompoundTag records = root.getCompound("CompanionRecords");
+            if (records.hasUUID(id.toString())) return records.getUUID(id.toString());
+        }
+        return root.hasUUID("CompanionRecord") ? root.getUUID("CompanionRecord") : null;
     }
 
     public static String companionName(ServerPlayer player) { return root(player).getString("CompanionName"); }

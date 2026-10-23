@@ -95,7 +95,10 @@ final class DmzRevampFusionCompat {
             Class<?> logic = Class.forName("com.dmzrevamp.revamp.fusion.FusionRevampLogic");
             Method clear = logic.getMethod("clearFusionBonuses", StatsData.class);
             clear.invoke(null, data);
-        } catch (ReflectiveOperationException ignored) {}
+        } catch (Throwable ignored) {
+            // dmzrevamp's fusion internals are version-sensitive.  A failed optional
+            // cleanup must never take down the server during login/fusion teardown.
+        }
     }
 
     private static Object field(Object owner, String name) throws ReflectiveOperationException {

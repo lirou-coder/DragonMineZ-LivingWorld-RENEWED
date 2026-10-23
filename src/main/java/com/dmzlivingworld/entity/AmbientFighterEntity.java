@@ -496,6 +496,17 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
         super.registerControllers(controllers);
+        // The generic Living World fighter has its own model/controller set and therefore does
+        // not inherit the trigger-only fusion controller that DMZ saga entities receive from
+        // SagaFusionAnimationMixin.  Register the same native DMZ dance clips here so the
+        // server-side fusion trigger can reach NPCs as well.
+        controllers.add(new AnimationController<>(this, com.dmzlwfusion.FusionAnimations.CONTROLLER, 0,
+                state -> PlayState.STOP)
+                .triggerableAnim(com.dmzlwfusion.FusionAnimations.LEFT,
+                        RawAnimation.begin().thenPlay("base.fusion_dance_left"))
+                .triggerableAnim(com.dmzlwfusion.FusionAnimations.RIGHT,
+                        RawAnimation.begin().thenPlay("base.fusion_dance_right"))
+                .setAnimationSpeed(0.583D));
         // DMZ's stock attack_controller owns vanilla attack-timer body swings. Replace only that
         // controller with an LW-aware wrapper: weapon choreography suppresses it, while every
         // non-weapon state delegates to DMZ's exact original predicate.
@@ -866,6 +877,13 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
     @Override
     public void tick() {
         super.tick();
+        // A fusion partner remains loaded as a hidden passenger, but it must not continue
+        // running Living World routines (training, pickups, speech, combat or movement) while
+        // the fusion is active.  The fusion manager restores the complete saved state later.
+        if (!level().isClientSide && com.dmzlwfusion.NpcFusionManager.isFusionLocked(this)) {
+            lockDuringFusion();
+            return;
+        }
         enforceLivingWorldSleepingRotation();
         if (level().isClientSide && clientWeaponAnimationWindow > 0) clientWeaponAnimationWindow--;
         if (!level().isClientSide && isAlive() && postSparPeaceTicks > 0) enforcePostSparPeace();
@@ -943,6 +961,12 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
 
     @Override
     public void aiStep() {
+        // Guard before the DMZ superclass AI runs; the later guard in this method is too late
+        // because native goals may already have started a strike/training action this tick.
+        if (com.dmzlwfusion.NpcFusionManager.isFusionLocked(this)) {
+            lockDuringFusion();
+            return;
+        }
         if (!level().isClientSide && postSparPeaceTicks > 0) enforcePostSparPeace();
         // Clear intent before native AI gets another chance to act while conceding.
         if (!level().isClientSide && (isDefeated() || isCaptive())) {
@@ -1230,6 +1254,26 @@ public class AmbientFighterEntity extends LivingWorldSagasEntity {
         FighterLivelinessManager.tick(this);
         tickIdleWandering();
         faceFlightMovement();
+    }
+
+    private void lockDuringFusion() {
+        getNavigation().stop();
+        setTarget(null);
+        setAggressive(false);
+        setAmbientPose(0);
+        setAmbientFlightActivity(false);
+        setSocialLifeActivity(false);
+        interruptCombo();
+        stopCasting();
+        setAttacking(false);
+        setKiCharge(false);
+        setDeltaMovement(Vec3.ZERO);
+        setSprinting(false);
+        setNoGravity(false);
+        if (!getSpeech().isEmpty()) {
+            entityData.set(SPEECH, "");
+            speechTicks = 0;
+        }
     }
 
     /** Dead evil/neutral souls are permanently subterranean in the Otherworld. */

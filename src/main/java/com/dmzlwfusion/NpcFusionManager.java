@@ -82,6 +82,17 @@ public final class NpcFusionManager {
         return dance == null ? 0 : dance.ticksLeft;
     }
 
+    /** True while an NPC is either performing the dance or hidden inside the fused entity. */
+    public static boolean isFusionLocked(Entity entity) {
+        if (entity == null) return false;
+        if (isHiddenFusionPartner(entity)) return true;
+        UUID id = entity.getUUID();
+        for (PendingDance dance : PENDING.values()) {
+            if (id.equals(dance.first) || id.equals(dance.second)) return true;
+        }
+        return false;
+    }
+
     public static boolean startBoundFusion(ServerPlayer initiator, boolean instant) {
         if (initiator == null) return false;
         return startPairFusion(initiator, boundFirst(initiator), boundSecond(initiator), true, instant, 16.0D);

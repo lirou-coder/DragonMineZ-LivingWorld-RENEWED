@@ -46,15 +46,28 @@ public final class LivingWorldGodRitualManager {
         GeneralServerConfig.GodRitualConfig cfg = GodRitualHelper.config();
         StatsData data = stats(player);
         if (cfg == null || !cfg.getEnabled() || data == null || !GodRitualHelper.isSaiyan(data)) return false;
-        if (!GodRitualHelper.isInAnyForm(data, cfg.getRecipientForms())) return false;
+        // DMZ's ritual recipient must be in base form.  The previous check required
+        // an entry in recipientForms, which is the inverse of the native service and
+        // made every otherwise-valid companion ritual fail before donor counting.
+        if (GodRitualHelper.isActiveForm(data)) return false;
+        if (data.getStatus().isFused() || data.getStatus().isKnockedDown()
+                || com.dragonminez.server.events.players.GodRitualService.isParticipant(player)) return false;
         int required = Math.max(1, cfg.getRequiredDonors());
         List<AmbientFighterEntity> helpers = new ArrayList<>();
         for (UUID id : LivingBondManager.companionIds(player)) {
-            var entity = player.serverLevel().getEntity(id);
+            var entity = findEntity(player, id);
             if (!(entity instanceof AmbientFighterEntity npc) || !npc.isAlive()) continue;
-            if (npc.getRace() != FighterRace.SAIYAN || npc.getRacialSkillLevel() < 1) continue;
-            if (npc.distanceToSqr(player) > cfg.getRitualRadius() * cfg.getRitualRadius()) continue;
-            if (Math.abs(npc.getY() - player.getY()) > cfg.getRitualVerticalRange()) continue;
+            // A companion is eligible only when it is physically present with the ritual
+            // recipient; resolving through every loaded level avoids stale/current-level
+            // lookup failures after dimension transfers.
+            if (npc.level() != player.level()) continue;
+            // Ambient fighters do not expose DMZ's player StatsData, so eligibility is
+            // based on their Living World race/skill state.  Keep the same horizontal
+            // ritual range as DMZ, but do not reject a valid flying/raised companion
+            // merely because it is a few blocks above the recipient.
+            if (!isEligibleSaiyanCompanion(npc)) continue;
+            double ritualRange = Math.max(20.0D, cfg.getRitualRadius());
+            if (npc.distanceToSqr(player) > ritualRange * ritualRange) continue;
             helpers.add(npc);
             if (helpers.size() >= required) break;
         }
@@ -78,6 +91,12 @@ public final class LivingWorldGodRitualManager {
             return true;
         }
         return startWithDonors(player, helpers, List.of());
+    }
+
+    private static boolean isEligibleSaiyanCompanion(AmbientFighterEntity npc) {
+        if (npc == null || !npc.isAlive() || npc.getRacialSkillLevel() < 1) return false;
+        FighterRace race = npc.getRace();
+        return race == FighterRace.SAIYAN || (race != null && "saiyan".equalsIgnoreCase(race.dmzId()));
     }
 
     public static boolean accept(ServerPlayer helper, UUID ownerId) {
@@ -228,5 +247,14 @@ public final class LivingWorldGodRitualManager {
 
     private static StatsData stats(Player player) {
         return StatsProvider.get(StatsCapability.INSTANCE, player).resolve().orElse(null);
+    }
+
+    private static net.minecraft.world.entity.Entity findEntity(ServerPlayer player, UUID id) {
+        if (player == null || id == null || player.getServer() == null) return null;
+        for (var level : player.getServer().getAllLevels()) {
+            var entity = level.getEntity(id);
+            if (entity != null) return entity;
+        }
+        return null;
     }
 }
